@@ -1,0 +1,28 @@
+name: GitHub Actions test
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - name: Install clang-format
+      run: sudo apt-get update && sudo apt-get install -y clang-format
+    - name: Check formatting
+      run: ./scripts/format.sh --check
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - name: Run tests
+      run: ./scripts/test.sh
