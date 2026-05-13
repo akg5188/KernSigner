@@ -4,7 +4,7 @@ on:
 
 jobs:
   test-each-commit:
-    # Single-commit PRs are already fully covered by github-actions-test.yml,
+    # Single-commit PRs are already fully covered by test-all-builds.yml,
     # so there's nothing new to verify.
     if: github.event.pull_request.commits > 1
     runs-on: ubuntu-latest
@@ -45,7 +45,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ci-scripts"
           cp -p scripts/ci-checks.sh scripts/format.sh scripts/test.sh \
             "$RUNNER_TEMP/ci-scripts/"
-          # HEAD is the PR tip -- already covered by github-actions-test.yml.
+          # HEAD is the PR tip -- already covered by test-all-builds.yml.
           # Walking the range origin/${GITHUB_BASE_REF}..HEAD~ runs checks on
           # every intermediate commit. `git rebase --exec CMD BASE` replays
           # each commit in (BASE..HEAD] chronologically and runs CMD after

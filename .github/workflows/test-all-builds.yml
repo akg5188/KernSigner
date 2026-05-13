@@ -1,4 +1,4 @@
-name: GitHub Actions test
+name: Test All Builds
 on:
   push:
   pull_request:
