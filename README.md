@@ -1,23 +1,8 @@
-<p align="center">
-  <img src="branding/kern_logo_with_text_dark_bg.png" alt="Kern" width="400">
-</p>
-
-<p align="center">
-  <a href="docs/screens/login.png"><img src="docs/screens/login.png" width="15%" alt="Login"></a>
-  <a href="docs/screens/enter_key.png"><img src="docs/screens/enter_key.png" width="15%" alt="Enter key"></a>
-  <a href="docs/screens/home.png"><img src="docs/screens/home.png" width="15%" alt="Home"></a>
-  <a href="docs/screens/addresses.png"><img src="docs/screens/addresses.png" width="15%" alt="Addresses"></a>
-</p>
-<p align="center">
-  <a href="docs/screens/mnemonic_edit.png"><img src="docs/screens/mnemonic_edit.png" width="15%" alt="Mnemonic editor"></a>
-  <a href="docs/screens/transcript.png"><img src="docs/screens/transcript.png" width="15%" alt="Transcript"></a>
-  <a href="docs/screens/xpub.png"><img src="docs/screens/xpub.png" width="15%" alt="XPUB"></a>
-  <a href="docs/screens/tx.png"><img src="docs/screens/tx.png" width="15%" alt="Transaction"></a>
-</p>
-
 # Kern
 
 Kern is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, and hardware wallet research. It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for small touch-screen devices.
+
+One of the most important upstream references here is [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner); its wallet flow, UX patterns, and smart-card-adjacent thinking influenced a large part of the project structure.
 
 This repository was largely assembled with AI assistance. It is still unfinished, intended for learning and discussion only, and must not be used to store or sign real funds.
 

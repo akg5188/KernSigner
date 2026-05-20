@@ -27,10 +27,10 @@ These are external projects that Kern builds against or depends on through ESP-I
 
 These projects helped shape Kern’s UI, wallet flow, or security posture. They are references and inspirations unless a component above explicitly says otherwise:
 
+- [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner) - especially important for wallet flow, QR UX, and the broader offline-signer feel.
 - [Krux](https://github.com/selfcustody/krux)
 - [Blockstream Jade](https://github.com/Blockstream/Jade)
 - [SeedSigner](https://github.com/SeedSigner/seedsigner)
-- [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner)
 - [Specter-DIY](https://github.com/cryptoadvance/specter-diy)
 - [Toporin](https://github.com/Toporin)
 - [`satochip-signer`](https://github.com/tpsign/satochip-signer)
