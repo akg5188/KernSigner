@@ -6,8 +6,14 @@ Thank you for your interest in contributing to Kern! This document outlines the 
 
 1. Fork the repository and clone it locally.
 2. Initialize submodules: `git submodule update --init --recursive`
-3. Set up ESP-IDF v5.5.3 and source the environment: `source ~/esp/esp-idf/export.sh`
-4. Build the project: `idf.py build` (or `just build`)
+3. Set up ESP-IDF v6.0.1 and source the environment: `source ~/esp/esp-idf/export.sh`
+4. Build the project with the correct board defaults, for example:
+   ```bash
+   idf.py -B build_wave_43 \
+     -D SDKCONFIG=build_wave_43/sdkconfig \
+     -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' \
+     build
+   ```
 
 ## Development Guidelines
 
@@ -92,7 +98,7 @@ Whenever possible, link to a previously discussed **Issue** where the problem ha
 
 1. Create a branch from `master` with a descriptive name.
 2. Make your changes in focused, well-described commits.
-3. Ensure the project builds cleanly with `idf.py build`.
+3. Ensure the project builds cleanly for the board you changed, using the matching `sdkconfig.defaults.*` file.
 4. Open a Pull Request that:
    - References the related Issue (preferred), or clearly describes the problem being solved.
    - Explains **what** changed and **why**.

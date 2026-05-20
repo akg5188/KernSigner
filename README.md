@@ -3,207 +3,254 @@
 </p>
 
 <p align="center">
-  <a href="docs/screens/login.png"><img src="docs/screens/login.png" width="15%"></a>
-  <a href="docs/screens/enter_key.png"><img src="docs/screens/enter_key.png" width="15%"></a>
-  <a href="docs/screens/home.png"><img src="docs/screens/home.png" width="15%"></a>
-  <a href="docs/screens/addresses.png"><img src="docs/screens/addresses.png" width="15%"></a>
+  <a href="docs/screens/login.png"><img src="docs/screens/login.png" width="15%" alt="Login"></a>
+  <a href="docs/screens/enter_key.png"><img src="docs/screens/enter_key.png" width="15%" alt="Enter key"></a>
+  <a href="docs/screens/home.png"><img src="docs/screens/home.png" width="15%" alt="Home"></a>
+  <a href="docs/screens/addresses.png"><img src="docs/screens/addresses.png" width="15%" alt="Addresses"></a>
 </p>
 <p align="center">
-  <a href="docs/screens/mnemonic_edit.png"><img src="docs/screens/mnemonic_edit.png" width="15%"></a>
-  <a href="docs/screens/transcript.png"><img src="docs/screens/transcript.png" width="15%"></a>
-  <a href="docs/screens/xpub.png"><img src="docs/screens/xpub.png" width="15%"></a>
-  <a href="docs/screens/tx.png"><img src="docs/screens/tx.png" width="15%"></a>
+  <a href="docs/screens/mnemonic_edit.png"><img src="docs/screens/mnemonic_edit.png" width="15%" alt="Mnemonic editor"></a>
+  <a href="docs/screens/transcript.png"><img src="docs/screens/transcript.png" width="15%" alt="Transcript"></a>
+  <a href="docs/screens/xpub.png"><img src="docs/screens/xpub.png" width="15%" alt="XPUB"></a>
+  <a href="docs/screens/tx.png"><img src="docs/screens/tx.png" width="15%" alt="Transaction"></a>
 </p>
 
-Kern is an experimental project that explores the capabilities of the ESP32-P4 as a platform to perform air-gapped Bitcoin signatures and cryptography.
+# Kern
 
-## Hardware
+Kern is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, and hardware wallet research. It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for small touch-screen devices.
 
-Kern supports four Waveshare ESP32-P4 boards:
+This repository was largely assembled with AI assistance. It is still unfinished, intended for learning and discussion only, and must not be used to store or sign real funds.
 
-| Board | Display | Touch | Camera |
-|-------|---------|-------|--------|
-| [ESP32-P4-WiFi6-Touch-LCD-4B](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) (`wave_4b`) | 720x720 MIPI DSI | GT911 | OV5647 + DW9714 autofocus |
-| [ESP32-P4-WiFi6-Touch-LCD-3.5](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.5.htm) (`wave_35`) | 320x480 SPI | FT5x06 | OV5647 (no autofocus) |
-| [ESP32-P4-WiFi6-Touch-LCD-5](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-5.htm) (`wave_5`) | 720x1280 MIPI DSI | GT911 | OV5647 (no autofocus) |
-| [ESP32-P4-WiFi6-Touch-LCD-4.3](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4.3.htm) (`wave_43`) | 480x800 MIPI DSI | GT911 | OV5647 (no autofocus) |
+The current tree is a **test-funds validation build**, not an audited production wallet. It contains real wallet paths and Satochip/Web3 work, but production use with mainnet funds requires the security gates and real-device acceptance checks in `docs/` to pass.
 
-ESP32-P4 does not contain radio (WiFi, BLE), but these boards have a radio in a secondary chip (ESP32-C6 mini). Later the project will migrate to use radio-less, simpler and cheaper boards with ESP32-P4 only.
+## What Works
 
-An OV5647 camera module is required for all boards.
+- Air-gapped Bitcoin wallet flows: load or create a mnemonic, view public keys and addresses, review wallet data, and enter signing flows.
+- QR input/output: SeedQR, PSBT/message-signing paths, BBQR/cUR plumbing, text QR generation, and QR classification.
+- Mnemonic and backup tooling: manual word entry, numbered imports, grid/1248/Tinyseed/Stackbit-style restore paths, encrypted backup pages, and BIP39 checks.
+- Custom derivation: Bitcoin legacy, nested SegWit, native SegWit, Taproot, testnet variants, and EVM address display.
+- Satochip smart-card validation paths: USB CCID detection, ATR/status reads, Web3 connection/signing tests, path address display, and BTC watch-only public keys.
+- Hardware tooling: display/touch setup, camera preview, storage browser, brightness control, device status, and real-device delivery checks.
+- Desktop simulator: runs the LVGL UI in an SDL2 window for UI review and automated screenshots.
+
+## Safety Status
+
+Use this repository with test seeds and test funds only unless you have independently completed the production release gate.
+
+Known release boundaries:
+
+- Not audited for production custody.
+- Secure Boot, Flash Encryption, NVS encryption, debug-port closure, and release provenance must be verified before any commercial or mainnet funds build.
+- Satochip write-card, PIN-management, reset, SeedKeeper management, and Satochip BTC PSBT/message card-signing features are intentionally not exposed as completed capabilities.
+- Web3/Satochip signing is a validation path and still needs broad wallet-format and failure-path regression.
+
+Start with [docs/README.md](docs/README.md) for the full delivery and acceptance map.
+
+## Supported Hardware
+
+Kern supports these Waveshare ESP32-P4 boards:
+
+| Board | Config | Display | Touch | Camera |
+| --- | --- | --- | --- | --- |
+| [ESP32-P4-WiFi6-Touch-LCD-4B](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) | `wave_4b` | 720x720 MIPI DSI | GT911 | OV5647 + DW9714 autofocus |
+| [ESP32-P4-WiFi6-Touch-LCD-3.5](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.5.htm) | `wave_35` | 320x480 SPI | FT5x06 | OV5647 |
+| [ESP32-P4-WiFi6-Touch-LCD-5](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-5.htm) | `wave_5` | 720x1280 MIPI DSI | GT911 | OV5647 |
+| [ESP32-P4-WiFi6-Touch-LCD-4.3](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4.3.htm) | `wave_43` | 480x800 MIPI DSI | GT911 | OV5647 |
+
+An OV5647 camera module is required for camera and QR workflows.
+
+ESP32-P4 itself has no Wi-Fi or BLE radio. Some supported development boards include an ESP32-C6 companion chip, but Kern's signer model treats the firmware as an offline, QR-first device.
+
+## Repository Layout
+
+```text
+main/core/          Bitcoin, key, PSBT, PIN, storage, EVM, and wallet logic
+main/pages/         LVGL page flows and wallet screens
+main/ui/            Reusable UI widgets, theme, icons, fonts, and navigation
+main/qr/            QR parser, scanner, encoder, and viewer
+main/smartcard/     USB CCID and Satochip integration
+main/krux_port/     Krux-style shell, hardware probes, and service adapters
+components/         ESP-IDF components and third-party libraries
+simulator/          SDL2 desktop simulator
+scripts/            Format, test, CI, and release helpers
+tools/              Delivery, production-check, and asset-baking helpers
+docs/               Acceptance plans, security gates, and delivery records
+```
 
 ## Prerequisites
 
-Kern targets [ESP-IDF v6.0.1](https://docs.espressif.com/projects/esp-idf/en/v6.0.1/esp32p4/get-started/index.html). Install it for the `esp32p4` target:
+Kern targets [ESP-IDF v6.0.1](https://docs.espressif.com/projects/esp-idf/en/v6.0.1/esp32p4/get-started/index.html) for ESP32-P4:
 
 ```bash
-git clone --depth 1 --recurse-submodules --shallow-submodules -b v6.0.1 https://github.com/espressif/esp-idf.git ~/esp/esp-idf
+git clone --depth 1 --recurse-submodules --shallow-submodules \
+  -b v6.0.1 https://github.com/espressif/esp-idf.git ~/esp/esp-idf
 ~/esp/esp-idf/install.sh esp32p4
 . ~/esp/esp-idf/export.sh
 ```
 
-## Build
+Simulator builds also need SDL2 and mbedTLS:
 
-### Cloning the Repository
+```bash
+# Debian/Ubuntu
+sudo apt install build-essential cmake libsdl2-dev libmbedtls-dev
 
-This project uses git submodules. You have two options:
+# macOS
+brew install cmake sdl2 mbedtls
+```
 
-#### Option 1: Clone with submodules (Recommended)
+## Clone
 
-When cloning the project for the first time, make sure to clone it recursively to include all submodules:
+This repository uses submodules:
 
 ```bash
 git clone --recursive https://github.com/odudex/Kern.git
+cd Kern
 ```
 
-#### Option 2: Initialize submodules after cloning
-
-If you've already cloned the repository without the `--recursive` flag, you can initialize and update the submodules with:
+If you already cloned without submodules:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-### Building the Project
+## Build Firmware
 
-Build with [just](https://github.com/casey/just) (recommended) or `idf.py` directly. All `just` commands accept a board parameter — `wave_4b` (default), `wave_35`, `wave_5`, or `wave_43`:
-
-```bash
-just build              # Build for wave_4b (default)
-just build wave_35      # Build for wave_35
-just build wave_5       # Build for wave_5
-just build wave_43      # Build for wave_43
-just flash wave_5       # Flash for wave_5
-just monitor            # Serial monitor
-just clean              # Required when switching boards
-```
-
-Or using `idf.py` directly:
+Select the board by passing the matching `sdkconfig.defaults.*` file. Use a separate build directory per board:
 
 ```bash
 # wave_4b
-idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_4b' build
+idf.py -B build_wave_4b \
+  -D SDKCONFIG=build_wave_4b/sdkconfig \
+  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_4b' \
+  build
 
 # wave_35
-idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_35' build
+idf.py -B build_wave_35 \
+  -D SDKCONFIG=build_wave_35/sdkconfig \
+  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_35' \
+  build
 
 # wave_5
-idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_5' build
+idf.py -B build_wave_5 \
+  -D SDKCONFIG=build_wave_5/sdkconfig \
+  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_5' \
+  build
 
 # wave_43
-idf.py -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' build
+idf.py -B build_wave_43 \
+  -D SDKCONFIG=build_wave_43/sdkconfig \
+  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' \
+  build
 ```
 
-> **Note:** Switching between boards requires a clean build (`just clean`) because sdkconfig is board-specific.
-
-### Desktop Simulator
-
-The simulator renders the full LVGL UI in an SDL2 window, matching each board's resolution:
+Flash and monitor with ESP-IDF:
 
 ```bash
-just sim                # Run simulator as wave_4b (720x720)
-just sim wave_35        # Run simulator as wave_35 (320x480)
-just sim wave_5         # Run simulator as wave_5 (720x1280)
-just sim wave_43        # Run simulator as wave_43 (480x800)
-just sim-build wave_35  # Build only
-just sim-clean          # Remove simulator build artifacts
-just sim-reset          # Wipe simulator data (factory reset)
-just sim-qr IMG         # Run with a QR image
-just sim-webcam         # Run with real webcam (V4L2)
+idf.py -B build_wave_43 -p /dev/ttyACM0 flash monitor
 ```
 
-Switching simulator boards also requires `just sim-clean` first. See [simulator/README.md](simulator/README.md) for details.
-
-### Full Clean
-
-After updating ESP-IDF or switching branches with significant build changes, do a full clean to avoid stale artifacts:
+When changing board configs in the same build directory, clean first:
 
 ```bash
-idf.py fullclean
-rm sdkconfig
-idf.py set-target esp32p4
-idf.py build
+idf.py -B build_wave_43 fullclean
 ```
 
-### Build Options
+## Desktop Simulator
 
-#### Enable/disable Auto-focus
-
-To enable camera auto-focus, enable camera focus motor on menuconfig:
-
-```
-CONFIG_CAM_MOTOR_DW9714=y
-CONFIG_CAMERA_OV5647_ENABLE_MOTOR_BY_GPIO0=y
-```
-
-## Flashing Pre-releases
-
-Pre-release firmware is provided **for testing purposes only**. Do not use pre-release builds as a signer for real savings.
-
-### Supported Devices
-
-| Device | Board | Display |
-|--------|-------|---------|
-| `wave_4b` | Waveshare ESP32-P4-WiFi6-Touch-LCD-4B | 720x720 MIPI DSI |
-| `wave_35` | Waveshare ESP32-P4-WiFi6-Touch-LCD-3.5 | 320x480 SPI |
-| `wave_5` | Waveshare ESP32-P4-WiFi6-Touch-LCD-5 | 720x1280 MIPI DSI |
-| `wave_43` | Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 | 480x800 MIPI DSI |
-
-### Requirements
-
-- Python 3
-- USB cable connected to the board
-
-### Steps
-
-1. Download the zip for your device from the [Releases](https://github.com/odudex/Kern/releases) page (e.g. `kern-wave_4b-v0.0.3.zip`).
-
-2. Unzip the package:
+The simulator renders the LVGL UI in an SDL2 window:
 
 ```bash
-unzip kern-wave_4b-v0.0.3.zip
+cd simulator
+cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -- -j"$(nproc)"
+./build/kern_simulator
 ```
 
-The zip contains:
-- `bootloader.bin` — bootloader
-- `partition-table.bin` — partition table
-- `firmware.bin` — application firmware
-- `kern-v0.0.3.bin` — merged binary (all of the above)
-
-3. Create a Python virtual environment and install esptool:
+Useful options:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install esptool
+./build/kern_simulator --width 480 --height 800
+./build/kern_simulator --qr-image path/to/qr.png
+./build/kern_simulator --qr-dir path/to/qr-images
+./build/kern_simulator --data-dir /tmp/kern-sim-data
 ```
 
-4. Flash the merged binary (clean install):
+See [simulator/README.md](simulator/README.md) for webcam support and platform notes.
+
+## Test And Check
+
+Run unit tests:
 
 ```bash
-esptool --chip esp32p4 --baud 460800 write-flash 0x0 kern-v0.0.3.bin
+./scripts/test.sh
 ```
 
-> **Note:** Flashing the merged binary from offset `0x0` erases the entire flash range it covers, including the NVS partition where PIN and settings are stored. To preserve NVS data when updating, flash the individual binaries instead:
->
-> ```bash
-> esptool --chip esp32p4 --baud 460800 write-flash \
->   0x2000 bootloader.bin \
->   0x8000 partition-table.bin \
->   0x20000 firmware.bin
-> ```
+Run formatting:
 
-## References
+```bash
+./scripts/format.sh
+./scripts/format.sh --check
+```
 
-Kern is strongly inspired by [Krux](https://github.com/selfcustody/krux), sharing similar but simplified UI elements and flow.
+Run the local CI bundle used by commit-history checks:
 
-[Blockstream Jade](https://github.com/Blockstream/Jade) was a strong inspiration for the decision to use C language for efficient use of the hardware. Additionally, Kern uses the same core library Jade does, [libwally](https://github.com/ElementsProject/libwally-core/), is shared with Jade.
+```bash
+./scripts/ci-checks.sh
+```
 
-The simplicity and UI polish of [SeedSigner](https://github.com/SeedSigner/seedsigner) and the security focus of the pioneering [Specter-DIY](https://github.com/cryptoadvance/specter-diy) were also strong inspirations.
+Run the delivery and production checks used by the current validation workflow:
 
-## [Roadmap](ROADMAP.md)
+```bash
+tools/kern_delivery.sh check
+tools/kern_delivery.sh final
+tools/kern_delivery.sh prodcheck
+```
 
-## [Contributing](CONTRIBUTING.md)
+`prodcheck` is expected to fail on normal development builds until production security options and release provenance are deliberately enabled.
+
+## Release Packages
+
+`scripts/release.sh` builds release zips for all supported boards. It reads the version from `version.txt` and writes packages under `release/v<version>/`:
+
+```bash
+./scripts/release.sh
+```
+
+Pre-release firmware, when published, is for testing. Do not use pre-release builds for real savings or commercial custody.
+
+Merged binary flashing:
+
+```bash
+esptool --chip esp32p4 --baud 460800 write-flash 0x0 kern-v0.0.7-rc1.bin
+```
+
+To preserve NVS data, flash individual binaries instead:
+
+```bash
+esptool --chip esp32p4 --baud 460800 write-flash \
+  0x2000 bootloader.bin \
+  0x8000 partition-table.bin \
+  0x20000 firmware.bin
+```
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Third-party notices](docs/THIRD_PARTY.md)
+- [Hardware overview and OTG notes](docs/HARDWARE_OVERVIEW_AND_OTG.md)
+- [First delivery note](docs/README_FIRST_DELIVERY.md)
+- [Delivery status and acceptance checklist](docs/DELIVERY_STATUS.md)
+- [Commercial release gate](docs/COMMERCIAL_RELEASE_GATE.md)
+- [Secure boot notes](docs/secure-boot.md)
+- [Security plan](docs/security-plan.md)
+- [Roadmap](ROADMAP.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Inspirations
+
+Kern is strongly inspired by [Krux](https://github.com/selfcustody/krux), [Blockstream Jade](https://github.com/Blockstream/Jade), [SeedSigner](https://github.com/SeedSigner/seedsigner), [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner), [Specter-DIY](https://github.com/cryptoadvance/specter-diy), [Toporin](https://github.com/Toporin), and `satochip-signer` smart-card reference material.
+
+Kern uses [libwally-core](https://github.com/ElementsProject/libwally-core/) for Bitcoin primitives.
 
 ## License
 
