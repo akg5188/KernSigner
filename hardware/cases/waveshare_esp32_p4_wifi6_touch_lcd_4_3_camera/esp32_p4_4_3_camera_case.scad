@@ -114,6 +114,19 @@ usb_cutout_y1 = 11.50;
 usb_cutout_y2 = -12.50;
 usb_cutout_w = 15.00;
 usb_cutout_h = 8.60;
+// USB-C side cutout corrections from first print:
+// - leave only a 3 mm bridge between the two ports;
+// - fill 4 mm on both outer ends;
+// - fill 1.5 mm on the screen/front side of both openings.
+usb_center_separator_w = 3.00;
+usb_outer_side_fill = 4.00;
+usb_screen_side_fill = 1.50;
+usb_cutout_pos_y_min = usb_center_separator_w / 2;
+usb_cutout_pos_y_max = usb_cutout_y1 + usb_cutout_w / 2 - usb_outer_side_fill;
+usb_cutout_neg_y_min = usb_cutout_y2 - usb_cutout_w / 2 + usb_outer_side_fill;
+usb_cutout_neg_y_max = -usb_center_separator_w / 2;
+usb_cutout_z_min = port_z_center - usb_cutout_h / 2;
+usb_cutout_z_max = port_z_center + usb_cutout_h / 2 - usb_screen_side_fill;
 
 // Official rear-view top-edge positions.
 tf_slot_x_from_pcb_left = 52.00;
@@ -176,9 +189,9 @@ function side_cut_x0() =
     mirror_official_rear_x ? outer_w / 2 - edge_cut_depth - eps : -outer_w / 2 - eps;
 function top_cut_y0() = outer_h / 2 - edge_cut_depth - eps;
 
-module side_usb_cutout(y) {
-    translate([side_cut_x0(), y - usb_cutout_w / 2, port_z_center - usb_cutout_h / 2])
-        cube([edge_cut_depth + 2 * eps, usb_cutout_w, usb_cutout_h]);
+module side_usb_cutout(y_min, y_max) {
+    translate([side_cut_x0(), y_min, usb_cutout_z_min])
+        cube([edge_cut_depth + 2 * eps, y_max - y_min, usb_cutout_z_max - usb_cutout_z_min]);
 }
 
 module top_cutout(x, w, h) {
@@ -235,8 +248,8 @@ module protective_case() {
         }
 
         // Only the requested edge openings.
-        side_usb_cutout(usb_cutout_y1);
-        side_usb_cutout(usb_cutout_y2);
+        side_usb_cutout(usb_cutout_pos_y_min, usb_cutout_pos_y_max);
+        side_usb_cutout(usb_cutout_neg_y_min, usb_cutout_neg_y_max);
         top_cutout(from_pcb_left(tf_slot_x_from_pcb_left), tf_slot_w, tf_slot_h);
         top_cutout(from_pcb_left(reset_x_from_pcb_left), button_slot_w, button_slot_h);
         top_cutout(from_pcb_left(boot_x_from_pcb_left), button_slot_w, button_slot_h);
@@ -295,10 +308,10 @@ module fit_check_plate() {
             cylinder(d = camera_lens_hole_d, h = 1.20 + 2 * eps);
 
         // Edge-opening markers.
-        translate([side_cut_x0(), usb_cutout_y1 - usb_cutout_w / 2, -eps])
-            cube([edge_cut_depth + 2 * eps, usb_cutout_w, 1.20 + 2 * eps]);
-        translate([side_cut_x0(), usb_cutout_y2 - usb_cutout_w / 2, -eps])
-            cube([edge_cut_depth + 2 * eps, usb_cutout_w, 1.20 + 2 * eps]);
+        translate([side_cut_x0(), usb_cutout_pos_y_min, -eps])
+            cube([edge_cut_depth + 2 * eps, usb_cutout_pos_y_max - usb_cutout_pos_y_min, 1.20 + 2 * eps]);
+        translate([side_cut_x0(), usb_cutout_neg_y_min, -eps])
+            cube([edge_cut_depth + 2 * eps, usb_cutout_neg_y_max - usb_cutout_neg_y_min, 1.20 + 2 * eps]);
 
         for (x = [
             from_pcb_left(tf_slot_x_from_pcb_left),
