@@ -71,6 +71,15 @@ An OV5647 camera module is required for camera and QR workflows.
 
 ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board includes an ESP32-C6 companion chip, but Kern's signer model treats the firmware as an offline, QR-first device.
 
+## Approximate Hardware Cost / 基础硬件成本
+
+当前基础硬件成本约 **37 美元**：
+
+- Waveshare ESP32-P4 4.3 寸开发板：约 **35 美元**
+- 3D 打印外壳：约 **2 美元**
+
+这个价格只计算开发板和打印外壳，不包含智能卡读卡器、Satochip/SeedKeeper 智能卡、带供电 OTG 转接线/Hub、摄像头备件、运费、税费或后续试错打印成本。
+
 ## Smart-Card OTG Power / 智能卡 OTG 供电
 
 实测结论：这块开发板的 OTG 口不能稳定给 ACR39U-NF Pocketmate II 这类 USB-C 智能卡读卡器提供 5V 外设供电。读卡器直插开发板 OTG 口时，常见现象是灯只闪一下、亮度很弱、枚举不到设备、能看到 Hub 但看不到读卡器，或者签名过程中掉线。
