@@ -66,13 +66,19 @@ App 源码已经复制到：
 /home/ak/123/Kern/wallet/dist/smartcard-compat-v0.1.19-usbt1-release.apk
 ```
 
+也可以直接去树莓派参考项目的 Releases 下载同款 APK：
+
+```text
+https://github.com/akg5188/satochip-signer/releases
+```
+
 校验文件：
 
 ```text
 /home/ak/123/Kern/wallet/dist/SHA256SUMS.txt
 ```
 
-这个 APK 可以用于临时测试中转流程。
+这个 APK 可以用于测试中转流程。下载 Releases 里的 APK 后，建议和本仓库的 `SHA256SUMS.txt` 对一下，确认版本一致。
 
 正式使用或重新发布时，建议从当前源码重新构建。
 
@@ -246,6 +252,12 @@ DApp
 
 ```text
 /home/ak/123/Kern/wallet
+```
+
+安卓 APK Releases 下载：
+
+```text
+https://github.com/akg5188/satochip-signer/releases
 ```
 
 安卓 App 原始使用教程：

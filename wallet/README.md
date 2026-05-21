@@ -52,6 +52,15 @@
 - `dist/satochip-wallet-debug.apk`
 - `dist/satochip-wallet-debug.apk.sha256`
 
+KernSigner 当前也保留了一份可直接安装的历史中转 APK：
+
+- `dist/smartcard-compat-v0.1.19-usbt1-release.apk`
+- `dist/SHA256SUMS.txt`
+
+同款 APK 也可以从 `satochip-signer` Releases 下载：
+
+- https://github.com/akg5188/satochip-signer/releases
+
 ## 当前 release 构建
 
 ```bash

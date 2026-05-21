@@ -99,6 +99,12 @@ Prebuilt firmware is included for beginners who only want to flash the supported
 
 For a first-time board or a board with unknown firmware, use the full firmware at offset `0x0`. If the board already runs this project and you only want to update the app, use the app-only firmware at offset `0x20000`.
 
+Android relay APK for dense QR handoff:
+
+- Included copy: [wallet/dist/smartcard-compat-v0.1.19-usbt1-release.apk](wallet/dist/smartcard-compat-v0.1.19-usbt1-release.apk)
+- Release download mirror: [akg5188/satochip-signer releases](https://github.com/akg5188/satochip-signer/releases)
+- Android relay guide: [docs/ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](docs/ANDROID_RELAY_WALLET_GUIDE.zh-CN.md)
+
 ## Prerequisites
 
 The included firmware was built with ESP-IDF v5.5.4 for ESP32-P4. To reproduce this snapshot as closely as possible, use the same ESP-IDF version:

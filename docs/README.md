@@ -19,6 +19,7 @@ The short version: the codebase contains real wallet functionality and real-devi
 - [连接钱包教程.zh-CN.md](连接钱包教程.zh-CN.md): beginner guide for connecting Web3 wallets, Bitcoin watch-only wallets, and signing QR/PSBT transactions.
 - [screens/gallery/README.md](screens/gallery/README.md): 常用 480x800 界面截图，方便 GitHub 预览和新手对照操作。
 - [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md): Android relay app guide for high-density Web3 QR codes.
+- Android relay APK mirror: https://github.com/akg5188/satochip-signer/releases
 - [MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md](MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md): beginner guide for creating mnemonics and verifying them with the BIP39 tool.
 - [BACKUP_AND_RECOVERY_GUIDE.zh-CN.md](BACKUP_AND_RECOVERY_GUIDE.zh-CN.md): backup and recovery guide for mnemonics, entropy, QR, metal backups, KEF, and smart cards.
 - [UNTESTED_FIRMWARE_NOTICE.md](UNTESTED_FIRMWARE_NOTICE.md): explicit notice for included untested development firmware.

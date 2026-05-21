@@ -36,7 +36,13 @@
 /home/ak/123/Kern/wallet/dist/smartcard-compat-v0.1.19-usbt1-release.apk
 ```
 
-这个包可以先用来测试二维码中转流程。正式使用建议重新构建当前源码。
+也可以直接从这个 Releases 页面下载同款 APK：
+
+```text
+https://github.com/akg5188/satochip-signer/releases
+```
+
+这个包可以先用来测试二维码中转流程。下载外部 APK 时，建议和 `wallet/dist/SHA256SUMS.txt` 对一下哈希。正式使用建议重新构建当前源码。
 
 ```bash
 cd /home/ak/123/Kern/wallet
