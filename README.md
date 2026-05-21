@@ -28,11 +28,11 @@ More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gal
 
 | 首页 | 连接钱包 | 扫码签名 | 智能卡 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/gallery/home.png" width="160" alt="首页"> | <img src="docs/screens/gallery/connect_wallet.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/scan_sign.png" width="160" alt="扫码签名"> | <img src="docs/screens/gallery/smartcard_tools.png" width="160" alt="智能卡"> |
+| <img src="docs/screens/gallery/v20260521_124238_001_home_top.png" width="160" alt="首页"> | <img src="docs/screens/gallery/v20260521_124238_002_pi_connect_wallet_top.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/v20260521_124238_128_signing_top.png" width="160" alt="扫码签名"> | <img src="docs/screens/gallery/v20260521_124238_030_smartcard_tools_top.png" width="160" alt="智能卡"> |
 
 | Satochip | SeedKeeper | 创建助记词 | 备份 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/gallery/satochip_tools.png" width="160" alt="Satochip"> | <img src="docs/screens/gallery/seedkeeper_tools.png" width="160" alt="SeedKeeper"> | <img src="docs/screens/gallery/new_mnemonic.png" width="160" alt="创建助记词"> | <img src="docs/screens/gallery/backup.png" width="160" alt="备份"> |
+| <img src="docs/screens/gallery/v20260521_124238_031_smartcard_satochip_tools_top.png" width="160" alt="Satochip"> | <img src="docs/screens/gallery/v20260521_124238_037_smartcard_satochip_seedkeeper_tools_top.png" width="160" alt="SeedKeeper"> | <img src="docs/screens/gallery/v20260521_124238_102_new_mnemonic_top.png" width="160" alt="创建助记词"> | <img src="docs/screens/gallery/v20260521_124238_115_backup_export_top.png" width="160" alt="备份"> |
 
 ## What Works
 
