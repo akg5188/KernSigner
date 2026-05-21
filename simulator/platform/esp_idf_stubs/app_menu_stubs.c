@@ -244,6 +244,12 @@ esp_err_t smartcard_satochip_card_reset_factory_signal(
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
   (void)timeout_ms; if (out) memset(out, 0, sizeof(*out)); return ESP_OK;
 }
+esp_err_t smartcard_seedkeeper_reset_factory_signal(
+    smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
+  (void)timeout_ms;
+  if (out) memset(out, 0, sizeof(*out));
+  return ESP_OK;
+}
 esp_err_t smartcard_satochip_card_reset_seed(
     const char *pin, const uint8_t *hmac, size_t hmac_len,
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
@@ -253,6 +259,13 @@ esp_err_t smartcard_satochip_card_change_pin(
     uint8_t pin_nbr, const char *old_pin, const char *new_pin,
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
   (void)pin_nbr; (void)old_pin; (void)new_pin; (void)timeout_ms; if (out) memset(out, 0, sizeof(*out)); return ESP_OK;
+}
+esp_err_t smartcard_seedkeeper_change_pin(
+    uint8_t pin_nbr, const char *old_pin, const char *new_pin,
+    smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
+  (void)pin_nbr; (void)old_pin; (void)new_pin; (void)timeout_ms;
+  if (out) memset(out, 0, sizeof(*out));
+  return ESP_OK;
 }
 esp_err_t smartcard_satochip_card_unblock_pin(
     uint8_t pin_nbr, const uint8_t *puk, size_t puk_len,

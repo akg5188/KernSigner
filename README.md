@@ -26,13 +26,13 @@ Common 480x800 UI screenshots are included for GitHub preview and beginner docum
 
 More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gallery/README.md)
 
-| 首页 | 连接钱包 | Web3 钱包 | 扫码签名 |
+| 首页 | 连接钱包 | 扫码签名 | 智能卡 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/gallery/home.png" width="160" alt="首页"> | <img src="docs/screens/gallery/connect_wallet.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/web3_wallets.png" width="160" alt="Web3 钱包"> | <img src="docs/screens/gallery/scan_sign.png" width="160" alt="扫码签名"> |
+| <img src="docs/screens/gallery/home.png" width="160" alt="首页"> | <img src="docs/screens/gallery/connect_wallet.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/scan_sign.png" width="160" alt="扫码签名"> | <img src="docs/screens/gallery/smartcard_tools.png" width="160" alt="智能卡"> |
 
-| 助记词工具 | 创建助记词 | 备份 | 智能卡工具 |
+| Satochip | SeedKeeper | 创建助记词 | 备份 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/gallery/mnemonic_tools.png" width="160" alt="助记词工具"> | <img src="docs/screens/gallery/new_mnemonic.png" width="160" alt="创建助记词"> | <img src="docs/screens/gallery/backup.png" width="160" alt="备份"> | <img src="docs/screens/gallery/smartcard_tools.png" width="160" alt="智能卡工具"> |
+| <img src="docs/screens/gallery/satochip_tools.png" width="160" alt="Satochip"> | <img src="docs/screens/gallery/seedkeeper_tools.png" width="160" alt="SeedKeeper"> | <img src="docs/screens/gallery/new_mnemonic.png" width="160" alt="创建助记词"> | <img src="docs/screens/gallery/backup.png" width="160" alt="备份"> |
 
 ## What Works
 
@@ -52,8 +52,8 @@ Known release boundaries:
 
 - Not audited for production custody.
 - Secure Boot, Flash Encryption, NVS encryption, debug-port closure, and release provenance must be verified before any commercial or mainnet funds build.
-- Satochip write-card, PIN-management, reset, SeedKeeper management, and Satochip BTC PSBT/message card-signing features are intentionally not exposed as completed capabilities.
-- Web3/Satochip signing is a validation path and still needs broad wallet-format and failure-path regression.
+- Satochip PIN/maintenance, SeedKeeper management, Web3 connection/signing, and BTC watch-only public-key paths are exposed for development testing, but they are not audited production wallet guarantees.
+- Web3/Satochip signing has passed limited manual validation and still needs broad wallet-format, failure-path, and powered-OTG regression.
 
 Start with [docs/README.md](docs/README.md) for the full delivery and acceptance map.
 
@@ -70,6 +70,23 @@ Other Waveshare ESP32-P4 display boards are not supported by this project unless
 An OV5647 camera module is required for camera and QR workflows.
 
 ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board includes an ESP32-C6 companion chip, but Kern's signer model treats the firmware as an offline, QR-first device.
+
+## Smart-Card OTG Power / 智能卡 OTG 供电
+
+实测结论：这块开发板的 OTG 口不能稳定给 ACR39U-NF Pocketmate II 这类 USB-C 智能卡读卡器提供 5V 外设供电。读卡器直插开发板 OTG 口时，常见现象是灯只闪一下、亮度很弱、枚举不到设备、能看到 Hub 但看不到读卡器，或者签名过程中掉线。
+
+智能卡功能要正常工作，请使用 **带供电 OTG 转接线** 或 **真正外接供电的 USB Hub**。连接方向如下：
+
+```text
+ESP32-P4 OTG 口
+-> 带供电 OTG 转接线 / 外接供电 Hub
+-> ACR39U-NF Pocketmate II 读卡器
+-> Satochip / SeedKeeper 智能卡
+```
+
+<img src="docs/screens/powered_otg_smartcard_setup.jpg" width="620" alt="ESP32-P4 smart-card reader powered OTG setup">
+
+不要把“电脑能识别读卡器”理解成“开发板直插也能给读卡器供电”。电脑 USB 口和 ESP32-P4 OTG Host 口的供电条件不是一回事。详细排障看 [智能卡供电和 OTG 排障](docs/TROUBLESHOOTING_SMARTCARD_POWER_OTG.md)。
 
 ## Repository Layout
 

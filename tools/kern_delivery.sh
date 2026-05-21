@@ -14,7 +14,7 @@ SIM_HEIGHT="${SIM_HEIGHT:-800}"
 JOBS="${JOBS:-2}"
 ACTION="${1:-all}"
 VERIFY_DIR="${2:-}"
-EXPECTED_HOME_TITLE="Kern"
+EXPECTED_HOME_TITLE="离线签名器"
 LAST_SCREENSHOT_DIR=""
 LAST_ACCEPTANCE_REPORT=""
 LAST_BOOT_LOG=""
@@ -133,7 +133,7 @@ verify_screenshots() {
   local manifest glyph_report smoke_report scroll_report interaction_report report
   local total_pages top_bmp_count bottom_bmp_count bmp_count bad_capture
   local bad_glyphs bad_smoke bad_scroll bad_interaction scroll_pages interaction_checks home_title
-  local blocked_manifest_ids blocked_interaction_ids
+  local deprecated_manifest_ids deprecated_interaction_ids
 
   if [[ -z "$dir" ]]; then
     dir="$(latest_screenshot_dir)"
@@ -202,22 +202,20 @@ verify_screenshots() {
   bad_smoke="$(awk -F '\t' 'NR > 1 && $5 != "ok" {n++} END {print n + 0}' "$smoke_report")"
   bad_scroll="$(awk -F '\t' 'NR > 1 && $7 == "failed" {n++} END {print n + 0}' "$scroll_report")"
   bad_interaction="$(awk -F '\t' 'NR > 1 && $6 !~ /^ok/ {n++} END {print n + 0}' "$interaction_report")"
-  blocked_manifest_ids="$(awk -F '\t' '
-    NR > 1 && $2 != "smartcard_probe" &&
-      ($2 ~ /(web3_message_sign|web3_typed_data|smartcard|satochip|seedkeeper|ccid|test_usb_ccid)/ ||
-       ($3 ~ /(智能卡|读卡器|CCID|Satochip|SeedKeeper|Web3 消息签名|结构化数据签名)/ &&
-        $3 != "智能卡检测")) {
+  deprecated_manifest_ids="$(awk -F '\t' '
+    NR > 1 &&
+      ($2 ~ /(web3_message_sign|web3_typed_data|test_usb_ccid)/ ||
+       $3 ~ /(Web3 消息签名|结构化数据签名)/) {
       if (out) out = out ", ";
       out = out $2 "(" $3 ")";
     }
     END {print out}
   ' "$manifest")"
-  blocked_interaction_ids="$(awk -F '\t' '
-    NR > 1 && $1 != "smartcard_probe" && $3 != "smartcard_probe" &&
-      ($1 ~ /(web3_message_sign|web3_typed_data|smartcard|satochip|seedkeeper|ccid|test_usb_ccid)/ ||
-       ($2 ~ /(智能卡|读卡器|CCID|Satochip|SeedKeeper|Web3 消息签名|结构化数据签名)/ &&
-        $2 != "智能卡检测") ||
-       $3 ~ /(web3_message_sign|web3_typed_data|smartcard|satochip|seedkeeper|ccid|test_usb_ccid)/) {
+  deprecated_interaction_ids="$(awk -F '\t' '
+    NR > 1 &&
+      ($1 ~ /(web3_message_sign|web3_typed_data|test_usb_ccid)/ ||
+       $2 ~ /(Web3 消息签名|结构化数据签名)/ ||
+       $3 ~ /(web3_message_sign|web3_typed_data|test_usb_ccid)/) {
       if (out) out = out ", ";
       out = out $1 "->" $3;
     }
@@ -240,8 +238,8 @@ verify_screenshots() {
     echo "- Scroll capture failures: $bad_scroll"
     echo "- Button interaction checks: $interaction_checks"
     echo "- Button interaction failures: $bad_interaction"
-    echo "- Blocked feature manifest entries: ${blocked_manifest_ids:-0}"
-    echo "- Blocked feature interaction entries: ${blocked_interaction_ids:-0}"
+    echo "- Deprecated feature manifest entries: ${deprecated_manifest_ids:-0}"
+    echo "- Deprecated feature interaction entries: ${deprecated_interaction_ids:-0}"
     echo "- Button interaction rule: *action* 类入口必须命中目标文本，不再只按点击动作判定通过"
     echo "- Home title: $home_title"
     echo
@@ -283,15 +281,15 @@ verify_screenshots() {
     missing=1
   fi
 
-  if [[ -n "$blocked_manifest_ids" ]]; then
-    log "blocked feature appears in manifest: $blocked_manifest_ids"
-    echo "FAIL: blocked smartcard/Web3 signing feature appears in manifest: $blocked_manifest_ids" >>"$report"
+  if [[ -n "$deprecated_manifest_ids" ]]; then
+    log "deprecated feature appears in manifest: $deprecated_manifest_ids"
+    echo "FAIL: deprecated Web3 message/test feature appears in manifest: $deprecated_manifest_ids" >>"$report"
     missing=1
   fi
 
-  if [[ -n "$blocked_interaction_ids" ]]; then
-    log "blocked feature appears in interactions: $blocked_interaction_ids"
-    echo "FAIL: blocked smartcard/Web3 signing feature appears in interactions: $blocked_interaction_ids" >>"$report"
+  if [[ -n "$deprecated_interaction_ids" ]]; then
+    log "deprecated feature appears in interactions: $deprecated_interaction_ids"
+    echo "FAIL: deprecated Web3 message/test feature appears in interactions: $deprecated_interaction_ids" >>"$report"
     missing=1
   fi
 
@@ -604,7 +602,8 @@ Verification summary:
 Safety boundary:
 - 钱包核心和主要钱包入口已经编译进 ESP32-P4 固件，用于开发验收。
 - 核心钱包单测通过，但真实资金版必须先通过创建/导入、公钥/地址、备份/清除、PSBT/消息签名、取消/错误路径和真机回归审查。
-- 智能卡 APDU、USB CCID 和卡片签名仍未开放。
+- 智能卡 USB CCID、Satochip 和 SeedKeeper 路径已开放开发验证；实机使用必须采用带供电 OTG 转接线或外接供电 Hub。
+- 智能卡写卡、PIN/重置、Web3/BTC 签名等敏感路径仍需更完整的真机回归和安全审查后才能进入商业真钱包发布。
 - 只有使用 prodship/prodshipflash 且 Production gate: PASS 的包，才允许进入商业真钱包发布流程。
 
 Final readiness: $final_status

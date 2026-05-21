@@ -79,6 +79,8 @@ def main() -> None:
             ],
             check=True,
         )
+        output.write_text(output.read_text(encoding="utf-8").rstrip() + "\n",
+                          encoding="utf-8")
         print(output)
 
     print(f"ASCII glyphs: {len(ascii_symbols)}")

@@ -803,7 +803,6 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "sign_tokenpocket_satochip",
     "sign_btc_mnemonic",
     "sign_btc_satochip",
-    "smartcard_web3_scan",
     "smartcard_card_info",
     "satochip_path_address",
     "satochip_btc_zpub",

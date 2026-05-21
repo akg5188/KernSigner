@@ -61,6 +61,8 @@ ESP32-P4 OTG 口
 -> Satochip 卡
 ```
 
+![带供电 OTG 智能卡接法实拍图](screens/powered_otg_smartcard_setup.jpg)
+
 如果是你发的那种“转接头上带灯、并且有外接供电”的接法，就属于正确方向。重点不是外观，而是它必须真的给 OTG Host 侧供上电。
 
 ### 连接顺序
