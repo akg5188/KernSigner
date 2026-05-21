@@ -48,6 +48,13 @@ More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gal
 
 当前支持范围按“测试资金验收版”口径说明，不能理解为生产真钱包审计通过。
 
+连接钱包、查看地址和签名流程支持两种密钥来源：
+
+- **助记词方式**：在开发板内临时加载或创建助记词，敏感材料只用于当前会话；适合测试普通离线钱包流程。
+- **智能卡方式**：通过外接供电 OTG 读卡器连接 Satochip / SeedKeeper 智能卡；适合测试智能卡账户、Web3 连接码、签名和 BTC 观察公钥。
+
+典型流程是：先选择要连接的钱包或要签名的二维码，再选择使用 **助记词** 还是 **智能卡**。
+
 | 类型 | 当前支持 | 说明 |
 | --- | --- | --- |
 | Bitcoin / BTC | 已接主流程 | 支持常见 BTC 地址、扩展公钥、观察钱包、PSBT/消息签名入口；包含 legacy、nested SegWit、native SegWit、Taproot 和 testnet 变体。 |
