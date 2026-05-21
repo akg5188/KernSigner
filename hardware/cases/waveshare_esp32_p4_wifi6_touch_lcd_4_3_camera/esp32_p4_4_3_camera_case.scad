@@ -135,6 +135,7 @@ tf_slot_h = 5.40;
 
 button_slot_w = 7.20;
 button_slot_h = 5.20;
+button_pin_hole_d = 1.00;
 power_x_from_pcb_left = pcb_w - 23.00;
 boot_x_from_pcb_left = power_x_from_pcb_left - 8.35;
 reset_x_from_pcb_left = boot_x_from_pcb_left - 8.35;
@@ -199,6 +200,12 @@ module top_cutout(x, w, h) {
         cube([w, edge_cut_depth + 2 * eps, h]);
 }
 
+module top_pin_hole(x) {
+    translate([x, top_cut_y0(), port_z_center])
+        rotate([-90, 0, 0])
+            cylinder(d = button_pin_hole_d, h = edge_cut_depth + 2 * eps);
+}
+
 module camera_hole() {
     translate([camera_x(), camera_y(), -eps])
         cylinder(d = camera_lens_hole_d, h = back_thickness + 2 * eps);
@@ -250,10 +257,9 @@ module protective_case() {
         // Only the requested edge openings.
         side_usb_cutout(usb_cutout_pos_y_min, usb_cutout_pos_y_max);
         side_usb_cutout(usb_cutout_neg_y_min, usb_cutout_neg_y_max);
-        top_cutout(from_pcb_left(tf_slot_x_from_pcb_left), tf_slot_w, tf_slot_h);
-        top_cutout(from_pcb_left(reset_x_from_pcb_left), button_slot_w, button_slot_h);
-        top_cutout(from_pcb_left(boot_x_from_pcb_left), button_slot_w, button_slot_h);
-        top_cutout(from_pcb_left(power_x_from_pcb_left), button_slot_w, button_slot_h);
+        top_pin_hole(from_pcb_left(reset_x_from_pcb_left));
+        top_pin_hole(from_pcb_left(boot_x_from_pcb_left));
+        top_pin_hole(from_pcb_left(power_x_from_pcb_left));
 
         // Camera opening on the back.
         camera_hole();
