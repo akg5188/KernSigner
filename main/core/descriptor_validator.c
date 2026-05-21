@@ -1,6 +1,7 @@
 #include "descriptor_validator.h"
 #include "key.h"
 #include "wallet.h"
+#include "../utils/secure_mem.h"
 #include <esp_log.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -359,6 +360,8 @@ static void apply_changes_and_verify(void) {
     complete_validation(VALIDATION_INTERNAL_ERROR);
     return;
   }
+  char *passphrase = NULL;
+  (void)key_get_session_passphrase(&passphrase);
 
   bool is_testnet = (current_ctx->target_network == WALLET_NETWORK_TESTNET);
 
@@ -367,14 +370,16 @@ static void apply_changes_and_verify(void) {
   wallet_set_account(current_ctx->target_account);
   wallet_set_policy(current_ctx->target_policy);
 
-  // Reload key - passphrase is already applied in current key
-  if (!key_load_from_mnemonic(mnemonic, NULL, is_testnet)) {
+  // Reload key while preserving the in-RAM passphrase for this session.
+  if (!key_load_from_mnemonic(mnemonic, passphrase, is_testnet)) {
     ESP_LOGE(TAG, "Failed to reload key");
-    free(mnemonic);
+    SECURE_FREE_STRING(mnemonic);
+    SECURE_FREE_STRING(passphrase);
     complete_validation(VALIDATION_INTERNAL_ERROR);
     return;
   }
-  free(mnemonic);
+  SECURE_FREE_STRING(mnemonic);
+  SECURE_FREE_STRING(passphrase);
 
   if (!wallet_init(current_ctx->target_network)) {
     ESP_LOGE(TAG, "Failed to reinit wallet");
@@ -455,9 +460,9 @@ static void check_attributes_and_verify(struct wally_descriptor *descriptor,
 
   if (network_mismatch) {
     const char *current_net =
-        (wallet_network == WALLET_NETWORK_MAINNET) ? "Mainnet" : "Testnet";
+        (wallet_network == WALLET_NETWORK_MAINNET) ? "主网" : "测试网";
     const char *target_net =
-        (desc_network == WALLET_NETWORK_MAINNET) ? "Mainnet" : "Testnet";
+        (desc_network == WALLET_NETWORK_MAINNET) ? "主网" : "测试网";
     offset += snprintf(message + offset, sizeof(message) - offset,
                        "#FFFFFF   Network: %s -> ##FF6600 %s#\n", current_net,
                        target_net);

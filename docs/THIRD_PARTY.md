@@ -13,7 +13,7 @@ The project overall was largely assembled with AI assistance and is still an unf
 | `k_quirc` | `components/k_quirc/` | OpenMV quirc adaptation, originally based on Daniel Beer’s `quirc` | MIT license in [components/k_quirc/LICENSE](../components/k_quirc/LICENSE) |
 | `bbqr` | `components/bbqr/` | BBQr/Base32/Miniz utility code | See source file headers in `components/bbqr/src/` and `components/bbqr/src/miniz.*` |
 | `mbedtls_compat` | `components/mbedtls_compat/` | Local compatibility shim for ESP-IDF 6.x / mbedTLS v4 header layout | Repository-local shim; follows the upstream mbedTLS license chain via ESP-IDF |
-| `wave_4b`, `wave_35`, `wave_43`, `wave_5` | `components/wave_*` | Waveshare board support and display/touch glue | See the component directories and bundled vendor headers |
+| `wave_43` | `components/wave_43/` | Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 board support and display/touch glue | See the component directory and bundled vendor headers |
 
 ## Repository-Level Dependencies
 

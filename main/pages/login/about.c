@@ -37,10 +37,10 @@ void about_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_add_event_cb(touch, about_screen_event_cb, LV_EVENT_CLICKED, NULL);
 
   // Title pinned at top
-  theme_create_page_title(about_screen, "About");
+  theme_create_page_title(about_screen, "关于");
 
   // Footer pinned at bottom
-  lv_obj_t *footer = theme_create_label(about_screen, "Tap to return", true);
+  lv_obj_t *footer = theme_create_label(about_screen, "点击返回", true);
   lv_obj_align(footer, LV_ALIGN_BOTTOM_MID, 0, -pad);
 
   // Flex body between title and footer
@@ -57,7 +57,7 @@ void about_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   const esp_app_desc_t *app_desc = esp_app_get_description();
   char ver_text[48];
-  snprintf(ver_text, sizeof(ver_text), "Version: %s", app_desc->version);
+  snprintf(ver_text, sizeof(ver_text), "版本: %s", app_desc->version);
   theme_create_label(body, ver_text, true);
 
   lv_obj_t *qr = lv_qrcode_create(body);

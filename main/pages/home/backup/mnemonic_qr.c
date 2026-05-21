@@ -4,11 +4,14 @@
 #include "../../../core/base43.h"
 #include "../../../core/key.h"
 #include "../../../qr/encoder.h"
+#include "../../../qr/viewer.h"
 #include "../../../ui/dialog.h"
 #include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
+#include "../../../utils/bip39_filter.h"
 #include "../../shared/kef_encrypt_page.h"
 #include <lvgl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wally_core.h>
@@ -36,10 +39,14 @@ static lv_obj_t *mnemonic_qr_screen = NULL;
 static lv_obj_t *back_button = NULL;
 static lv_obj_t *qr_type_dropdown = NULL;
 static lv_obj_t *grid_btn = NULL;
+static lv_obj_t *fullscreen_btn = NULL;
 static lv_obj_t *qr_code = NULL;
 static lv_obj_t *qr_container = NULL;
+static lv_obj_t *qr_status_label = NULL;
 static lv_obj_t *grid_overlay = NULL;
 static lv_obj_t *content_area = NULL;
+static lv_obj_t *fingerprint_label = NULL;
+static lv_obj_t *index_label = NULL;
 static lv_obj_t *shade_overlay = NULL;
 static lv_obj_t **col_labels = NULL;
 static lv_obj_t **row_labels = NULL;
@@ -59,9 +66,49 @@ static qr_encode_result_t last_qr_result = {0, 0};
 /* Encrypted QR state */
 static char *encrypted_qr_data = NULL;
 static qr_type_t previous_qr_type = QR_TYPE_PLAINTEXT;
+static bool qr_viewer_active = false;
 
 /* Forward declaration */
 static void update_qr_code(void);
+
+static void build_mnemonic_index_summary(const char *mnemonic, char *out,
+                                         size_t out_len) {
+  if (!out || out_len == 0)
+    return;
+  out[0] = '\0';
+  if (!mnemonic)
+    return;
+
+  char copy[256];
+  snprintf(copy, sizeof(copy), "%s", mnemonic);
+
+  bool wordlist_ready = bip39_filter_init();
+  size_t pos = 0;
+  int word_count = 0;
+  char *token = strtok(copy, " ");
+  while (token && pos < out_len - 1) {
+    int word_index = wordlist_ready ? bip39_filter_get_word_index(token) : -1;
+    int written = 0;
+    if (word_index >= 0) {
+      written = snprintf(out + pos, out_len - pos, "%s%04d",
+                         word_count > 0 ? " " : "", word_index);
+    } else {
+      written = snprintf(out + pos, out_len - pos, "%s未知",
+                         word_count > 0 ? " " : "");
+    }
+    if (written < 0)
+      break;
+    if ((size_t)written >= out_len - pos) {
+      pos = out_len - 1;
+      break;
+    }
+    pos += (size_t)written;
+    word_count++;
+    token = strtok(NULL, " ");
+  }
+
+  secure_memzero(copy, sizeof(copy));
+}
 
 static void back_cb(lv_event_t *e) {
   (void)e;
@@ -309,6 +356,75 @@ static void grid_btn_cb(lv_event_t *e) {
   }
 }
 
+static const char *current_qr_title(void) {
+  switch (current_qr_type) {
+  case QR_TYPE_PLAINTEXT:
+    return "明文备份";
+  case QR_TYPE_SEEDQR:
+    return "助记词QR";
+  case QR_TYPE_COMPACT_SEEDQR:
+    return "紧凑QR";
+  case QR_TYPE_ENCRYPTED:
+    return "加密备份";
+  default:
+    return "备份QR";
+  }
+}
+
+static const char *current_text_qr_data(void) {
+  switch (current_qr_type) {
+  case QR_TYPE_PLAINTEXT:
+    return mnemonic_data;
+  case QR_TYPE_SEEDQR:
+    return seedqr_data;
+  case QR_TYPE_ENCRYPTED:
+    return encrypted_qr_data;
+  default:
+    return NULL;
+  }
+}
+
+static void return_from_print_qr_cb(void) {
+  qr_viewer_page_destroy();
+  qr_viewer_active = false;
+  if (mnemonic_qr_screen)
+    lv_obj_clear_flag(mnemonic_qr_screen, LV_OBJ_FLAG_HIDDEN);
+  if (back_button)
+    lv_obj_clear_flag(back_button, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void open_fullscreen_qr(void) {
+  if (!mnemonic_qr_screen)
+    return;
+
+  const char *data = current_text_qr_data();
+  if (!data || data[0] == '\0') {
+    if (current_qr_type == QR_TYPE_COMPACT_SEEDQR) {
+      dialog_show_error("紧凑QR不适合复印，请选助记词QR", NULL, 2000);
+    } else {
+      dialog_show_error("没有可显示的数据", NULL, 2000);
+    }
+    return;
+  }
+
+  if (!qr_viewer_page_create_print(lv_screen_active(), data, current_qr_title(),
+                                   return_from_print_qr_cb, 180)) {
+    dialog_show_error("全屏二维码创建失败", NULL, 2000);
+    return;
+  }
+
+  qr_viewer_active = true;
+  lv_obj_add_flag(mnemonic_qr_screen, LV_OBJ_FLAG_HIDDEN);
+  if (back_button)
+    lv_obj_add_flag(back_button, LV_OBJ_FLAG_HIDDEN);
+  qr_viewer_page_show();
+}
+
+static void fullscreen_btn_cb(lv_event_t *e) {
+  (void)e;
+  open_fullscreen_qr();
+}
+
 /* ---------- Encrypted QR flow (via kef_encrypt_page) ---------- */
 
 static void encrypt_return_cb(void) {
@@ -324,7 +440,7 @@ static void encrypt_success_cb(const char *id, const uint8_t *envelope,
   size_t b43_len = 0;
   if (!base43_encode(envelope, len, &b43, &b43_len)) {
     kef_encrypt_page_destroy();
-    dialog_show_error("Encoding failed", NULL, 0);
+    dialog_show_error("编码失败", NULL, 0);
     current_qr_type = previous_qr_type;
     lv_dropdown_set_selected(qr_type_dropdown, (uint32_t)current_qr_type);
     return;
@@ -337,13 +453,14 @@ static void encrypt_success_cb(const char *id, const uint8_t *envelope,
   current_qr_type = QR_TYPE_ENCRYPTED;
   lv_dropdown_set_selected(qr_type_dropdown, 3);
   update_qr_code();
+  open_fullscreen_qr();
 }
 
 static void start_encrypted_flow(void) {
   previous_qr_type = current_qr_type;
 
   if (!compact_seedqr_data || compact_seedqr_len == 0) {
-    dialog_show_error("No data to encrypt", NULL, 0);
+    dialog_show_error("无可加密数据", NULL, 0);
     return;
   }
 
@@ -356,19 +473,35 @@ static void update_qr_code(void) {
   if (!qr_code)
     return;
 
+  lv_result_t result = LV_RESULT_INVALID;
+  last_qr_result = (qr_encode_result_t){0, 0};
+
   if (current_qr_type == QR_TYPE_COMPACT_SEEDQR) {
     if (compact_seedqr_data && compact_seedqr_len > 0)
-      qr_update_binary(qr_code, compact_seedqr_data, compact_seedqr_len,
-                       &last_qr_result);
+      result = qr_update_binary(qr_code, compact_seedqr_data,
+                                compact_seedqr_len, &last_qr_result);
   } else if (current_qr_type == QR_TYPE_ENCRYPTED) {
     if (encrypted_qr_data)
-      qr_update_optimal(qr_code, encrypted_qr_data, &last_qr_result);
+      result = qr_update_optimal(qr_code, encrypted_qr_data, &last_qr_result);
   } else {
     const char *data = (current_qr_type == QR_TYPE_PLAINTEXT) ? mnemonic_data
                        : (current_qr_type == QR_TYPE_SEEDQR)  ? seedqr_data
                                                               : NULL;
     if (data)
-      qr_update_optimal(qr_code, data, &last_qr_result);
+      result = qr_update_optimal(qr_code, data, &last_qr_result);
+  }
+
+  if (qr_status_label) {
+    if (result == LV_RESULT_OK) {
+      lv_label_set_text(qr_status_label, "");
+      lv_obj_set_style_text_color(qr_status_label, secondary_color(), 0);
+    } else if (current_qr_type == QR_TYPE_ENCRYPTED) {
+      lv_label_set_text(qr_status_label, "内容较长");
+      lv_obj_set_style_text_color(qr_status_label, highlight_color(), 0);
+    } else {
+      lv_label_set_text(qr_status_label, "二维码过长");
+      lv_obj_set_style_text_color(qr_status_label, highlight_color(), 0);
+    }
   }
 
   reset_shade_mode();
@@ -398,6 +531,11 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   return_callback = return_cb;
 
+  if (!key_mnemonic_is_valid()) {
+    dialog_show_error("临时助记词不能显示助记词二维码", return_cb, 0);
+    return;
+  }
+
   if (!key_get_mnemonic(&mnemonic_data) || !mnemonic_data)
     return;
 
@@ -425,10 +563,10 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_flex_align(mnemonic_qr_screen, LV_FLEX_ALIGN_START,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_all(mnemonic_qr_screen, theme_get_default_padding(), 0);
-  lv_obj_set_style_pad_gap(mnemonic_qr_screen, theme_get_default_padding(), 0);
+  lv_obj_set_style_pad_gap(mnemonic_qr_screen, theme_get_small_padding(), 0);
 
   lv_obj_t *top_bar = lv_obj_create(mnemonic_qr_screen);
-  lv_obj_set_size(top_bar, LV_PCT(100), 60);
+  lv_obj_set_size(top_bar, LV_PCT(100), theme_get_min_touch_size());
   lv_obj_set_style_bg_opa(top_bar, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(top_bar, 0, 0);
   lv_obj_set_style_pad_all(top_bar, 0, 0);
@@ -436,16 +574,19 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   back_button = ui_create_back_button(parent, back_cb);
 
-  qr_type_dropdown = theme_create_dropdown(
-      top_bar, "Plaintext\nSeedQR\nCompact SeedQR\nEncrypted");
-  lv_obj_set_width(qr_type_dropdown, LV_PCT(40));
-  lv_obj_align(qr_type_dropdown, LV_ALIGN_CENTER, -30, 0);
+  qr_type_dropdown =
+      theme_create_dropdown(top_bar, "明文\n助记词QR\n紧凑QR\n加密QR");
+  lv_obj_set_width(qr_type_dropdown, LV_PCT(58));
+  lv_obj_align(qr_type_dropdown, LV_ALIGN_CENTER, -theme_get_min_touch_size() / 2,
+               0);
   lv_obj_add_event_cb(qr_type_dropdown, dropdown_cb, LV_EVENT_VALUE_CHANGED,
                       NULL);
 
   grid_btn = lv_btn_create(top_bar);
-  lv_obj_set_size(grid_btn, 80, 120);
-  lv_obj_align_to(grid_btn, qr_type_dropdown, LV_ALIGN_OUT_RIGHT_MID, 10, 0);
+  lv_obj_set_size(grid_btn, theme_get_min_touch_size(),
+                  theme_get_min_touch_size());
+  lv_obj_align_to(grid_btn, qr_type_dropdown, LV_ALIGN_OUT_RIGHT_MID,
+                  theme_get_small_padding(), 0);
   theme_apply_touch_button(grid_btn, false);
   lv_obj_add_event_cb(grid_btn, grid_btn_cb, LV_EVENT_CLICKED, NULL);
 
@@ -455,8 +596,23 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_text_color(grid_label, main_color(), 0);
   lv_obj_center(grid_label);
 
+  fullscreen_btn = lv_btn_create(top_bar);
+  lv_obj_set_size(fullscreen_btn, theme_get_min_touch_size() + 18,
+                  theme_get_min_touch_size());
+  lv_obj_align_to(fullscreen_btn, grid_btn, LV_ALIGN_OUT_RIGHT_MID,
+                  theme_get_small_padding(), 0);
+  theme_apply_touch_button(fullscreen_btn, true);
+  lv_obj_add_event_cb(fullscreen_btn, fullscreen_btn_cb, LV_EVENT_CLICKED,
+                      NULL);
+
+  lv_obj_t *fullscreen_label = lv_label_create(fullscreen_btn);
+  lv_label_set_text(fullscreen_label, "全屏");
+  lv_obj_set_style_text_font(fullscreen_label, theme_font_small(), 0);
+  lv_obj_set_style_text_color(fullscreen_label, bg_color(), 0);
+  lv_obj_center(fullscreen_label);
+
   content_area = lv_obj_create(mnemonic_qr_screen);
-  lv_obj_set_size(content_area, LV_PCT(100), LV_SIZE_CONTENT);
+  lv_obj_set_size(content_area, LV_PCT(100), 0);
   lv_obj_set_style_bg_opa(content_area, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(content_area, 0, 0);
   lv_obj_set_style_pad_all(content_area, 0, 0);
@@ -466,10 +622,13 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_flex_align(content_area, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
+  lv_obj_update_layout(mnemonic_qr_screen);
   lv_obj_update_layout(content_area);
   int32_t avail_w = lv_obj_get_content_width(content_area);
   int32_t avail_h = lv_obj_get_content_height(content_area);
-  int32_t container_size = (avail_w < avail_h) ? avail_w : avail_h;
+  int32_t meta_reserve = theme_get_screen_height() >= 760 ? 70 : 54;
+  int32_t max_qr_h = avail_h > meta_reserve ? avail_h - meta_reserve : avail_h;
+  int32_t container_size = (avail_w < max_qr_h) ? avail_w : max_qr_h;
 
   qr_container = lv_obj_create(content_area);
   lv_obj_set_size(qr_container, container_size, container_size);
@@ -490,6 +649,34 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_add_flag(qr_container, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(qr_container, qr_area_tap_cb, LV_EVENT_CLICKED, NULL);
 
+  char fingerprint_hex[9] = "--------";
+  key_get_fingerprint_hex(fingerprint_hex);
+  char fp_text[32];
+  snprintf(fp_text, sizeof(fp_text), "指纹 %s", fingerprint_hex);
+  fingerprint_label = theme_create_label(content_area, fp_text, false);
+  lv_obj_set_style_text_font(fingerprint_label, theme_font_small(), 0);
+  lv_obj_set_style_text_color(fingerprint_label, highlight_color(), 0);
+  lv_obj_set_style_text_align(fingerprint_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_width(fingerprint_label, LV_PCT(100));
+
+  char index_text[160];
+  char index_summary[128];
+  build_mnemonic_index_summary(mnemonic_data, index_summary,
+                               sizeof(index_summary));
+  snprintf(index_text, sizeof(index_text), "序号 %s", index_summary);
+  index_label = theme_create_label(content_area, index_text, false);
+  lv_obj_set_style_text_font(index_label, theme_font_small(), 0);
+  lv_obj_set_style_text_color(index_label, secondary_color(), 0);
+  lv_obj_set_style_text_align(index_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_label_set_long_mode(index_label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_width(index_label, LV_PCT(100));
+
+  qr_status_label = theme_create_label(content_area, "", false);
+  lv_obj_set_style_text_font(qr_status_label, theme_font_small(), 0);
+  lv_obj_set_style_text_color(qr_status_label, secondary_color(), 0);
+  lv_obj_set_style_text_align(qr_status_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_width(qr_status_label, LV_PCT(100));
+
   update_qr_code();
 }
 
@@ -505,6 +692,10 @@ void mnemonic_qr_page_hide(void) {
 
 void mnemonic_qr_page_destroy(void) {
   kef_encrypt_page_destroy();
+  if (qr_viewer_active) {
+    qr_viewer_page_destroy();
+    qr_viewer_active = false;
+  }
 
   reset_shade_mode();
   destroy_grid_overlay();
@@ -532,9 +723,13 @@ void mnemonic_qr_page_destroy(void) {
 
   qr_type_dropdown = NULL;
   grid_btn = NULL;
+  fullscreen_btn = NULL;
   qr_code = NULL;
   qr_container = NULL;
+  qr_status_label = NULL;
   content_area = NULL;
+  fingerprint_label = NULL;
+  index_label = NULL;
   return_callback = NULL;
   current_qr_type = QR_TYPE_PLAINTEXT;
   grid_visible = false;

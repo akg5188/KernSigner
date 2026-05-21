@@ -1,6 +1,8 @@
-// Mnemonic Editor Page - Review and edit mnemonic words before loading
+// 助记词 Editor Page - Review and edit mnemonic words before loading
 
 #include "mnemonic_editor.h"
+#include "../../core/key.h"
+#include "../../core/wallet.h"
 #include "../../ui/assets/icons_24.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
@@ -77,6 +79,20 @@ static bool is_checksum_valid(void);
 static bool recalculate_last_word(void);
 static void update_checksum_ui(void);
 
+static void format_word_line(char *out, size_t out_len, int position,
+                             const char *word) {
+  if (!out || out_len == 0)
+    return;
+
+  int word_index = bip39_filter_get_word_index(word);
+  if (word_index >= 0) {
+    snprintf(out, out_len, "%2d. %04d  %s", position + 1, word_index,
+             word ? word : "");
+  } else {
+    snprintf(out, out_len, "%2d. 未知  %s", position + 1, word ? word : "");
+  }
+}
+
 static bool is_checksum_valid(void) {
   char mnemonic[MAX_MNEMONIC_LEN];
   mnemonic[0] = '\0';
@@ -132,7 +148,7 @@ static bool get_mnemonic_fingerprint_hex(char *hex_out) {
   bip32_key_free(master_key);
 
   for (int i = 0; i < BIP32_KEY_FINGERPRINT_LEN; i++)
-    sprintf(hex_out + (i * 2), "%02x", fingerprint[i]);
+    snprintf(hex_out + (i * 2), 3, "%02x", fingerprint[i]);
   hex_out[BIP32_KEY_FINGERPRINT_LEN * 2] = '\0';
 
   return true;
@@ -207,8 +223,8 @@ static void update_fingerprint_display(void) {
   if (is_checksum_valid()) {
     char fp_hex[9];
     if (get_mnemonic_fingerprint_hex(fp_hex)) {
-      char buf[24];
-      snprintf(buf, sizeof(buf), ICON_FINGERPRINT " %s", fp_hex);
+      char buf[32];
+      snprintf(buf, sizeof(buf), "指纹 %s", fp_hex);
       lv_label_set_text(fingerprint_label, buf);
       lv_obj_clear_flag(fingerprint_label, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -227,14 +243,14 @@ static void update_checksum_ui(void) {
 
   if (valid) {
     lv_obj_add_flag(checksum_error_label, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_clear_state(load_btn, LV_STATE_DISABLED);
-    lv_obj_set_style_text_color(load_label, main_color(), 0);
+    lv_label_set_text(load_label, "加载");
   } else {
     lv_obj_clear_flag(checksum_error_label, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_state(load_btn, LV_STATE_DISABLED);
-    lv_obj_set_style_text_color(load_label, disabled_color(), 0);
+    lv_label_set_text(load_label, "加载中间");
   }
 
+  lv_obj_clear_state(load_btn, LV_STATE_DISABLED);
+  lv_obj_set_style_text_color(load_label, main_color(), 0);
   update_fingerprint_display();
 }
 
@@ -264,6 +280,7 @@ static void parse_mnemonic(const char *mnemonic) {
     total_words++;
     token = strtok(NULL, " ");
   }
+  secure_memzero(mnemonic_copy, sizeof(mnemonic_copy));
 }
 
 static void cleanup_editing_ui(void) {
@@ -285,8 +302,8 @@ static void update_word_label(int index) {
   if (index < 0 || index >= total_words || !word_labels[index])
     return;
 
-  char text[24];
-  snprintf(text, sizeof(text), "%2d. %s", index + 1, entered_words[index]);
+  char text[40];
+  format_word_line(text, sizeof(text), index, entered_words[index]);
   lv_label_set_text(word_labels[index], text);
 
   bool changed = strcmp(entered_words[index], original_words[index]) != 0;
@@ -303,10 +320,7 @@ static void show_word_grid(void) {
     lv_obj_clear_flag(load_btn, LV_OBJ_FLAG_HIDDEN);
   if (header_container)
     lv_obj_clear_flag(header_container, LV_OBJ_FLAG_HIDDEN);
-  if (is_new_mnemonic)
-    update_fingerprint_display();
-  else
-    update_checksum_ui();
+  update_checksum_ui();
 }
 
 static void hide_word_grid(void) {
@@ -350,7 +364,7 @@ static void update_keyboard_state(void) {
     return;
 
   char title[32];
-  snprintf(title, sizeof(title), "Word %d/%d", editing_word_index + 1,
+  snprintf(title, sizeof(title), "第 %d/%d 个单词", editing_word_index + 1,
            total_words);
   ui_keyboard_set_title(keyboard, title);
   ui_keyboard_set_input_text(keyboard, current_prefix);
@@ -374,7 +388,7 @@ static void show_keyboard_for_word(int index) {
   current_mode = MODE_KEYBOARD_INPUT;
 
   char title[32];
-  snprintf(title, sizeof(title), "Word %d/%d", index + 1, total_words);
+  snprintf(title, sizeof(title), "第 %d/%d 个单词", index + 1, total_words);
 
   keyboard =
       ui_keyboard_create(mnemonic_editor_screen, title, keyboard_callback);
@@ -394,8 +408,15 @@ static void show_word_confirmation(const char *word) {
   strncpy(pending_word, word, sizeof(pending_word) - 1);
   pending_word[sizeof(pending_word) - 1] = '\0';
 
-  char msg[64];
-  snprintf(msg, sizeof(msg), "Word %d: %s", editing_word_index + 1, word);
+  int word_index = bip39_filter_get_word_index(word);
+  char msg[96];
+  if (word_index >= 0) {
+    snprintf(msg, sizeof(msg), "第 %d 个单词\n序号：%04d\n%s",
+             editing_word_index + 1, word_index, word);
+  } else {
+    snprintf(msg, sizeof(msg), "第 %d 个单词\n序号：未知\n%s",
+             editing_word_index + 1, word);
+  }
 
   dialog_show_confirm(msg, word_confirmation_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
@@ -416,9 +437,8 @@ static void word_confirmation_cb(bool confirmed, void *user_data) {
           update_word_label(total_words - 1);
         }
       }
-    } else {
-      update_checksum_ui();
     }
+    update_checksum_ui();
 
     return_to_word_grid();
   } else {
@@ -478,7 +498,7 @@ static void create_word_select_menu(void) {
   }
 
   char title[64];
-  snprintf(title, sizeof(title), "Select: %s...", current_prefix);
+  snprintf(title, sizeof(title), "选择：%s...", current_prefix);
 
   current_menu =
       ui_menu_create(mnemonic_editor_screen, title, back_to_keyboard_cb);
@@ -527,7 +547,7 @@ static void back_confirm_cb(bool confirmed, void *user_data) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("Are you sure?", back_confirm_cb, NULL,
+  dialog_show_confirm("确定返回？", back_confirm_cb, NULL,
                       DIALOG_STYLE_OVERLAY);
 }
 
@@ -549,8 +569,21 @@ static void load_btn_cb(lv_event_t *e) {
             sizeof(mnemonic) - strlen(mnemonic) - 1);
   }
 
-  if (bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
-    dialog_show_error("Invalid checksum", NULL, 0);
+  bool valid_checksum = bip39_mnemonic_validate(NULL, mnemonic) == WALLY_OK;
+  if (!valid_checksum) {
+    if (!key_load_from_mnemonic_unchecked(mnemonic)) {
+      dialog_show_error("临时助记词导入失败", NULL, 0);
+      secure_memzero(mnemonic, sizeof(mnemonic));
+      return;
+    }
+    wallet_cleanup();
+    key_apply_pending_source_material(mnemonic);
+    mnemonic_editor_page_hide();
+    dialog_show_message("已导入临时助记词",
+                        "只能用于助记词变换和还原，不能签名或备份。");
+    if (success_callback)
+      success_callback();
+    secure_memzero(mnemonic, sizeof(mnemonic));
     return;
   }
 
@@ -584,9 +617,10 @@ static lv_obj_t *create_column(lv_obj_t *parent, int x, int width, int height) {
 }
 
 static lv_obj_t *create_word_button(lv_obj_t *parent, int index, int height,
-                                    lv_color_t bg) {
-  char text[24];
-  snprintf(text, sizeof(text), "%2d. %s", index + 1, entered_words[index]);
+                                    lv_color_t bg,
+                                    const lv_font_t *word_font) {
+  char text[40];
+  format_word_line(text, sizeof(text), index, entered_words[index]);
 
   lv_obj_t *btn = lv_btn_create(parent);
   lv_obj_set_size(btn, LV_PCT(100), height);
@@ -600,7 +634,8 @@ static lv_obj_t *create_word_button(lv_obj_t *parent, int index, int height,
   lv_obj_t *label = lv_label_create(btn);
   lv_label_set_text(label, text);
   lv_obj_align(label, LV_ALIGN_LEFT_MID, -10, 0);
-  lv_obj_set_style_text_font(label, theme_font_medium(), 0);
+  lv_obj_set_style_text_font(label, word_font ? word_font : theme_font_medium(),
+                             0);
   lv_obj_set_style_text_color(label, main_color(), 0);
 
   word_labels[index] = label;
@@ -638,7 +673,10 @@ static void create_word_grid(void) {
       int row_idx = (i < 12) ? i : i - 12;
       lv_color_t cell_bg =
           ((col_idx + row_idx) % 2 == 0) ? bg_color() : panel_color();
-      create_word_button(parent_col, i, btn_height, cell_bg);
+      const lv_font_t *word_font =
+          theme_get_screen_width() <= 520 ? theme_font_small()
+                                          : theme_font_medium();
+      create_word_button(parent_col, i, btn_height, cell_bg, word_font);
     }
   } else {
     int btn_height = grid_height / total_words;
@@ -647,26 +685,37 @@ static void create_word_grid(void) {
 
     for (int i = 0; i < total_words; i++) {
       lv_color_t cell_bg = (i % 2 == 0) ? bg_color() : panel_color();
-      create_word_button(col, i, btn_height, cell_bg);
+      const lv_font_t *word_font =
+          theme_get_screen_width() <= 520 ? theme_font_small()
+                                          : theme_font_medium();
+      create_word_button(col, i, btn_height, cell_bg, word_font);
     }
   }
 }
 
 static void create_ui(void) {
-  header_container = theme_create_flex_row(mnemonic_editor_screen);
-  lv_obj_set_style_pad_column(header_container, 8, 0);
+  header_container = theme_create_flex_column(mnemonic_editor_screen);
+  lv_obj_set_width(header_container, LV_PCT(62));
+  lv_obj_set_height(header_container, 56);
+  lv_obj_set_style_pad_row(header_container, 2, 0);
   lv_obj_align(header_container, LV_ALIGN_TOP_MID, 0,
                theme_get_default_padding());
 
   lv_obj_t *title = lv_label_create(header_container);
-  lv_label_set_text(title, "Mnemonic");
+  lv_label_set_text(title, "助记词");
+  lv_obj_set_width(title, LV_PCT(100));
+  lv_label_set_long_mode(title, LV_LABEL_LONG_CLIP);
   lv_obj_set_style_text_font(title, theme_font_small(), 0);
   lv_obj_set_style_text_color(title, main_color(), 0);
+  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
 
   fingerprint_label = lv_label_create(header_container);
   lv_label_set_text(fingerprint_label, "");
+  lv_obj_set_width(fingerprint_label, LV_PCT(100));
+  lv_label_set_long_mode(fingerprint_label, LV_LABEL_LONG_CLIP);
   lv_obj_set_style_text_font(fingerprint_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(fingerprint_label, highlight_color(), 0);
+  lv_obj_set_style_text_align(fingerprint_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_add_flag(fingerprint_label, LV_OBJ_FLAG_HIDDEN);
 
   update_fingerprint_display();
@@ -682,20 +731,19 @@ static void create_ui(void) {
   lv_obj_add_event_cb(load_btn, load_btn_cb, LV_EVENT_CLICKED, NULL);
 
   load_label = lv_label_create(load_btn);
-  lv_label_set_text(load_label, "Load");
+  lv_label_set_text(load_label, "加载");
   lv_obj_center(load_label);
   theme_apply_button_label(load_label, false);
 
   checksum_error_label = lv_label_create(mnemonic_editor_screen);
-  lv_label_set_text(checksum_error_label, "Invalid checksum");
+  lv_label_set_text(checksum_error_label, "校验和无效");
   lv_obj_set_style_text_color(checksum_error_label, error_color(), 0);
   lv_obj_set_style_text_font(checksum_error_label, theme_font_small(), 0);
   lv_obj_align_to(checksum_error_label, load_btn, LV_ALIGN_OUT_LEFT_MID, -10,
                   0);
   lv_obj_add_flag(checksum_error_label, LV_OBJ_FLAG_HIDDEN);
 
-  if (!is_new_mnemonic)
-    update_checksum_ui();
+  update_checksum_ui();
 }
 
 void mnemonic_editor_page_create(lv_obj_t *parent, void (*return_cb)(void),
@@ -709,14 +757,14 @@ void mnemonic_editor_page_create(lv_obj_t *parent, void (*return_cb)(void),
   is_new_mnemonic = new_mnemonic;
 
   if (!bip39_filter_init()) {
-    dialog_show_error("Failed to load wordlist", return_cb, 0);
+    dialog_show_error("单词表加载失败", return_cb, 0);
     return;
   }
 
   parse_mnemonic(mnemonic);
 
   if (total_words == 0) {
-    dialog_show_error("No words in mnemonic", return_cb, 0);
+    dialog_show_error("助记词为空", return_cb, 0);
     return;
   }
 

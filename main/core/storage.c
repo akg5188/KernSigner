@@ -481,6 +481,9 @@ static bool item_exists(const storage_item_config_t *cfg,
 
 esp_err_t storage_save_mnemonic(storage_location_t loc, const char *id,
                                 const uint8_t *kef_envelope, size_t len) {
+  if (loc == STORAGE_FLASH)
+    return ESP_ERR_INVALID_ARG;
+
   return item_save(&mnemonic_config, loc, id, kef_envelope, len,
                    STORAGE_MNEMONIC_EXT, true);
 }

@@ -1,4 +1,4 @@
-// PIN settings page — manage PIN, timeout, wipe threshold
+// PIN settings page — manage PIN, timeout, and shutdown protection threshold.
 
 #include "pin_settings.h"
 #include "../../core/pin.h"
@@ -24,7 +24,7 @@ static void (*return_callback)(void) = NULL;
 static lv_obj_t *timeout_screen = NULL;
 static lv_obj_t *timeout_dropdown = NULL;
 
-// Wipe threshold detail page
+// PIN protection threshold detail page
 static lv_obj_t *threshold_screen = NULL;
 static lv_obj_t *threshold_dropdown = NULL;
 
@@ -57,18 +57,18 @@ static void change_pin_cb(void) {
 // Session timeout
 // ---------------------------------------------------------------------------
 
-// Timeout options: index → seconds (0=off)
-static const uint16_t timeout_values[] = {0, 60, 300, 900, 1800};
-static const char *timeout_options = "Off\n1 min\n5 min\n15 min\n30 min";
+// Security policy is fixed: 3 minutes to lock, 10 minutes to power off.
+static const uint16_t timeout_values[] = {PIN_DEFAULT_TIMEOUT_SEC};
+static const char *timeout_options = "3 分钟";
 
 static void timeout_dropdown_cb(lv_event_t *e) {
   uint16_t sel = lv_dropdown_get_selected(lv_event_get_target(e));
   if (sel < sizeof(timeout_values) / sizeof(timeout_values[0])) {
-    pin_set_session_timeout(timeout_values[sel]);
-    // Restart session with new timeout
+    if (pin_set_session_timeout(timeout_values[sel]) != ESP_OK)
+      return;
     session_stop();
-    if (timeout_values[sel] > 0)
-      session_start(timeout_values[sel]);
+    session_start_protected(timeout_values[sel],
+                            PIN_DEFAULT_POWER_OFF_TIMEOUT_SEC);
   }
 }
 
@@ -83,7 +83,7 @@ static void show_timeout_page(void) {
 
   timeout_screen = theme_create_page_container(lv_screen_active());
   ui_create_back_button(timeout_screen, timeout_back_cb);
-  theme_create_page_title(timeout_screen, "Session Timeout");
+  theme_create_page_title(timeout_screen, "自动锁定");
 
   timeout_dropdown = theme_create_dropdown(timeout_screen, timeout_options);
   lv_obj_set_width(timeout_dropdown, LV_HOR_RES * 40 / 100);
@@ -91,7 +91,7 @@ static void show_timeout_page(void) {
 
   // Select current value
   uint16_t current = pin_get_session_timeout();
-  uint16_t sel = 2; // Default: 5 min
+  uint16_t sel = 0;
   for (int i = 0; i < (int)(sizeof(timeout_values) / sizeof(timeout_values[0]));
        i++) {
     if (timeout_values[i] == current) {
@@ -113,12 +113,12 @@ static void destroy_timeout_page(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Wipe threshold
+// Shutdown protection threshold
 // ---------------------------------------------------------------------------
 
-// Threshold options
-static const uint8_t threshold_values[] = {5, 10, 15, 20, 30, 50};
-static const char *threshold_options = "5\n10\n15\n20\n30\n50";
+// User requirement: three wrong PIN attempts triggers shutdown protection.
+static const uint8_t threshold_values[] = {3};
+static const char *threshold_options = "3";
 
 static void threshold_dropdown_cb(lv_event_t *e) {
   uint16_t sel = lv_dropdown_get_selected(lv_event_get_target(e));
@@ -138,11 +138,11 @@ static void show_threshold_page(void) {
 
   threshold_screen = theme_create_page_container(lv_screen_active());
   ui_create_back_button(threshold_screen, threshold_back_cb);
-  theme_create_page_title(threshold_screen, "Wipe Threshold");
+  theme_create_page_title(threshold_screen, "关机保护");
 
   lv_obj_t *desc = lv_label_create(threshold_screen);
-  lv_label_set_text(desc, "Number of wrong PIN attempts before wiping "
-                          "all data");
+  lv_label_set_text(desc,
+                    "连续输错 PIN 3 次后，将清除本次会话并尝试关机保护。");
   lv_obj_set_style_text_color(desc, secondary_color(), 0);
   lv_obj_set_style_text_align(desc, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_width(desc, LV_PCT(80));
@@ -155,7 +155,7 @@ static void show_threshold_page(void) {
 
   // Select current value
   uint8_t current = pin_get_max_failures();
-  uint16_t sel = 1; // Default: 10
+  uint16_t sel = 0; // Fixed: 3 attempts
   for (int i = 0;
        i < (int)(sizeof(threshold_values) / sizeof(threshold_values[0])); i++) {
     if (threshold_values[i] == current) {
@@ -177,27 +177,6 @@ static void destroy_threshold_page(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Disable PIN
-// ---------------------------------------------------------------------------
-
-static void disable_confirm_result(bool confirmed, void *user_data) {
-  (void)user_data;
-  if (!confirmed)
-    return;
-  pin_remove();
-  session_stop();
-  if (return_callback)
-    return_callback();
-}
-
-static void disable_pin_cb(void) {
-  dialog_show_danger_confirm("Disable PIN protection?\n\n"
-                             "All PIN data will be removed.",
-                             disable_confirm_result, NULL,
-                             DIALOG_STYLE_OVERLAY);
-}
-
-// ---------------------------------------------------------------------------
 // Menu callbacks
 // ---------------------------------------------------------------------------
 
@@ -214,11 +193,10 @@ void pin_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   return_callback = return_cb;
   settings_screen = theme_create_page_container(parent);
   settings_menu =
-      ui_menu_create(settings_screen, "PIN Settings", settings_back_cb);
-  ui_menu_add_entry(settings_menu, "Change PIN", change_pin_cb);
-  ui_menu_add_entry(settings_menu, "Session Timeout", show_timeout_page);
-  ui_menu_add_entry(settings_menu, "Wipe Threshold", show_threshold_page);
-  ui_menu_add_entry(settings_menu, "Disable PIN", disable_pin_cb);
+      ui_menu_create(settings_screen, "PIN 设置", settings_back_cb);
+  ui_menu_add_entry(settings_menu, "修改 PIN", change_pin_cb);
+  ui_menu_add_entry(settings_menu, "自动锁定", show_timeout_page);
+  ui_menu_add_entry(settings_menu, "关机保护", show_threshold_page);
 }
 
 void pin_settings_page_show(void) {

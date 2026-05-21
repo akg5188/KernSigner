@@ -14,6 +14,7 @@
 
 #include "../components/video/video.h"
 #include "../ui/dialog.h"
+#include "../ui/input_helpers.h"
 #include "../ui/theme.h"
 #include "../utils/memory_utils.h"
 #include "../utils/secure_mem.h"
@@ -26,14 +27,21 @@ static const char *TAG = "capture_entropy";
 //
 // PPA uses Q4.4 fixed-point scaling (1/16 increments), so we quantize the
 // scale down to the nearest 1/16 and derive the actual preview size from it.
-//   wave_4b: crop 960, scale 12/16 -> 720x720 preview
+//   wave_4b: crop 960, scale  9/16 -> 540x540 preview with UI room
 //   wave_35: crop 960, scale  5/16 -> 300x300 preview
 #define CAMERA_INPUT_WIDTH 1280
 #define CAMERA_INPUT_HEIGHT 960
 #define CAMERA_INPUT_CROP CAMERA_INPUT_HEIGHT
-#define CAMERA_DIM_MIN                                                         \
-  ((BSP_LCD_H_RES) < (BSP_LCD_V_RES) ? (BSP_LCD_H_RES) : (BSP_LCD_V_RES))
-#define CAMERA_PPA_FRAG ((CAMERA_DIM_MIN * 16) / CAMERA_INPUT_CROP)
+#define CAMERA_TOP_RESERVED ((BSP_LCD_H_RES) / 6)
+#define CAMERA_BOTTOM_RESERVED ((BSP_LCD_H_RES) / 12)
+#define CAMERA_AVAILABLE_HEIGHT                                                \
+  ((BSP_LCD_V_RES) > (CAMERA_TOP_RESERVED + CAMERA_BOTTOM_RESERVED)            \
+       ? ((BSP_LCD_V_RES) - CAMERA_TOP_RESERVED - CAMERA_BOTTOM_RESERVED)      \
+       : (BSP_LCD_V_RES))
+#define CAMERA_DIM_MAX                                                         \
+  ((BSP_LCD_H_RES) < (CAMERA_AVAILABLE_HEIGHT) ? (BSP_LCD_H_RES)               \
+                                               : (CAMERA_AVAILABLE_HEIGHT))
+#define CAMERA_PPA_FRAG ((CAMERA_DIM_MAX * 16) / CAMERA_INPUT_CROP)
 #define CAMERA_SIZE ((CAMERA_INPUT_CROP * CAMERA_PPA_FRAG) / 16)
 #define CAMERA_WIDTH CAMERA_SIZE
 #define CAMERA_HEIGHT CAMERA_SIZE
@@ -47,10 +55,12 @@ typedef enum {
 static lv_obj_t *capture_screen = NULL;
 static lv_obj_t *camera_img = NULL;
 static void (*return_callback)(void) = NULL;
+static void (*pending_return_callback)(void) = NULL;
 
 static int camera_handle = -1;
 static lv_img_dsc_t img_dsc;
 static bool video_initialized = false;
+static bool video_stream_stopped_for_destroy = false;
 static EventGroupHandle_t camera_event_group = NULL;
 
 static uint8_t *display_buffer_a = NULL;
@@ -68,10 +78,23 @@ static uint8_t captured_entropy[32];
 static volatile bool entropy_captured = false;
 static volatile bool dialog_showing = false;
 
+static void deferred_return_cb(void *user_data);
+static void queue_return_callback(void);
 static void touch_event_cb(lv_event_t *e);
+static void back_btn_cb(lv_event_t *e);
 static void camera_frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index,
                             uint32_t camera_buf_hes, uint32_t camera_buf_ves,
                             size_t camera_buf_len);
+
+static int preview_top_y(void) {
+  int top = theme_get_small_padding() + theme_get_corner_button_height() +
+            theme_get_default_padding() / 2;
+  int max_top = theme_get_screen_height() - CAMERA_HEIGHT -
+                theme_get_default_padding();
+  if (max_top < theme_get_default_padding())
+    return theme_get_default_padding();
+  return top < max_top ? top : max_top;
+}
 
 static void low_entropy_prompt_cb(bool retry, void *user_data) {
   (void)user_data;
@@ -79,10 +102,27 @@ static void low_entropy_prompt_cb(bool retry, void *user_data) {
   if (!retry) {
     // User chose "No" - exit the capture page
     closing = true;
-    if (return_callback)
-      return_callback();
+    queue_return_callback();
   }
   // If retry (Yes), do nothing - user stays on camera page
+}
+
+static void deferred_return_cb(void *user_data) {
+  (void)user_data;
+
+  void (*callback)(void) = pending_return_callback;
+  pending_return_callback = NULL;
+
+  if (callback)
+    callback();
+}
+
+static void queue_return_callback(void) {
+  if (!return_callback)
+    return;
+
+  pending_return_callback = return_callback;
+  (void)lv_async_call(deferred_return_cb, NULL);
 }
 
 static uint8_t *allocate_buffer(size_t size) {
@@ -212,12 +252,11 @@ static void camera_frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index,
     return;
   }
 
-  if (!closing && !dialog_showing && bsp_display_lock(0)) {
+  if (!closing && !dialog_showing && bsp_display_lock(10)) {
     if (!closing && camera_img) {
       current_display_buffer = back_buffer;
       img_dsc.data = back_buffer;
       lv_img_set_src(camera_img, &img_dsc);
-      lv_refr_now(NULL);
     }
     bsp_display_unlock();
   }
@@ -226,8 +265,35 @@ static void camera_frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index,
 }
 
 static bool camera_init(void) {
-  if (video_initialized)
+  if (video_initialized) {
+    closing = false;
+    if (camera_event_group) {
+      xEventGroupClearBits(camera_event_group, CAMERA_EVENT_DELETE);
+      xEventGroupSetBits(camera_event_group, CAMERA_EVENT_TASK_RUN);
+    }
+
+    if (video_stream_stopped_for_destroy && camera_handle >= 0) {
+      esp_err_t start_err = app_video_stream_task_start(camera_handle, 0);
+      if (start_err == ESP_OK || start_err == ESP_ERR_INVALID_STATE) {
+        esp_err_t err = app_video_register_frame_operation_cb(
+            camera_frame_cb);
+        if (err != ESP_OK) {
+          ESP_LOGE(TAG, "Failed to register camera frame callback: %s",
+                   esp_err_to_name(err));
+          app_video_stream_task_stop(camera_handle);
+          video_stream_stopped_for_destroy = true;
+          return false;
+        }
+        video_stream_stopped_for_destroy = false;
+      } else {
+        ESP_LOGE(TAG, "Failed to resume camera stream: %s",
+                 esp_err_to_name(start_err));
+        return false;
+      }
+    }
+
     return true;
+  }
 
   camera_event_group = xEventGroupCreate();
   if (!camera_event_group)
@@ -247,7 +313,12 @@ static bool camera_init(void) {
   if (camera_handle < 0)
     return false;
 
-  ESP_ERROR_CHECK(app_video_register_frame_operation_cb(camera_frame_cb));
+  esp_err_t err = app_video_register_frame_operation_cb(camera_frame_cb);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to register camera frame callback: %s",
+             esp_err_to_name(err));
+    return false;
+  }
 
   img_dsc = (lv_img_dsc_t){
       .header = {.cf = LV_COLOR_FORMAT_RGB565,
@@ -263,10 +334,16 @@ static bool camera_init(void) {
   current_display_buffer = display_buffer_a;
   img_dsc.data = current_display_buffer;
 
-  ESP_ERROR_CHECK(app_video_set_bufs(camera_handle, CAM_BUF_NUM, NULL));
+  err = app_video_set_bufs(camera_handle, CAM_BUF_NUM, NULL);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to configure camera buffers: %s",
+             esp_err_to_name(err));
+    return false;
+  }
 
   if (app_video_stream_task_start(camera_handle, 0) != ESP_OK)
     return false;
+  video_stream_stopped_for_destroy = false;
 
   // Apply the wider AE hysteresis + gain cap — without this, the sensor keeps
   // its init-time ±8% window and uncapped gain ceiling, which causes
@@ -293,7 +370,7 @@ static void touch_event_cb(lv_event_t *e) {
 
   if (entropy < ENTROPY_THRESHOLD) {
     dialog_showing = true;
-    dialog_show_confirm("Low entropy\nTry again?", low_entropy_prompt_cb, NULL,
+    dialog_show_confirm("随机性不足\n重新拍摄？", low_entropy_prompt_cb, NULL,
                         DIALOG_STYLE_OVERLAY);
     return;
   }
@@ -306,9 +383,18 @@ static void touch_event_cb(lv_event_t *e) {
     memcpy(captured_entropy, hash, 32);
     entropy_captured = true;
     closing = true;
-    if (return_callback)
-      return_callback();
+    queue_return_callback();
   }
+}
+
+static void back_btn_cb(lv_event_t *e) {
+  (void)e;
+
+  if (closing)
+    return;
+
+  closing = true;
+  queue_return_callback();
 }
 
 void capture_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
@@ -333,11 +419,12 @@ void capture_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   lv_obj_t *frame = lv_obj_create(capture_screen);
   lv_obj_set_size(frame, CAMERA_WIDTH, CAMERA_HEIGHT);
-  lv_obj_center(frame);
+  lv_obj_align(frame, LV_ALIGN_TOP_MID, 0, preview_top_y());
   lv_obj_set_style_bg_opa(frame, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(frame, 0, 0);
   lv_obj_set_style_pad_all(frame, 0, 0);
   lv_obj_clear_flag(frame, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(frame, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(frame, touch_event_cb, LV_EVENT_CLICKED, NULL);
 
   camera_img = lv_img_create(frame);
@@ -347,15 +434,17 @@ void capture_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_bg_color(camera_img, lv_color_white(), 0);
   lv_obj_set_style_bg_opa(camera_img, LV_OPA_COVER, 0);
 
-  lv_obj_t *title =
-      theme_create_label(capture_screen, "Capture Entropy", false);
-  theme_apply_label(title, true);
-  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 8);
+  lv_obj_t *title = theme_create_page_title(capture_screen, "拍照生成随机熵");
+  lv_obj_set_width(title, LV_PCT(58));
+  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, theme_get_default_padding());
 
   lv_obj_t *instruction =
-      theme_create_label(capture_screen, "Tap to capture", false);
+      theme_create_label(capture_screen, "点击拍摄", false);
   lv_obj_set_style_text_color(instruction, highlight_color(), 0);
-  lv_obj_align(instruction, LV_ALIGN_BOTTOM_MID, 0, -10);
+  lv_obj_align(instruction, LV_ALIGN_BOTTOM_MID, 0,
+               -theme_get_default_padding());
+
+  ui_create_back_button(capture_screen, back_btn_cb);
 
   if (!camera_init()) {
     ESP_LOGE(TAG, "Failed to initialize camera");
@@ -384,6 +473,12 @@ void capture_entropy_page_destroy(void) {
     xEventGroupSetBits(camera_event_group, CAMERA_EVENT_DELETE);
   }
 
+  if (camera_handle >= 0) {
+    (void)app_video_register_frame_operation_cb(NULL);
+    (void)app_video_stream_task_stop(camera_handle);
+    video_stream_stopped_for_destroy = true;
+  }
+
   int wait = 0;
   while (__atomic_load_n(&active_frame_ops, __ATOMIC_SEQ_CST) > 0 &&
          wait < 30) {
@@ -392,10 +487,12 @@ void capture_entropy_page_destroy(void) {
   }
 
   if (camera_handle >= 0) {
-    app_video_stream_task_stop(camera_handle);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    app_video_close(camera_handle);
+    esp_err_t close_ret = app_video_close(camera_handle);
+    if (close_ret == ESP_ERR_TIMEOUT) {
+      ESP_LOGE(TAG, "Video close timeout; forced capture cleanup");
+    }
     camera_handle = -1;
+    video_stream_stopped_for_destroy = false;
   }
 
   bool locked = bsp_display_lock(1000);
@@ -428,6 +525,7 @@ void capture_entropy_page_destroy(void) {
   closing = false;
   dialog_showing = false;
   active_frame_ops = 0;
+  video_stream_stopped_for_destroy = false;
 }
 
 bool capture_entropy_get_hash(uint8_t *hash_out) {

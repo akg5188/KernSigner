@@ -61,15 +61,15 @@ static void show_detail_page(void) {
   detail_screen = theme_create_page_container(lv_screen_active());
 
   ui_create_back_button(detail_screen, detail_back_cb);
-  theme_create_page_title(detail_screen, "Default Wallet");
+  theme_create_page_title(detail_screen, "钱包默认项");
 
   int32_t dd_width = LV_HOR_RES * 35 / 100;
 
   // Network label + dropdown
-  lv_obj_t *net_label = theme_create_label(detail_screen, "Network", true);
+  lv_obj_t *net_label = theme_create_label(detail_screen, "网络", true);
   lv_obj_align(net_label, LV_ALIGN_CENTER, -(LV_HOR_RES / 4), -30);
 
-  network_dropdown = theme_create_dropdown(detail_screen, "Mainnet\nTestnet");
+  network_dropdown = theme_create_dropdown(detail_screen, "主网\n测试网");
   wallet_network_t cur_net = settings_get_default_network();
   lv_dropdown_set_selected(network_dropdown,
                            (cur_net == WALLET_NETWORK_MAINNET) ? 0 : 1);
@@ -79,11 +79,11 @@ static void show_detail_page(void) {
   lv_obj_align_to(network_dropdown, net_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 
   // Policy label + dropdown
-  lv_obj_t *pol_label = theme_create_label(detail_screen, "Policy", true);
+  lv_obj_t *pol_label = theme_create_label(detail_screen, "策略", true);
   lv_obj_align(pol_label, LV_ALIGN_CENTER, LV_HOR_RES / 4, -30);
 
   policy_dropdown =
-      theme_create_dropdown(detail_screen, "Single-sig\nMultisig");
+      theme_create_dropdown(detail_screen, "单签\n多签");
   wallet_policy_t cur_pol = settings_get_default_policy();
   lv_dropdown_set_selected(policy_dropdown,
                            (cur_pol == WALLET_POLICY_SINGLESIG) ? 0 : 1);
@@ -125,7 +125,7 @@ static void show_brightness_page(void) {
   brightness_screen = theme_create_page_container(lv_screen_active());
 
   ui_create_back_button(brightness_screen, brightness_back_cb);
-  theme_create_page_title(brightness_screen, "Screen Brightness");
+  theme_create_page_title(brightness_screen, "屏幕亮度");
 
   // Percentage label
   uint8_t cur = settings_get_brightness();
@@ -172,7 +172,7 @@ static void pin_setup_complete(void) {
   // Start session timeout after PIN setup
   uint16_t timeout = pin_get_session_timeout();
   if (timeout > 0)
-    session_start(timeout);
+    session_start_protected(timeout, PIN_DEFAULT_POWER_OFF_TIMEOUT_SEC);
   rebuild_menu();
 }
 
@@ -223,14 +223,14 @@ static void rebuild_menu(void) {
     ui_menu_destroy(settings_menu);
     settings_menu = NULL;
   }
-  settings_menu = ui_menu_create(settings_screen, "Settings", settings_back_cb);
+  settings_menu = ui_menu_create(settings_screen, "设置", settings_back_cb);
   if (pin_is_configured()) {
-    ui_menu_add_entry(settings_menu, "PIN Settings", pin_settings_cb);
+    ui_menu_add_entry(settings_menu, "PIN 设置", pin_settings_cb);
   } else {
-    ui_menu_add_entry(settings_menu, "Set Up PIN", setup_pin_cb);
+    ui_menu_add_entry(settings_menu, "设置 PIN", setup_pin_cb);
   }
-  ui_menu_add_entry(settings_menu, "Default Wallet", default_wallet_cb);
-  ui_menu_add_entry(settings_menu, "Screen Brightness", brightness_cb);
+  ui_menu_add_entry(settings_menu, "钱包默认项", default_wallet_cb);
+  ui_menu_add_entry(settings_menu, "屏幕亮度", brightness_cb);
 }
 
 // ── Public lifecycle ──

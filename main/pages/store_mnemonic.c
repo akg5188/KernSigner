@@ -63,14 +63,14 @@ static void do_save(void) {
 
   if (ret == ESP_OK) {
     const char *loc_name =
-        (target_location == STORAGE_FLASH) ? "flash" : "SD card";
+        (target_location == STORAGE_FLASH) ? "闪存" : "存储卡";
     char msg[128];
-    snprintf(msg, sizeof(msg), "Mnemonic saved to %s as: %s", loc_name,
+    snprintf(msg, sizeof(msg), "助记词已保存到%s，名称：%s", loc_name,
              saved_id);
-    dialog_show_info("Saved", msg, save_success_dialog_cb, NULL,
+    dialog_show_info("已保存", msg, save_success_dialog_cb, NULL,
                      DIALOG_STYLE_OVERLAY);
   } else {
-    dialog_show_error("Failed to save", go_back, 0);
+    dialog_show_error("保存失败", go_back, 0);
   }
 }
 
@@ -101,7 +101,7 @@ static void deferred_save_cb(lv_timer_t *timer) {
       progress_dialog = NULL;
     }
     dialog_show_danger_confirm(
-        "A backup with this ID already exists. Overwrite?",
+        "同名备份已经存在，是否覆盖？",
         overwrite_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
     return;
   }
@@ -126,7 +126,7 @@ static void encrypt_success_cb(const char *id, const uint8_t *envelope,
   /* Show "Saving..." and defer the actual save so LVGL can render
      before the potentially-blocking storage call */
   progress_dialog =
-      dialog_show_progress("KEF", "Saving...", DIALOG_STYLE_OVERLAY);
+      dialog_show_progress("加密备份", "正在保存...", DIALOG_STYLE_OVERLAY);
   save_timer = lv_timer_create(deferred_save_cb, 50, NULL);
   lv_timer_set_repeat_count(save_timer, 1);
 }
@@ -138,31 +138,38 @@ void store_mnemonic_page_create(lv_obj_t *parent, void (*return_cb)(void),
   if (!parent || !key_is_loaded())
     return;
 
+  if (location == STORAGE_FLASH) {
+    dialog_show_error("无状态模式不保存助记词到本机闪存", return_cb, 0);
+    return;
+  }
+
+  if (!key_mnemonic_is_valid()) {
+    dialog_show_error("临时助记词不能加密备份", return_cb, 0);
+    return;
+  }
+
   return_callback = return_cb;
   target_location = location;
 
   /* Get mnemonic and convert to compact SeedQR (binary entropy) */
   char *mnemonic = NULL;
   if (!key_get_mnemonic(&mnemonic) || !mnemonic) {
-    dialog_show_error("Failed to get mnemonic", return_cb, 0);
+    dialog_show_error("读取助记词失败", return_cb, 0);
     return;
   }
 
   compact_seedqr_data =
       mnemonic_to_compact_seedqr(mnemonic, &compact_seedqr_len);
 
-  /* Securely free mnemonic immediately */
-  secure_memzero(mnemonic, strlen(mnemonic));
-  wally_free_string(mnemonic);
+  SECURE_FREE_STRING(mnemonic);
 
   if (!compact_seedqr_data) {
-    dialog_show_error("Failed to prepare data", return_cb, 0);
+    dialog_show_error("准备数据失败", return_cb, 0);
     return;
   }
 
   /* Create background screen */
-  const char *title =
-      (location == STORAGE_FLASH) ? "Save to Flash" : "Save to SD Card";
+  const char *title = "保存到存储卡";
   main_screen = theme_create_page_container(parent);
   lv_obj_t *title_label = lv_label_create(main_screen);
   lv_label_set_text(title_label, title);

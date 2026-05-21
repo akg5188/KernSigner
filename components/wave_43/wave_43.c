@@ -7,6 +7,7 @@
 #include "driver/ledc.h"
 #include "esp_check.h"
 #include "esp_err.h"
+#include "esp_idf_version.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_st7701.h"
@@ -107,7 +108,11 @@ esp_err_t bsp_i2c_init(void) {
 }
 
 esp_err_t bsp_i2c_deinit(void) {
+  if (!i2c_initialized || !i2c_handle) {
+    return ESP_OK;
+  }
   BSP_ERROR_CHECK_RETURN_ERR(i2c_del_master_bus(i2c_handle));
+  i2c_handle = NULL;
   i2c_initialized = false;
   return ESP_OK;
 }
@@ -190,24 +195,39 @@ static esp_err_t bsp_enable_dsi_phy_power(void) {
 esp_err_t bsp_display_new(const bsp_display_config_t *config,
                           esp_lcd_panel_handle_t *ret_panel,
                           esp_lcd_panel_io_handle_t *ret_io) {
-  bsp_lcd_handles_t handles;
+  if (!ret_panel || !ret_io) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  *ret_panel = NULL;
+  *ret_io = NULL;
+
+  bsp_lcd_handles_t handles = {0};
   esp_err_t ret = bsp_display_new_with_handles(config, &handles);
 
-  *ret_panel = handles.panel;
-  *ret_io = handles.io;
+  if (ret == ESP_OK) {
+    *ret_panel = handles.panel;
+    *ret_io = handles.io;
+  }
 
   return ret;
 }
 
 esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config,
                                        bsp_lcd_handles_t *ret_handles) {
+  (void)config;
+  if (!ret_handles) {
+    return ESP_ERR_INVALID_ARG;
+  }
+  memset(ret_handles, 0, sizeof(*ret_handles));
+
   esp_err_t ret = ESP_OK;
 
   ESP_RETURN_ON_ERROR(bsp_display_brightness_init(), TAG,
                       "Brightness init failed");
   ESP_RETURN_ON_ERROR(bsp_enable_dsi_phy_power(), TAG, "DSI PHY power failed");
 
-  esp_lcd_dsi_bus_handle_t mipi_dsi_bus;
+  esp_lcd_dsi_bus_handle_t mipi_dsi_bus = NULL;
   esp_lcd_dsi_bus_config_t bus_config = {
       .bus_id = 0,
       .num_data_lanes = BSP_LCD_MIPI_DSI_LANE_NUM,
@@ -218,7 +238,7 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config,
                       "New DSI bus init failed");
 
   ESP_LOGI(TAG, "Install MIPI DSI LCD control panel");
-  esp_lcd_panel_io_handle_t io;
+  esp_lcd_panel_io_handle_t io = NULL;
   esp_lcd_dbi_io_config_t dbi_config = {
       .virtual_channel = 0,
       .lcd_cmd_bits = 8,
@@ -250,6 +270,12 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config,
               .vsync_pulse_width = 8,
               .vsync_front_porch = 60,
           },
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)
+      .flags =
+          {
+              .use_dma2d = 1,
+          },
+#endif
   };
 
   st7701_vendor_config_t vendor_config = {
@@ -278,8 +304,10 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config,
   };
   ESP_GOTO_ON_ERROR(esp_lcd_new_panel_st7701(io, &lcd_dev_config, &disp_panel),
                     err, TAG, "New LCD panel failed");
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
   ESP_GOTO_ON_ERROR(esp_lcd_dpi_panel_enable_dma2d(disp_panel), err, TAG,
                     "Enable DMA2D failed");
+#endif
   ESP_GOTO_ON_ERROR(esp_lcd_panel_reset(disp_panel), err, TAG,
                     "LCD panel reset failed");
   ESP_GOTO_ON_ERROR(esp_lcd_panel_init(disp_panel), err, TAG,
@@ -309,6 +337,12 @@ err:
 
 esp_err_t bsp_touch_new(const bsp_touch_config_t *config,
                         esp_lcd_touch_handle_t *ret_touch) {
+  (void)config;
+  if (!ret_touch) {
+    return ESP_ERR_INVALID_ARG;
+  }
+  *ret_touch = NULL;
+
   BSP_ERROR_CHECK_RETURN_ERR(bsp_i2c_init());
 
   /* GT911 can respond at either 0x5D (primary) or 0x14 (backup) depending
@@ -354,13 +388,21 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config,
       esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle), TAG,
       "");
 
-  return esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch);
+  esp_err_t ret = esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch);
+  if (ret != ESP_OK) {
+    esp_lcd_panel_io_del(tp_io_handle);
+  }
+  return ret;
 }
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
 static lv_display_t *bsp_display_lcd_init(void) {
-  bsp_lcd_handles_t lcd_panels;
-  BSP_ERROR_CHECK_RETURN_NULL(bsp_display_new_with_handles(NULL, &lcd_panels));
+  bsp_lcd_handles_t lcd_panels = {0};
+  esp_err_t ret = bsp_display_new_with_handles(NULL, &lcd_panels);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "LCD init failed: %s", esp_err_to_name(ret));
+    return NULL;
+  }
 
   ESP_LOGD(TAG, "Add LCD screen");
   esp_lv_adapter_display_config_t disp_cfg = {
@@ -381,18 +423,33 @@ static lv_display_t *bsp_display_lcd_init(void) {
       .te_sync = ESP_LV_ADAPTER_TE_SYNC_DISABLED(),
   };
 
-  return esp_lv_adapter_register_display(&disp_cfg);
+  lv_display_t *disp = esp_lv_adapter_register_display(&disp_cfg);
+  if (!disp) {
+    ESP_LOGE(TAG, "LVGL display registration failed");
+  }
+  return disp;
 }
 
 static lv_indev_t *bsp_display_indev_init(lv_display_t *disp) {
-  esp_lcd_touch_handle_t tp;
-  BSP_ERROR_CHECK_RETURN_NULL(bsp_touch_new(NULL, &tp));
-  assert(tp);
+  esp_lcd_touch_handle_t tp = NULL;
+  esp_err_t ret = bsp_touch_new(NULL, &tp);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Touch init failed: %s", esp_err_to_name(ret));
+    return NULL;
+  }
+  if (!tp) {
+    ESP_LOGE(TAG, "Touch init returned an empty handle");
+    return NULL;
+  }
 
   const esp_lv_adapter_touch_config_t touch_cfg =
       ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(disp, tp);
 
-  return esp_lv_adapter_register_touch(&touch_cfg);
+  lv_indev_t *indev = esp_lv_adapter_register_touch(&touch_cfg);
+  if (!indev) {
+    ESP_LOGE(TAG, "LVGL touch registration failed");
+  }
+  return indev;
 }
 
 lv_display_t *bsp_display_start(void) {
@@ -400,15 +457,32 @@ lv_display_t *bsp_display_start(void) {
   // Larger task stack: libwally descriptor parsing has deep call chains
   adapter_cfg.task_stack_size = 16384;
   adapter_cfg.stack_in_psram = false;
-  BSP_ERROR_CHECK_RETURN_NULL(esp_lv_adapter_init(&adapter_cfg));
+  esp_err_t ret = esp_lv_adapter_init(&adapter_cfg);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "LVGL adapter init failed: %s", esp_err_to_name(ret));
+    return NULL;
+  }
 
-  BSP_ERROR_CHECK_RETURN_NULL(bsp_display_brightness_init());
+  ret = bsp_display_brightness_init();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Brightness init failed: %s", esp_err_to_name(ret));
+    return NULL;
+  }
 
-  lv_display_t *disp;
-  BSP_NULL_CHECK(disp = bsp_display_lcd_init(), NULL);
-  BSP_NULL_CHECK(bsp_display_indev_init(disp), NULL);
+  lv_display_t *disp = bsp_display_lcd_init();
+  if (!disp) {
+    return NULL;
+  }
 
-  ESP_ERROR_CHECK(esp_lv_adapter_start());
+  if (!bsp_display_indev_init(disp)) {
+    return NULL;
+  }
+
+  ret = esp_lv_adapter_start();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "LVGL adapter start failed: %s", esp_err_to_name(ret));
+    return NULL;
+  }
 
   return disp;
 }

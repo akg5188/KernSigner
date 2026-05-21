@@ -1,4 +1,4 @@
-// PIN settings page — manage PIN, timeout, wipe threshold
+// PIN settings page — manage PIN, timeout, and shutdown protection threshold.
 
 #ifndef PIN_SETTINGS_H
 #define PIN_SETTINGS_H

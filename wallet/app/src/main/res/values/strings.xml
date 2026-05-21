@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Satochip 钱包</string>
+    <string name="brand_name">Satochip</string>
+    <string name="scan_title_default">扫码</string>
+    <string name="scan_title_request">扫描钱包二维码</string>
+    <string name="scan_title_response">扫描树莓派结果</string>
+    <string name="scan_status_request">请连续扫描 TP / OKX / Bitget 的高密度二维码</string>
+    <string name="scan_status_response">请扫描树莓派结果二维码</string>
+    <string name="scan_torch_on">打开补光灯</string>
+    <string name="scan_torch_off">关闭补光灯</string>
+    <string name="scan_pick_gallery">相册导入</string>
+    <string name="scan_pick_video">导入视频</string>
+    <string name="scan_cancel">取消</string>
+</resources>

@@ -1,4 +1,4 @@
-// Manual Mnemonic Input Page - BIP39 word entry with smart filtering
+// Manual 助记词 Input Page - BIP39 word entry with smart filtering
 
 #include "manual_input.h"
 #include "../../ui/dialog.h"
@@ -6,7 +6,6 @@
 #include "../../ui/keyboard.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
-#include "../../ui/word_selector.h"
 #include "../../utils/bip39_filter.h"
 #include "../shared/mnemonic_editor.h"
 #include <lvgl.h>
@@ -37,6 +36,7 @@ static char current_prefix[BIP39_MAX_PREFIX_LEN + 1];
 static int prefix_len = 0;
 
 static const char *filtered_words[BIP39_MAX_FILTERED_WORDS];
+static char filtered_labels[BIP39_MAX_FILTERED_WORDS][32];
 static int filtered_count = 0;
 static input_mode_t current_mode = MODE_WORD_COUNT_SELECT;
 static char pending_word[16] = {0};
@@ -49,6 +49,11 @@ static void create_word_select_menu(void);
 static void update_keyboard_state(void);
 static void filter_words_by_prefix(void);
 static void on_word_count_selected(int word_count);
+static void word_count_12_cb(void);
+static void word_count_15_cb(void);
+static void word_count_18_cb(void);
+static void word_count_21_cb(void);
+static void word_count_24_cb(void);
 static void keyboard_callback(char key);
 static void word_selected_cb(void);
 static void back_to_keyboard_cb(void);
@@ -86,8 +91,15 @@ static void show_word_confirmation(const char *word) {
   strncpy(pending_word, word, sizeof(pending_word) - 1);
   pending_word[sizeof(pending_word) - 1] = '\0';
 
-  char msg[64];
-  snprintf(msg, sizeof(msg), "Word %d: %s", current_word_index + 1, word);
+  int word_index = bip39_filter_get_word_index(word);
+  char msg[96];
+  if (word_index >= 0) {
+    snprintf(msg, sizeof(msg), "词 %d\n序号：%04d\n%s",
+             current_word_index + 1, word_index, word);
+  } else {
+    snprintf(msg, sizeof(msg), "词 %d\n序号：未知\n%s",
+             current_word_index + 1, word);
+  }
 
   dialog_show_confirm(msg, word_confirmation_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
@@ -132,8 +144,17 @@ static void word_confirmation_cb(bool confirmed, void *user_data) {
 static void create_word_count_menu(void) {
   cleanup_ui();
   current_mode = MODE_WORD_COUNT_SELECT;
-  ui_word_count_selector_create(manual_input_screen, back_cb,
-                                on_word_count_selected);
+
+  current_menu = ui_menu_create(manual_input_screen, "词数", back_cb);
+  if (!current_menu)
+    return;
+
+  ui_menu_add_entry(current_menu, "12词", word_count_12_cb);
+  ui_menu_add_entry(current_menu, "15词", word_count_15_cb);
+  ui_menu_add_entry(current_menu, "18词", word_count_18_cb);
+  ui_menu_add_entry(current_menu, "21词", word_count_21_cb);
+  ui_menu_add_entry(current_menu, "24词", word_count_24_cb);
+  ui_menu_show(current_menu);
 }
 
 static void update_keyboard_state(void) {
@@ -144,10 +165,10 @@ static void update_keyboard_state(void) {
   bool is_last_word =
       checksum_filter_mode && current_word_index == total_words - 1;
   if (is_last_word) {
-    snprintf(title, sizeof(title), "Word %d/%d (checksum)",
+    snprintf(title, sizeof(title), "校验词 %d/%d",
              current_word_index + 1, total_words);
   } else {
-    snprintf(title, sizeof(title), "Word %d/%d", current_word_index + 1,
+    snprintf(title, sizeof(title), "词 %d/%d", current_word_index + 1,
              total_words);
   }
   ui_keyboard_set_title(keyboard, title);
@@ -181,8 +202,7 @@ static void back_confirm_cb(bool confirmed, void *user_data) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("Are you sure?", back_confirm_cb, NULL,
-                      DIALOG_STYLE_OVERLAY);
+  dialog_show_confirm("返回？", back_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
 
 static void create_keyboard_input(void) {
@@ -190,7 +210,7 @@ static void create_keyboard_input(void) {
   current_mode = MODE_KEYBOARD_INPUT;
 
   char title[48];
-  snprintf(title, sizeof(title), "Word %d/%d", current_word_index + 1,
+  snprintf(title, sizeof(title), "词 %d/%d", current_word_index + 1,
            total_words);
 
   keyboard = ui_keyboard_create(manual_input_screen, title, keyboard_callback);
@@ -215,7 +235,7 @@ static void create_word_select_menu(void) {
   }
 
   char title[64];
-  snprintf(title, sizeof(title), "Select: %s...", current_prefix);
+  snprintf(title, sizeof(title), "选词：%s", current_prefix);
 
   current_menu =
       ui_menu_create(manual_input_screen, title, back_to_keyboard_cb);
@@ -223,7 +243,14 @@ static void create_word_select_menu(void) {
     return;
 
   for (int i = 0; i < filtered_count; i++) {
-    ui_menu_add_entry(current_menu, filtered_words[i], word_selected_cb);
+    int word_index = bip39_filter_get_word_index(filtered_words[i]);
+    if (word_index >= 0) {
+      snprintf(filtered_labels[i], sizeof(filtered_labels[i]), "%04d  %s",
+               word_index, filtered_words[i]);
+      ui_menu_add_entry(current_menu, filtered_labels[i], word_selected_cb);
+    } else {
+      ui_menu_add_entry(current_menu, filtered_words[i], word_selected_cb);
+    }
   }
   ui_menu_show(current_menu);
 }
@@ -236,6 +263,16 @@ static void on_word_count_selected(int word_count) {
   secure_memzero(entered_words, sizeof(entered_words));
   create_keyboard_input();
 }
+
+static void word_count_12_cb(void) { on_word_count_selected(12); }
+
+static void word_count_15_cb(void) { on_word_count_selected(15); }
+
+static void word_count_18_cb(void) { on_word_count_selected(18); }
+
+static void word_count_21_cb(void) { on_word_count_selected(21); }
+
+static void word_count_24_cb(void) { on_word_count_selected(24); }
 
 static void keyboard_callback(char key) {
   if (key >= 'a' && key <= 'z') {
@@ -333,6 +370,7 @@ static void finish_mnemonic(void) {
   mnemonic_editor_page_create(lv_screen_active(), return_callback,
                               success_callback, mnemonic, checksum_filter_mode);
   mnemonic_editor_page_show();
+  secure_memzero(mnemonic, sizeof(mnemonic));
 }
 
 void manual_input_page_create(lv_obj_t *parent, void (*return_cb)(void),
@@ -346,7 +384,7 @@ void manual_input_page_create(lv_obj_t *parent, void (*return_cb)(void),
   checksum_filter_mode = checksum_filter_last_word;
 
   if (!bip39_filter_init()) {
-    dialog_show_error("Failed to load wordlist", return_cb, 0);
+    dialog_show_error("词表加载失败", return_cb, 0);
     return;
   }
 
@@ -392,6 +430,7 @@ void manual_input_page_destroy(void) {
   secure_memzero(entered_words, sizeof(entered_words));
   secure_memzero(current_prefix, sizeof(current_prefix));
   secure_memzero(pending_word, sizeof(pending_word));
+  secure_memzero(filtered_labels, sizeof(filtered_labels));
 
   return_callback = NULL;
   success_callback = NULL;

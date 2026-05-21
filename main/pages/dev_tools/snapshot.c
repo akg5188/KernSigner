@@ -215,7 +215,8 @@ static bool camera_init(void) {
   if (camera_handle < 0)
     return false;
 
-  ESP_ERROR_CHECK(app_video_register_frame_operation_cb(camera_frame_cb));
+  if (app_video_register_frame_operation_cb(camera_frame_cb) != ESP_OK)
+    return false;
 
   img_dsc = (lv_img_dsc_t){
       .header = {.cf = LV_COLOR_FORMAT_RGB565,
@@ -253,7 +254,7 @@ static void capture_btn_cb(lv_event_t *e) {
 
   if (!sd_card_is_mounted()) {
     if (sd_card_init() != ESP_OK) {
-      dialog_show_message("Error", "Failed to mount SD card");
+      dialog_show_message("错误", "存储卡挂载失败");
       return;
     }
   }
@@ -266,10 +267,10 @@ static void capture_btn_cb(lv_event_t *e) {
 
   if (save_pgm_file(grayscale_buffer, filename) == ESP_OK) {
     char msg[80];
-    snprintf(msg, sizeof(msg), "Saved: %s", strrchr(filename, '/') + 1);
-    dialog_show_message("Snapshot", msg);
+    snprintf(msg, sizeof(msg), "已保存：%s", strrchr(filename, '/') + 1);
+    dialog_show_message("相机快照", msg);
   } else {
-    dialog_show_message("Error", "Failed to save snapshot");
+    dialog_show_message("错误", "快照保存失败");
   }
 }
 
@@ -305,13 +306,13 @@ void snapshot_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_bg_color(camera_img, lv_color_white(), 0);
   lv_obj_set_style_bg_opa(camera_img, LV_OPA_COVER, 0);
 
-  lv_obj_t *title = theme_create_label(snapshot_screen, "Snapshot", false);
+  lv_obj_t *title = theme_create_label(snapshot_screen, "相机快照", false);
   theme_apply_label(title, true);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 8);
 
   back_btn = ui_create_back_button(snapshot_screen, back_btn_cb);
 
-  capture_btn = theme_create_button(snapshot_screen, "Capture", true);
+  capture_btn = theme_create_button(snapshot_screen, "拍摄", true);
   lv_obj_align(capture_btn, LV_ALIGN_BOTTOM_MID, 0, -20);
   lv_obj_add_event_cb(capture_btn, capture_btn_cb, LV_EVENT_CLICKED, NULL);
 
@@ -342,6 +343,11 @@ void snapshot_page_destroy(void) {
     xEventGroupSetBits(camera_event_group, CAMERA_EVENT_DELETE);
   }
 
+  if (camera_handle >= 0) {
+    (void)app_video_register_frame_operation_cb(NULL);
+    (void)app_video_stream_task_stop(camera_handle);
+  }
+
   int wait = 0;
   while (__atomic_load_n(&active_frame_ops, __ATOMIC_SEQ_CST) > 0 &&
          wait < 30) {
@@ -350,9 +356,9 @@ void snapshot_page_destroy(void) {
   }
 
   if (camera_handle >= 0) {
-    app_video_stream_task_stop(camera_handle);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    app_video_close(camera_handle);
+    esp_err_t close_ret = app_video_close(camera_handle);
+    if (close_ret == ESP_ERR_TIMEOUT)
+      ESP_LOGE(TAG, "Video close timeout; forced snapshot cleanup");
     camera_handle = -1;
   }
 

@@ -438,6 +438,183 @@ static void test_psbt_classify_fixture_e(void) {
   PASS();
 }
 
+static void test_psbt_sign_gate_fixture_a(void) {
+  TEST("psbt_sign gate: fixture A accepted");
+
+  struct ext_key *derived = NULL;
+  if (!key_get_derived_key("m/84'/0'/0'/0/0", &derived)) {
+    FAIL("key derivation failed");
+    return;
+  }
+
+  uint8_t kp_val[] = {
+      0x00, 0x00, 0x00, 0x00, /* fingerprint */
+      0x54, 0x00, 0x00, 0x80, /* 84' */
+      0x00, 0x00, 0x00, 0x80, /* 0'  */
+      0x00, 0x00, 0x00, 0x80, /* 0'  */
+      0x00, 0x00, 0x00, 0x00, /* 0   */
+      0x00, 0x00, 0x00, 0x00, /* 0   */
+  };
+
+  struct wally_psbt *psbt =
+      make_test_psbt(REF_SPK_P2WPKH, sizeof(REF_SPK_P2WPKH), derived->pub_key,
+                     sizeof(derived->pub_key), kp_val, sizeof(kp_val));
+  bip32_key_free(derived);
+  if (!psbt) {
+    FAIL("make_test_psbt");
+    return;
+  }
+
+  bool ok = psbt_inputs_verified_for_signing(psbt, false);
+  wally_psbt_free(psbt);
+
+  if (!ok) {
+    FAIL("verified-owned input must pass signing gate");
+    return;
+  }
+  PASS();
+}
+
+static void test_psbt_sign_gate_wrong_account(void) {
+  TEST("psbt_sign gate: account 1 rejected");
+
+  struct ext_key *derived = NULL;
+  if (!key_get_derived_key("m/84'/0'/1'/0/0", &derived)) {
+    FAIL("key derivation failed");
+    return;
+  }
+
+  uint8_t kp_val[] = {
+      0x00, 0x00, 0x00, 0x00, /* fingerprint */
+      0x54, 0x00, 0x00, 0x80, /* 84' */
+      0x00, 0x00, 0x00, 0x80, /* 0'  */
+      0x01, 0x00, 0x00, 0x80, /* 1'  */
+      0x00, 0x00, 0x00, 0x00, /* 0   */
+      0x00, 0x00, 0x00, 0x00, /* 0   */
+  };
+
+  uint8_t spk[34];
+  uint8_t redeem[256];
+  size_t spk_len = 0;
+  size_t redeem_len = 0;
+  if (!ss_scriptpubkey_with_redeem(SS_SCRIPT_P2WPKH, 1, 0, 0, false, spk,
+                                   &spk_len, redeem, &redeem_len)) {
+    bip32_key_free(derived);
+    FAIL("script generation failed");
+    return;
+  }
+
+  struct wally_psbt *psbt =
+      make_test_psbt(spk, spk_len, derived->pub_key, sizeof(derived->pub_key),
+                     kp_val, sizeof(kp_val));
+  bip32_key_free(derived);
+  if (!psbt) {
+    FAIL("make_test_psbt");
+    return;
+  }
+
+  input_ownership_t r = psbt_classify_input(psbt, 0, false);
+  if (!r.owned || !r.verified) {
+    wally_psbt_free(psbt);
+    FAIL("fixture should be script-verified before account gate");
+    return;
+  }
+
+  if (psbt_inputs_verified_for_signing(psbt, false)) {
+    wally_psbt_free(psbt);
+    FAIL("non-current account must fail signing gate");
+    return;
+  }
+
+  size_t signed_count = psbt_sign(psbt, false);
+  wally_psbt_free(psbt);
+  if (signed_count != 0) {
+    FAIL("non-current account must not be signed");
+    return;
+  }
+  PASS();
+}
+
+static void test_psbt_sign_gate_fixture_d(void) {
+  TEST("psbt_sign gate: fixture D rejected before signing");
+
+  struct ext_key *derived = NULL;
+  if (!key_get_derived_key("m/84'/0'/0'/0/0", &derived)) {
+    FAIL("key derivation failed");
+    return;
+  }
+
+  uint8_t kp_val[] = {
+      0x00, 0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80,
+      0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  };
+
+  struct wally_psbt *psbt =
+      make_test_psbt(REF_SPK_P2PKH, sizeof(REF_SPK_P2PKH), derived->pub_key,
+                     sizeof(derived->pub_key), kp_val, sizeof(kp_val));
+  bip32_key_free(derived);
+  if (!psbt) {
+    FAIL("make_test_psbt");
+    return;
+  }
+
+  if (psbt_inputs_verified_for_signing(psbt, false)) {
+    FAIL("wrong UTXO script must fail signing gate");
+    wally_psbt_free(psbt);
+    return;
+  }
+
+  size_t signed_count = psbt_sign(psbt, false);
+  wally_psbt_free(psbt);
+  if (signed_count != 0) {
+    FAIL("wrong UTXO script must not be signed");
+    return;
+  }
+  PASS();
+}
+
+static void test_psbt_sign_gate_fixture_e(void) {
+  TEST("psbt_sign gate: fixture E rejected before signing");
+
+  struct ext_key *derived = NULL;
+  if (!key_get_derived_key("m/84'/0'/0'/0/0", &derived)) {
+    FAIL("key derivation failed");
+    return;
+  }
+
+  uint8_t kp_val[] = {
+      0x00, 0x00, 0x00, 0x00, /* fingerprint = 00000000 (matches stub) */
+      0x63, 0x00, 0x00, 0x80, /* 99' = 0x80000063 LE                   */
+      0x00, 0x00, 0x00, 0x80, /* 0'                                    */
+      0x00, 0x00, 0x00, 0x80, /* 0'                                    */
+      0x00, 0x00, 0x00, 0x00, /* 0                                     */
+      0x00, 0x00, 0x00, 0x00, /* 0                                     */
+  };
+
+  struct wally_psbt *psbt =
+      make_test_psbt(REF_SPK_P2WPKH, sizeof(REF_SPK_P2WPKH), derived->pub_key,
+                     sizeof(derived->pub_key), kp_val, sizeof(kp_val));
+  bip32_key_free(derived);
+  if (!psbt) {
+    FAIL("make_test_psbt");
+    return;
+  }
+
+  if (psbt_inputs_verified_for_signing(psbt, false)) {
+    FAIL("unknown derivation path must fail signing gate");
+    wally_psbt_free(psbt);
+    return;
+  }
+
+  size_t signed_count = psbt_sign(psbt, false);
+  wally_psbt_free(psbt);
+  if (signed_count != 0) {
+    FAIL("unknown derivation path must not be signed");
+    return;
+  }
+  PASS();
+}
+
 static void test_psbt_classify_fixture_b(void) {
   TEST("psbt_classify_output: fixture B (BIP86 taproot owned + external)");
 
@@ -745,6 +922,13 @@ int main(void) {
   test_psbt_classify_fixture_a();
   test_psbt_classify_fixture_d();
   test_psbt_classify_fixture_e();
+
+  printf("\n=== psbt_sign gate tests ===\n\n");
+
+  test_psbt_sign_gate_fixture_a();
+  test_psbt_sign_gate_wrong_account();
+  test_psbt_sign_gate_fixture_d();
+  test_psbt_sign_gate_fixture_e();
 
   printf("\n=== psbt_classify_output tests ===\n\n");
 

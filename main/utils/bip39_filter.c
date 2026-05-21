@@ -110,11 +110,11 @@ int bip39_filter_get_valid_last_words(const char entered_words[24][16],
                                       int max_words) {
   if (!wordlist || !entered_words || !out_words || max_words <= 0)
     return 0;
-  if (word_count != 12 && word_count != 24)
+  if (word_count != 12 && word_count != 15 && word_count != 18 &&
+      word_count != 21 && word_count != 24)
     return 0;
 
-  // 12 words: 128 bits entropy + 4 bits checksum, last word has 7 entropy bits
-  // 24 words: 256 bits entropy + 8 bits checksum, last word has 3 entropy bits
+  // BIP39: checksum bits = word_count / 3.
   size_t checksum_bits = word_count / 3;
   size_t entropy_bytes = ((word_count * 11) - checksum_bits) / 8;
   size_t last_word_entropy_bits = 11 - checksum_bits;

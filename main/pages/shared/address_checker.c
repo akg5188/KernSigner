@@ -53,7 +53,7 @@ static void not_found_confirm_cb(bool confirmed, void *user_data) {
 // (especially for multisig) and blocks the LVGL loop. Show a progress overlay
 // first, then defer the work via a one-shot timer so LVGL can render it.
 static void perform_sweep(void) {
-  progress_dialog = dialog_show_progress("Verifying", "Checking addresses...",
+  progress_dialog = dialog_show_progress("正在验证", "正在检查地址...",
                                          DIALOG_STYLE_FULLSCREEN);
   lv_timer_t *t = lv_timer_create(perform_sweep_deferred, 50, NULL);
   lv_timer_set_repeat_count(t, 1);
@@ -80,8 +80,8 @@ static void perform_sweep_deferred(lv_timer_t *timer) {
       wally_free_string(address);
       dismiss_progress();
       char msg[64];
-      snprintf(msg, sizeof(msg), "Receive #%u", i);
-      dialog_show_info("Address Verified", msg, found_info_cb, NULL,
+      snprintf(msg, sizeof(msg), "收款地址 #%u", i);
+      dialog_show_info("地址已验证", msg, found_info_cb, NULL,
                        DIALOG_STYLE_FULLSCREEN);
       return;
     }
@@ -105,8 +105,8 @@ static void perform_sweep_deferred(lv_timer_t *timer) {
       wally_free_string(address);
       dismiss_progress();
       char msg[64];
-      snprintf(msg, sizeof(msg), "Change #%u", i);
-      dialog_show_info("Address Verified", msg, found_info_cb, NULL,
+      snprintf(msg, sizeof(msg), "找零地址 #%u", i);
+      dialog_show_info("地址已验证", msg, found_info_cb, NULL,
                        DIALOG_STYLE_FULLSCREEN);
       return;
     }
@@ -118,9 +118,9 @@ static void perform_sweep_deferred(lv_timer_t *timer) {
   // Not found
   char msg[192];
   snprintf(msg, sizeof(msg),
-           "Address not found in first %u addresses.\n\n"
-           "(Check if loaded wallet settings match coordinator's)\n\n"
-           "Search %u more?",
+           "前 %u 个地址里没有找到。\n\n"
+           "请确认当前钱包设置和协调器一致。\n\n"
+           "继续多搜索 %u 个？",
            search_limit, SEARCH_BATCH);
   dialog_show_confirm(msg, not_found_confirm_cb, NULL, DIALOG_STYLE_FULLSCREEN);
 }
@@ -160,7 +160,7 @@ void address_checker_check(const char *raw_content, void (*found_cb)(void),
                                      &written) == WALLY_OK);
   if (!valid) {
     free(content);
-    dialog_show_error("Invalid address", invalid_address_cb, 0);
+    dialog_show_error("地址无效", invalid_address_cb, 0);
     return;
   }
 

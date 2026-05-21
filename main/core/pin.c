@@ -3,9 +3,13 @@
 #include "pin.h"
 #include "../utils/secure_mem.h"
 #include "crypto_utils.h"
+#include "key.h"
+#include "mnemonic_slots.h"
 #include "settings.h"
 #include "storage.h"
+#include "wallet.h"
 
+#include <bsp/pmic.h>
 #include <esp_efuse.h>
 #include <esp_hmac.h>
 #include <esp_log.h>
@@ -33,6 +37,20 @@ static const char *FALLBACK_SALT_TAG = "C-Krux-fallback-salt-v1";
 static nvs_handle_t pin_nvs;
 static bool initialized = false;
 
+static void pin_power_off_protect(void) {
+  ESP_LOGW(TAG, "PIN protection shutdown requested");
+  mnemonic_slots_clear_all();
+  key_unload();
+  wallet_unload();
+  (void)bsp_pmic_init();
+  if (bsp_pmic_power_off() == ESP_OK)
+    return;
+
+  // Boards without PMIC power-off support cannot cut power in software, so
+  // restart into the boot PIN gate after clearing secrets from RAM.
+  esp_restart();
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -53,6 +71,11 @@ static esp_err_t compute_device_salt(uint8_t salt_out[PIN_HASH_SIZE]) {
 
   if (err == ESP_OK)
     return ESP_OK;
+
+#ifdef CONFIG_KERN_PRODUCTION_REQUIRE_PIN_HMAC
+  ESP_LOGE(TAG, "HMAC peripheral unavailable in production PIN mode");
+  return err;
+#endif
 
   // Fallback: deterministic salt (no eFuse)
   ESP_LOGW(TAG, "HMAC peripheral unavailable, using fallback salt");
@@ -269,6 +292,7 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
 
   uint8_t max_fail = PIN_DEFAULT_MAX_FAILURES;
   nvs_get_u8(pin_nvs, KEY_MAX_FAIL, &max_fail);
+  max_fail = PIN_DEFAULT_MAX_FAILURES;
 
   // Pre-increment failure count and commit before the slow PBKDF2 so that
   // a power-cut during verification cannot gift the attacker a free attempt.
@@ -276,15 +300,16 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
   nvs_set_u8(pin_nvs, KEY_FAIL_CNT, pending_cnt);
   nvs_commit(pin_nvs);
 
-  // Always run PBKDF2 to prevent timing oracle at wipe threshold
+  // Always run PBKDF2 before threshold handling. A correct PIN on the last
+  // allowed attempt must still unlock and reset the counter.
   uint8_t salt[PIN_HASH_SIZE];
   if (compute_device_salt(salt) != ESP_OK) {
     secure_memzero(salt, sizeof(salt));
     if (pending_cnt >= max_fail) {
-      pin_wipe_all();
+      pin_power_off_protect();
       return PIN_VERIFY_WIPED; // unreachable
     }
-    return PIN_VERIFY_WRONG;
+    return PIN_VERIFY_DELAY;
   }
 
   uint8_t attempt_hash[PIN_HASH_SIZE];
@@ -295,19 +320,10 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
   if (rc != CRYPTO_OK) {
     secure_memzero(attempt_hash, sizeof(attempt_hash));
     if (pending_cnt >= max_fail) {
-      pin_wipe_all();
+      pin_power_off_protect();
       return PIN_VERIFY_WIPED; // unreachable
     }
-    return PIN_VERIFY_WRONG;
-  }
-
-  // Check wipe threshold after PBKDF2 (uniform timing)
-  if (pending_cnt >= max_fail) {
-    secure_memzero(attempt_hash, sizeof(attempt_hash));
-    ESP_LOGW(TAG, "Max failures reached (%u/%u), wiping device", pending_cnt,
-             max_fail);
-    pin_wipe_all();
-    return PIN_VERIFY_WIPED; // unreachable
+    return PIN_VERIFY_DELAY;
   }
 
   // Load stored hash
@@ -317,7 +333,11 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
   if (err != ESP_OK || hash_len != PIN_HASH_SIZE) {
     secure_memzero(attempt_hash, sizeof(attempt_hash));
     secure_memzero(stored_hash, sizeof(stored_hash));
-    return PIN_VERIFY_WRONG;
+    if (pending_cnt >= max_fail) {
+      pin_power_off_protect();
+      return PIN_VERIFY_WIPED; // unreachable
+    }
+    return PIN_VERIFY_DELAY;
   }
 
   // Constant-time comparison
@@ -332,7 +352,14 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
     return PIN_VERIFY_OK;
   }
 
-  // Wrong PIN — failure count was already persisted above
+  // Wrong PIN — failure count was already persisted above.
+  if (pending_cnt >= max_fail) {
+    ESP_LOGW(TAG, "Max failures reached (%u/%u), powering off for protection",
+             pending_cnt, max_fail);
+    pin_power_off_protect();
+    return PIN_VERIFY_WIPED; // unreachable
+  }
+
   return PIN_VERIFY_DELAY;
 }
 
@@ -385,9 +412,7 @@ uint8_t pin_get_fail_count(void) {
 uint8_t pin_get_max_failures(void) {
   if (!initialized)
     return PIN_DEFAULT_MAX_FAILURES;
-  uint8_t val = PIN_DEFAULT_MAX_FAILURES;
-  nvs_get_u8(pin_nvs, KEY_MAX_FAIL, &val);
-  return val;
+  return PIN_DEFAULT_MAX_FAILURES;
 }
 
 bool pin_has_anti_phishing(void) {
@@ -403,12 +428,19 @@ uint16_t pin_get_session_timeout(void) {
     return PIN_DEFAULT_TIMEOUT_SEC;
   uint16_t val = PIN_DEFAULT_TIMEOUT_SEC;
   nvs_get_u16(pin_nvs, KEY_TIMEOUT, &val);
+  if (val != PIN_DEFAULT_TIMEOUT_SEC) {
+    val = PIN_DEFAULT_TIMEOUT_SEC;
+    nvs_set_u16(pin_nvs, KEY_TIMEOUT, val);
+    nvs_commit(pin_nvs);
+  }
   return val;
 }
 
 esp_err_t pin_set_session_timeout(uint16_t sec) {
   if (!initialized)
     return ESP_ERR_INVALID_STATE;
+  if (sec != PIN_DEFAULT_TIMEOUT_SEC)
+    return ESP_ERR_INVALID_ARG;
   esp_err_t err = nvs_set_u16(pin_nvs, KEY_TIMEOUT, sec);
   if (err != ESP_OK)
     return err;
@@ -418,7 +450,7 @@ esp_err_t pin_set_session_timeout(uint16_t sec) {
 esp_err_t pin_set_max_failures(uint8_t max) {
   if (!initialized)
     return ESP_ERR_INVALID_STATE;
-  if (max < 5 || max > 50)
+  if (max != PIN_DEFAULT_MAX_FAILURES)
     return ESP_ERR_INVALID_ARG;
   esp_err_t err = nvs_set_u8(pin_nvs, KEY_MAX_FAIL, max);
   if (err != ESP_OK)

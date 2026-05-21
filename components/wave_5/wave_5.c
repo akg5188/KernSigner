@@ -6,6 +6,7 @@
 #include "driver/ledc.h"
 #include "esp_check.h"
 #include "esp_err.h"
+#include "esp_idf_version.h"
 #include "esp_lcd_hx8394.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "driver/i2c_master.h"
@@ -219,6 +220,12 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config,
               .vsync_pulse_width = 4,
               .vsync_front_porch = 24,
           },
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)
+      .flags =
+          {
+              .use_dma2d = 1,
+          },
+#endif
   };
 
   hx8394_vendor_config_t vendor_config = {
@@ -242,8 +249,10 @@ esp_err_t bsp_display_new_with_handles(const bsp_display_config_t *config,
   };
   ESP_GOTO_ON_ERROR(esp_lcd_new_panel_hx8394(io, &lcd_dev_config, &disp_panel),
                     err, TAG, "New LCD panel failed");
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
   ESP_GOTO_ON_ERROR(esp_lcd_dpi_panel_enable_dma2d(disp_panel), err, TAG,
                     "Enable DMA2D failed");
+#endif
   ESP_GOTO_ON_ERROR(esp_lcd_panel_reset(disp_panel), err, TAG,
                     "LCD panel reset failed");
   ESP_GOTO_ON_ERROR(esp_lcd_panel_init(disp_panel), err, TAG,

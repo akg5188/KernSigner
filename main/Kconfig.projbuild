@@ -19,4 +19,13 @@ menu "Kern Configuration"
             bool "Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 (480x800 MIPI DSI)"
     endchoice
 
+    config KERN_PRODUCTION_REQUIRE_PIN_HMAC
+        bool "Production: require eFuse HMAC key for PIN salt"
+        default n
+        help
+            Development builds may fall back to a deterministic PIN salt so a
+            fresh board can be tested before eFuse provisioning. Commercial
+            real-funds builds must enable this option so PIN setup/verification
+            fails unless eFuse KEY5 is provisioned for the HMAC peripheral.
+
 endmenu

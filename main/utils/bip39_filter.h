@@ -61,7 +61,7 @@ void bip39_filter_clear_last_word_cache(void);
 /**
  * Get all valid last words that produce a valid checksum given first N-1 words.
  * @param entered_words Array of first N-1 words (plus placeholder for last)
- * @param word_count Total word count (12 or 24)
+ * @param word_count Total word count (12/15/18/21/24)
  * @param out_words Array to receive valid last word pointers
  * @param max_words Maximum words to return
  * @return Number of valid last words found
@@ -74,7 +74,7 @@ int bip39_filter_get_valid_last_words(const char entered_words[24][16],
  * Get bitmask of valid keyboard letters for last word position.
  * Only letters that could start a checksum-valid last word are enabled.
  * @param entered_words Array of first N-1 words
- * @param word_count Total word count (12 or 24)
+ * @param word_count Total word count (12/15/18/21/24)
  * @param prefix Current prefix being typed for last word
  * @param prefix_len Length of prefix
  * @return 26-bit mask (bits 0-25 for a-z)
@@ -87,7 +87,7 @@ bip39_filter_get_valid_letters_for_last_word(const char entered_words[24][16],
 /**
  * Filter valid last words by prefix.
  * @param entered_words Array of first N-1 words
- * @param word_count Total word count (12 or 24)
+ * @param word_count Total word count (12/15/18/21/24)
  * @param prefix Prefix to filter by
  * @param prefix_len Length of prefix
  * @param out_words Array to receive matching word pointers

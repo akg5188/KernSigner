@@ -48,6 +48,9 @@ typedef enum {
  * @brief SeedQR size constants (4 digits per word)
  */
 #define SEEDQR_12_WORDS_LEN 48 /**< 12 words * 4 digits */
+#define SEEDQR_15_WORDS_LEN 60 /**< 15 words * 4 digits */
+#define SEEDQR_18_WORDS_LEN 72 /**< 18 words * 4 digits */
+#define SEEDQR_21_WORDS_LEN 84 /**< 21 words * 4 digits */
 #define SEEDQR_24_WORDS_LEN 96 /**< 24 words * 4 digits */
 
 /**
@@ -78,6 +81,15 @@ char *mnemonic_qr_to_mnemonic(const char *data, size_t len,
                               mnemonic_qr_format_t *format_out);
 
 /**
+ * @brief Convert QR data to BIP39 words without enforcing checksum.
+ *
+ * This is for intermediate/fake mnemonics used by add/subtract recovery.
+ * It still requires a valid BIP39 word count and every word/index to exist.
+ */
+char *mnemonic_qr_to_mnemonic_unchecked(const char *data, size_t len,
+                                        mnemonic_qr_format_t *format_out);
+
+/**
  * @brief Convert Compact SeedQR binary data to mnemonic
  *
  * @param data Binary entropy data
@@ -99,6 +111,11 @@ char *mnemonic_qr_compact_to_mnemonic(const unsigned char *data, size_t len);
  *         or NULL on failure
  */
 char *mnemonic_qr_seedqr_to_mnemonic(const char *data, size_t len);
+
+/**
+ * @brief Convert SeedQR numeric indices to words without checksum validation.
+ */
+char *mnemonic_qr_seedqr_to_mnemonic_unchecked(const char *data, size_t len);
 
 /**
  * @brief Get a human-readable name for a format

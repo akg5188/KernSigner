@@ -25,11 +25,15 @@ static void info_ok_cb(lv_event_t *e) {
   if (!ctx)
     return;
 
+  dialog_callback_t callback = ctx->callback;
+  void *user_data = ctx->user_data;
   if (ctx->callback)
-    ctx->callback(ctx->user_data);
+    ctx->callback = NULL;
   if (ctx->root)
     lv_obj_del(ctx->root);
   free(ctx);
+  if (callback)
+    callback(user_data);
 }
 
 static void confirm_yes_cb(lv_event_t *e) {
@@ -37,11 +41,13 @@ static void confirm_yes_cb(lv_event_t *e) {
   if (!ctx)
     return;
 
-  if (ctx->callback)
-    ctx->callback(true, ctx->user_data);
+  dialog_confirm_callback_t callback = ctx->callback;
+  void *user_data = ctx->user_data;
   if (ctx->root)
     lv_obj_del(ctx->root);
   free(ctx);
+  if (callback)
+    callback(true, user_data);
 }
 
 static void confirm_no_cb(lv_event_t *e) {
@@ -49,11 +55,13 @@ static void confirm_no_cb(lv_event_t *e) {
   if (!ctx)
     return;
 
-  if (ctx->callback)
-    ctx->callback(false, ctx->user_data);
+  dialog_confirm_callback_t callback = ctx->callback;
+  void *user_data = ctx->user_data;
   if (ctx->root)
     lv_obj_del(ctx->root);
   free(ctx);
+  if (callback)
+    callback(false, user_data);
 }
 
 static void error_timer_cb(lv_timer_t *timer) {
@@ -61,11 +69,12 @@ static void error_timer_cb(lv_timer_t *timer) {
   if (!ctx)
     return;
 
-  if (ctx->callback)
-    ctx->callback();
+  dialog_simple_callback_t callback = ctx->callback;
   if (ctx->modal)
     lv_obj_del(ctx->modal);
   free(ctx);
+  if (callback)
+    callback();
 }
 
 static void message_close_cb(lv_event_t *e) {
@@ -169,7 +178,7 @@ void dialog_show_info(const char *title, const char *message,
   lv_obj_add_event_cb(ok_btn, info_ok_cb, LV_EVENT_CLICKED, ctx);
 
   lv_obj_t *ok_label = lv_label_create(ok_btn);
-  lv_label_set_text(ok_label, "OK");
+  lv_label_set_text(ok_label, "确定");
   lv_obj_center(ok_label);
   lv_obj_set_style_text_color(ok_label, main_color(), 0);
   lv_obj_set_style_text_font(ok_label, theme_font_medium(), 0);
@@ -196,7 +205,7 @@ void dialog_show_error(const char *message, dialog_simple_callback_t callback,
   lv_obj_center(ctx->modal);
   theme_apply_frame(ctx->modal);
 
-  lv_obj_t *title = theme_create_label(ctx->modal, "Error", false);
+  lv_obj_t *title = theme_create_label(ctx->modal, "错误", false);
   theme_apply_label(title, true);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
 
@@ -208,7 +217,7 @@ void dialog_show_error(const char *message, dialog_simple_callback_t callback,
   lv_obj_set_style_text_align(error, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(error, LV_ALIGN_CENTER, 0, 0);
 
-  lv_obj_t *hint = theme_create_label(ctx->modal, "Returning...", false);
+  lv_obj_t *hint = theme_create_label(ctx->modal, "正在返回...", false);
   theme_apply_label(hint, false);
   lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -10);
 
@@ -243,7 +252,7 @@ static void show_confirm_internal(const char *message,
   lv_obj_set_style_text_font(msg_label, theme_font_medium(), 0);
   lv_obj_align(msg_label, LV_ALIGN_TOP_MID, 0, 10);
 
-  lv_obj_t *no_btn = theme_create_button(dialog, "No", false);
+  lv_obj_t *no_btn = theme_create_button(dialog, "否", false);
   lv_obj_set_size(no_btn, LV_PCT(40), theme_get_button_height());
   lv_obj_align(no_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
   lv_obj_add_event_cb(no_btn, confirm_no_cb, LV_EVENT_CLICKED, ctx);
@@ -253,7 +262,7 @@ static void show_confirm_internal(const char *message,
     lv_obj_set_style_text_font(no_label, theme_font_medium(), 0);
   }
 
-  lv_obj_t *yes_btn = theme_create_button(dialog, "Yes", true);
+  lv_obj_t *yes_btn = theme_create_button(dialog, "是", true);
   lv_obj_set_size(yes_btn, LV_PCT(40), theme_get_button_height());
   lv_obj_align(yes_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
   lv_obj_add_event_cb(yes_btn, confirm_yes_cb, LV_EVENT_CLICKED, ctx);
@@ -327,7 +336,7 @@ void dialog_show_message(const char *title, const char *message) {
   lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(msg_label, LV_ALIGN_CENTER, 0, -10);
 
-  lv_obj_t *btn = theme_create_button(modal, "OK", true);
+  lv_obj_t *btn = theme_create_button(modal, "确定", true);
   lv_obj_set_size(btn, 100, theme_get_min_touch_size());
   lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_obj_add_event_cb(btn, message_close_cb, LV_EVENT_CLICKED, modal);

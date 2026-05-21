@@ -1,5 +1,6 @@
 #include "encoder.h"
 #include "src/libs/qrcode/qrcodegen.h"
+#include "../utils/secure_mem.h"
 #include <ctype.h>
 #include <lvgl.h>
 #include <stdio.h>
@@ -7,6 +8,17 @@
 #include <string.h>
 #include <wally_bip39.h>
 #include <wally_core.h>
+
+static bool valid_mnemonic_word_count(int count) {
+  return count == 12 || count == 15 || count == 18 || count == 21 ||
+         count == 24;
+}
+
+static bool is_seedqr_len(size_t len) {
+  return len == SEEDQR_12_WORDS_LEN || len == SEEDQR_15_WORDS_LEN ||
+         len == SEEDQR_18_WORDS_LEN || len == SEEDQR_21_WORDS_LEN ||
+         len == SEEDQR_24_WORDS_LEN;
+}
 
 static bool is_all_digits(const char *data, size_t len) {
   for (size_t i = 0; i < len; i++) {
@@ -55,9 +67,8 @@ mnemonic_qr_format_t mnemonic_qr_detect_format(const char *data, size_t len) {
     return MNEMONIC_QR_COMPACT;
   }
 
-  // SeedQR: exactly 48 or 96 decimal digits
-  if ((len == SEEDQR_12_WORDS_LEN || len == SEEDQR_24_WORDS_LEN) &&
-      is_all_digits(data, len)) {
+  // SeedQR: 4 decimal digits per BIP39 word.
+  if (is_seedqr_len(len) && is_all_digits(data, len)) {
     return MNEMONIC_QR_SEEDQR;
   }
 
@@ -97,13 +108,13 @@ char *mnemonic_qr_compact_to_mnemonic(const unsigned char *data, size_t len) {
   return mnemonic;
 }
 
-char *mnemonic_qr_seedqr_to_mnemonic(const char *data, size_t len) {
-  if (!data || (len != SEEDQR_12_WORDS_LEN && len != SEEDQR_24_WORDS_LEN) ||
-      !is_all_digits(data, len)) {
+static char *mnemonic_qr_seedqr_to_mnemonic_impl(const char *data, size_t len,
+                                                 bool validate_checksum) {
+  if (!data || !is_seedqr_len(len) || !is_all_digits(data, len)) {
     return NULL;
   }
 
-  int word_count = (len == SEEDQR_12_WORDS_LEN) ? 12 : 24;
+  int word_count = (int)(len / 4);
 
   struct words *wordlist = NULL;
   if (bip39_get_wordlist(NULL, &wordlist) != WALLY_OK || !wordlist) {
@@ -111,7 +122,7 @@ char *mnemonic_qr_seedqr_to_mnemonic(const char *data, size_t len) {
   }
 
   size_t max_len = word_count * 12;
-  char *mnemonic = malloc(max_len);
+  char *mnemonic = calloc(1, max_len);
   if (!mnemonic) {
     return NULL;
   }
@@ -123,13 +134,13 @@ char *mnemonic_qr_seedqr_to_mnemonic(const char *data, size_t len) {
     int word_index = atoi(index_str);
 
     if (word_index < 0 || word_index > 2047) {
-      free(mnemonic);
+      SECURE_FREE_BUFFER(mnemonic, max_len);
       return NULL;
     }
 
     const char *word = bip39_get_word_by_index(wordlist, (size_t)word_index);
     if (!word) {
-      free(mnemonic);
+      SECURE_FREE_BUFFER(mnemonic, max_len);
       return NULL;
     }
 
@@ -139,7 +150,7 @@ char *mnemonic_qr_seedqr_to_mnemonic(const char *data, size_t len) {
 
     size_t word_len = strlen(word);
     if (offset + word_len >= max_len) {
-      free(mnemonic);
+      SECURE_FREE_BUFFER(mnemonic, max_len);
       return NULL;
     }
 
@@ -148,16 +159,78 @@ char *mnemonic_qr_seedqr_to_mnemonic(const char *data, size_t len) {
   }
   mnemonic[offset] = '\0';
 
-  if (bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
-    free(mnemonic);
+  if (validate_checksum && bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
+    SECURE_FREE_BUFFER(mnemonic, max_len);
     return NULL;
   }
 
   return mnemonic;
 }
 
-char *mnemonic_qr_to_mnemonic(const char *data, size_t len,
-                              mnemonic_qr_format_t *format_out) {
+char *mnemonic_qr_seedqr_to_mnemonic(const char *data, size_t len) {
+  return mnemonic_qr_seedqr_to_mnemonic_impl(data, len, true);
+}
+
+char *mnemonic_qr_seedqr_to_mnemonic_unchecked(const char *data, size_t len) {
+  return mnemonic_qr_seedqr_to_mnemonic_impl(data, len, false);
+}
+
+static char *mnemonic_qr_plaintext_to_mnemonic(const char *data, size_t len,
+                                               bool validate_checksum) {
+  int word_count = 0;
+  char copy[256];
+  if (len >= sizeof(copy)) {
+    return NULL;
+  }
+  memcpy(copy, data, len);
+  copy[len] = '\0';
+
+  char mnemonic[256];
+  mnemonic[0] = '\0';
+
+  struct words *wordlist = NULL;
+  if (bip39_get_wordlist(NULL, &wordlist) != WALLY_OK || !wordlist) {
+    secure_memzero(copy, sizeof(copy));
+    return NULL;
+  }
+
+  for (char *tok = strtok(copy, " \n\r\t"); tok;
+       tok = strtok(NULL, " \n\r\t")) {
+    bool found = false;
+    for (int i = 0; i < 2048; i++) {
+      const char *word = bip39_get_word_by_index(wordlist, (size_t)i);
+      if (word && strcmp(word, tok) == 0) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      secure_memzero(mnemonic, sizeof(mnemonic));
+      secure_memzero(copy, sizeof(copy));
+      return NULL;
+    }
+    if (word_count > 0)
+      strncat(mnemonic, " ", sizeof(mnemonic) - strlen(mnemonic) - 1);
+    strncat(mnemonic, tok, sizeof(mnemonic) - strlen(mnemonic) - 1);
+    word_count++;
+  }
+
+  secure_memzero(copy, sizeof(copy));
+  if (!valid_mnemonic_word_count(word_count) ||
+      (validate_checksum &&
+       bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK)) {
+    secure_memzero(mnemonic, sizeof(mnemonic));
+    return NULL;
+  }
+
+  char *out = strdup(mnemonic);
+  secure_memzero(mnemonic, sizeof(mnemonic));
+  return out;
+}
+
+static char *mnemonic_qr_to_mnemonic_impl(const char *data, size_t len,
+                                          mnemonic_qr_format_t *format_out,
+                                          bool validate_checksum) {
   if (!data || len == 0) {
     if (format_out) {
       *format_out = MNEMONIC_QR_UNKNOWN;
@@ -175,42 +248,41 @@ char *mnemonic_qr_to_mnemonic(const char *data, size_t len,
     return mnemonic_qr_compact_to_mnemonic((const unsigned char *)data, len);
 
   case MNEMONIC_QR_SEEDQR:
-    return mnemonic_qr_seedqr_to_mnemonic(data, len);
+    return mnemonic_qr_seedqr_to_mnemonic_impl(data, len, validate_checksum);
 
-  case MNEMONIC_QR_PLAINTEXT: {
-    char *mnemonic = strndup(data, len);
-    if (mnemonic && bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
-      free(mnemonic);
-      return NULL;
-    }
-    return mnemonic;
-  }
+  case MNEMONIC_QR_PLAINTEXT:
+    return mnemonic_qr_plaintext_to_mnemonic(data, len, validate_checksum);
 
   default:
     return NULL;
   }
+}
+
+char *mnemonic_qr_to_mnemonic(const char *data, size_t len,
+                              mnemonic_qr_format_t *format_out) {
+  return mnemonic_qr_to_mnemonic_impl(data, len, format_out, true);
+}
+
+char *mnemonic_qr_to_mnemonic_unchecked(const char *data, size_t len,
+                                        mnemonic_qr_format_t *format_out) {
+  return mnemonic_qr_to_mnemonic_impl(data, len, format_out, false);
 }
 
 const char *mnemonic_qr_format_name(mnemonic_qr_format_t format) {
   switch (format) {
   case MNEMONIC_QR_PLAINTEXT:
-    return "Plaintext";
+    return "明文助记词";
   case MNEMONIC_QR_COMPACT:
-    return "Compact SeedQR";
+    return "紧凑助记词二维码";
   case MNEMONIC_QR_SEEDQR:
-    return "SeedQR";
+    return "助记词二维码";
   default:
-    return "Unknown";
+    return "未知格式";
   }
 }
 
 char *mnemonic_to_seedqr(const char *mnemonic) {
   if (!mnemonic) {
-    return NULL;
-  }
-
-  // Validate mnemonic first
-  if (bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
     return NULL;
   }
 
@@ -233,7 +305,7 @@ char *mnemonic_to_seedqr(const char *mnemonic) {
     }
   }
 
-  if (word_count != 12 && word_count != 24) {
+  if (!valid_mnemonic_word_count(word_count)) {
     return NULL;
   }
 

@@ -258,7 +258,7 @@ static void show_address_detail(int index) {
 
   // Title
   char title[32];
-  snprintf(title, sizeof(title), "%s #%u", show_change ? "Change" : "Receive",
+  snprintf(title, sizeof(title), "%s #%u", show_change ? "找零" : "收款",
            addr_idx);
   lv_obj_t *title_label = theme_create_label(detail_container, title, false);
   lv_obj_set_style_text_align(title_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -291,7 +291,7 @@ static void show_address_detail(int index) {
   lv_obj_set_width(addr_label, LV_PCT(95));
   lv_label_set_long_mode(addr_label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(addr_label, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_text_font(addr_label, theme_font_medium(), 0);
+  lv_obj_set_style_text_font(addr_label, theme_font_small(), 0);
 
   // Back button
   detail_back_button = ui_create_back_button(parent, detail_back_cb);
@@ -316,8 +316,8 @@ static void refresh_address_list(void) {
   if (policy == WALLET_POLICY_MULTISIG && !wallet_has_descriptor()) {
     lv_obj_t *msg = theme_create_label(
         address_list_container,
-        "Multisig addresses require a wallet descriptor.\n\n"
-        "Scan your wallet descriptor QR code to view addresses.",
+        "多签地址需要先加载钱包描述符。\n\n"
+        "请扫描钱包描述符二维码后再查看地址。",
         false);
     lv_obj_set_width(msg, LV_PCT(100));
     lv_obj_set_style_text_align(msg, LV_TEXT_ALIGN_CENTER, 0);
@@ -469,7 +469,7 @@ void addresses_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_size(load_descriptor_btn, LV_PCT(70), LV_SIZE_CONTENT);
   theme_apply_touch_button(load_descriptor_btn, false);
   lv_obj_t *load_label = lv_label_create(load_descriptor_btn);
-  lv_label_set_text(load_label, "Load Descriptor");
+  lv_label_set_text(load_label, "加载描述符");
   lv_obj_center(load_label);
   theme_apply_button_label(load_label, false);
   lv_obj_add_event_cb(load_descriptor_btn, load_descriptor_btn_cb,
@@ -486,7 +486,7 @@ void addresses_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_flex_align(btn_cont, LV_FLEX_ALIGN_SPACE_BETWEEN,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-  type_dropdown = theme_create_dropdown(btn_cont, "Receive\nChange");
+  type_dropdown = theme_create_dropdown(btn_cont, "收款\n找零");
   lv_obj_set_width(type_dropdown, LV_PCT(40));
   lv_obj_add_event_cb(type_dropdown, type_dropdown_cb, LV_EVENT_VALUE_CHANGED,
                       NULL);

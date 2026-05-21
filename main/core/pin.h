@@ -16,8 +16,9 @@
 #define PIN_HASH_SIZE 32
 #define PIN_MIN_LENGTH 6
 #define PIN_MAX_LENGTH 16
-#define PIN_DEFAULT_MAX_FAILURES 10
-#define PIN_DEFAULT_TIMEOUT_SEC 300
+#define PIN_DEFAULT_MAX_FAILURES 3
+#define PIN_DEFAULT_TIMEOUT_SEC 180
+#define PIN_DEFAULT_POWER_OFF_TIMEOUT_SEC 600
 #define PIN_PBKDF2_ITERATIONS 100000
 
 typedef enum {
@@ -60,7 +61,7 @@ esp_err_t pin_setup(const char *pin, size_t len, uint8_t split_pos);
 pin_verify_result_t pin_verify(const char *pin, size_t len);
 esp_err_t pin_change(const char *new_pin, size_t len, uint8_t split_pos);
 
-/* Remove PIN without wiping user data (for "Disable PIN" in settings) */
+/* Administrative PIN removal helper. Production UI keeps PIN protection enabled. */
 esp_err_t pin_remove(void);
 
 /* Config getters/setters */

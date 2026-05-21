@@ -1,0 +1,10 @@
+# Binary release artifacts
+*.bin binary
+*.apk binary
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+
+# Windows helper scripts are stored normalized and checked out as CRLF.
+*.bat text eol=crlf

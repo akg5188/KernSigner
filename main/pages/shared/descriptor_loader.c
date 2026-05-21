@@ -177,20 +177,20 @@ bool descriptor_loader_show_error(descriptor_validation_result_t result) {
     return false;
 
   case VALIDATION_FINGERPRINT_NOT_FOUND:
-    dialog_show_error("Key not found in descriptor", NULL, 2000);
+    dialog_show_error("描述符里没有找到本机密钥", NULL, 2000);
     return true;
 
   case VALIDATION_XPUB_MISMATCH:
-    dialog_show_error("XPub mismatch - check passphrase", NULL, 2000);
+    dialog_show_error("扩展公钥不匹配，请检查附加口令", NULL, 2000);
     return true;
 
   case VALIDATION_PARSE_ERROR:
-    dialog_show_error("Invalid descriptor format", NULL, 2000);
+    dialog_show_error("描述符格式无效", NULL, 2000);
     return true;
 
   case VALIDATION_INTERNAL_ERROR:
   default:
-    dialog_show_error("Validation failed", NULL, 2000);
+    dialog_show_error("验证失败", NULL, 2000);
     return true;
   }
 }
@@ -261,10 +261,10 @@ static void descriptor_info_confirm_wrapper(const descriptor_info_t *info,
   // Title with "Load?" prompt
   char title[48];
   if (info->is_multisig) {
-    snprintf(title, sizeof(title), "Multisig (%u of %u) - Load?",
+    snprintf(title, sizeof(title), "多签（%u/%u）- 加载？",
              info->threshold, info->num_keys);
   } else {
-    snprintf(title, sizeof(title), "Single-sig - Load?");
+    snprintf(title, sizeof(title), "单签 - 加载？");
   }
   lv_obj_t *title_label = theme_create_label(root, title, false);
   lv_obj_set_style_text_font(title_label, theme_font_medium(), 0);
@@ -322,7 +322,7 @@ static void descriptor_info_confirm_wrapper(const descriptor_info_t *info,
   }
 
   // Button row (fixed at bottom)
-  lv_obj_t *no_btn = theme_create_button(root, "No", false);
+  lv_obj_t *no_btn = theme_create_button(root, "否", false);
   lv_obj_set_size(no_btn, LV_PCT(50), theme_get_button_height());
   lv_obj_align(no_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
   lv_obj_add_event_cb(no_btn, info_confirm_no_cb, LV_EVENT_CLICKED, ctx);
@@ -332,7 +332,7 @@ static void descriptor_info_confirm_wrapper(const descriptor_info_t *info,
     lv_obj_set_style_text_font(no_label, theme_font_medium(), 0);
   }
 
-  lv_obj_t *yes_btn = theme_create_button(root, "Yes", true);
+  lv_obj_t *yes_btn = theme_create_button(root, "是", true);
   lv_obj_set_size(yes_btn, LV_PCT(50), theme_get_button_height());
   lv_obj_align(yes_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
   lv_obj_add_event_cb(yes_btn, info_confirm_yes_cb, LV_EVENT_CLICKED, ctx);
@@ -362,7 +362,7 @@ void descriptor_loader_process_scanner(validation_complete_cb validation_cb,
     free(converted);
     free(descriptor_str);
   } else {
-    dialog_show_error("Unsupported descriptor format", NULL, 2000);
+    dialog_show_error("不支持的描述符格式", NULL, 2000);
     if (error_cb) {
       error_cb();
     }
@@ -398,13 +398,13 @@ void descriptor_loader_show_source_menu(lv_obj_t *parent, void (*qr_cb)(void),
                                         void (*back_cb)(void)) {
   descriptor_loader_destroy_source_menu();
 
-  source_menu = ui_menu_create(parent, "Load Descriptor", back_cb);
+  source_menu = ui_menu_create(parent, "加载描述符", back_cb);
   if (!source_menu)
     return;
 
-  ui_menu_add_entry(source_menu, "From QR Code", qr_cb);
-  ui_menu_add_entry(source_menu, "From Flash", flash_cb);
-  ui_menu_add_entry(source_menu, "From SD Card", sd_cb);
+  ui_menu_add_entry(source_menu, "从二维码", qr_cb);
+  ui_menu_add_entry(source_menu, "从闪存", flash_cb);
+  ui_menu_add_entry(source_menu, "从存储卡", sd_cb);
   ui_menu_show(source_menu);
 }
 

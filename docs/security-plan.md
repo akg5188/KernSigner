@@ -1,5 +1,9 @@
 # Kern Security Model & Implementation Plan
 
+> 当前状态：本文是安全模型和实施路线图，不证明当前固件已经启用 Secure Boot、Flash Encryption、NVS Encryption 或生产调试锁定。商业生产放行只以 `tools/kern_delivery.sh prodcheck`、制造记录、eFuse 证据和真机回归证据为准。
+
+> 操作说明：面向用户的 PIN 操作、开发板 PIN 与智能卡 PIN 区分、错误次数和锁定后果，以 `docs/SECURITY_PIN_GUIDE.zh-CN.md` 为准。当前构建的开发板 PIN 是 6-16 字符，连续输错 3 次会清除本次会话并尝试关机或重启；这不是恢复出厂，也不会替代生产级 Secure Boot、Flash Encryption 和 NVS Encryption。
+
 ## Baseline
 
 - **Air-gapped by design** — no radio on ESP32-P4, QR-only I/O

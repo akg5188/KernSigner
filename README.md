@@ -1,12 +1,38 @@
-# Kern
+# KernSigner
 
-Kern is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, and hardware wallet research. It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for small touch-screen devices.
+> **Telegram 电报群 / 项目交流**
+>
+> 遇到问题、想反馈错误或需要等本人有空协助修改，可以点击这里加入：**[电报群](https://t.me/+wfWuhjH53mVjNDNl)**
+
+> **重要声明 / AI 项目风险提示**
+>
+> 本项目全部由 AI 完成。本人未对全部功能进行完整检测，可能有很多功能存在错误、缺陷或安全风险。
+>
+> 请不要默认相信本项目可以直接用于真实资产或生产环境。使用前请自行审查、测试和修改；如果你不会修改，也可以联系本人，在本人有空的时候协助修改。
+
+KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, Satochip/SeedKeeper smart-card workflows, and hardware wallet research. It is based on the upstream Kern project and combines ideas, code, and testing notes from several open-source wallet projects.
+
+It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for the Waveshare ESP32-P4 4.3-inch touch-screen device.
 
 One of the most important upstream references here is [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner); its wallet flow, UX patterns, and smart-card-adjacent thinking influenced a large part of the project structure.
 
 This repository was largely assembled with AI assistance. It is still unfinished, intended for learning and discussion only, and must not be used to store or sign real funds.
 
 The current tree is a **test-funds validation build**, not an audited production wallet. It contains real wallet paths and Satochip/Web3 work, but production use with mainnet funds requires the security gates and real-device acceptance checks in `docs/` to pass.
+
+## Screenshots / 界面截图
+
+Common 480x800 UI screenshots are included for GitHub preview and beginner documentation. They are simulator reference images only and do not prove production readiness or real-funds safety.
+
+More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gallery/README.md)
+
+| 首页 | 连接钱包 | Web3 钱包 | 扫码签名 |
+| --- | --- | --- | --- |
+| <img src="docs/screens/gallery/home.png" width="160" alt="首页"> | <img src="docs/screens/gallery/connect_wallet.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/web3_wallets.png" width="160" alt="Web3 钱包"> | <img src="docs/screens/gallery/scan_sign.png" width="160" alt="扫码签名"> |
+
+| 助记词工具 | 创建助记词 | 备份 | 智能卡工具 |
+| --- | --- | --- | --- |
+| <img src="docs/screens/gallery/mnemonic_tools.png" width="160" alt="助记词工具"> | <img src="docs/screens/gallery/new_mnemonic.png" width="160" alt="创建助记词"> | <img src="docs/screens/gallery/backup.png" width="160" alt="备份"> | <img src="docs/screens/gallery/smartcard_tools.png" width="160" alt="智能卡工具"> |
 
 ## What Works
 
@@ -33,18 +59,17 @@ Start with [docs/README.md](docs/README.md) for the full delivery and acceptance
 
 ## Supported Hardware
 
-Kern supports these Waveshare ESP32-P4 boards:
+KernSigner currently supports **only** this development board:
 
 | Board | Config | Display | Touch | Camera |
 | --- | --- | --- | --- | --- |
-| [ESP32-P4-WiFi6-Touch-LCD-4B](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4b.htm) | `wave_4b` | 720x720 MIPI DSI | GT911 | OV5647 + DW9714 autofocus |
-| [ESP32-P4-WiFi6-Touch-LCD-3.5](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.5.htm) | `wave_35` | 320x480 SPI | FT5x06 | OV5647 |
-| [ESP32-P4-WiFi6-Touch-LCD-5](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-5.htm) | `wave_5` | 720x1280 MIPI DSI | GT911 | OV5647 |
 | [ESP32-P4-WiFi6-Touch-LCD-4.3](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-4.3.htm) | `wave_43` | 480x800 MIPI DSI | GT911 | OV5647 |
+
+Other Waveshare ESP32-P4 display boards are not supported by this project unless you independently port, test, and fix the board-specific display, touch, camera, UI layout, and power paths.
 
 An OV5647 camera module is required for camera and QR workflows.
 
-ESP32-P4 itself has no Wi-Fi or BLE radio. Some supported development boards include an ESP32-C6 companion chip, but Kern's signer model treats the firmware as an offline, QR-first device.
+ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board includes an ESP32-C6 companion chip, but Kern's signer model treats the firmware as an offline, QR-first device.
 
 ## Repository Layout
 
@@ -60,17 +85,29 @@ simulator/          SDL2 desktop simulator
 scripts/            Format, test, CI, and release helpers
 tools/              Delivery, production-check, and asset-baking helpers
 docs/               Acceptance plans, security gates, and delivery records
+wallet/             Android relay wallet app for high-density QR handoff
 ```
+
+## Download Firmware / 直接下载固件
+
+Prebuilt firmware is included for beginners who only want to flash the supported board:
+
+- Full one-file firmware: [firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin](firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin)
+- App-only firmware: [firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin](firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin)
+- Beginner flashing guide: [firmware/wave_43/README.zh-CN.md](firmware/wave_43/README.zh-CN.md)
+- SHA256 checksums: [firmware/wave_43/SHA256SUMS.txt](firmware/wave_43/SHA256SUMS.txt)
+
+For a first-time board or a board with unknown firmware, use the full firmware at offset `0x0`. If the board already runs this project and you only want to update the app, use the app-only firmware at offset `0x20000`.
 
 ## Prerequisites
 
-Kern targets [ESP-IDF v6.0.1](https://docs.espressif.com/projects/esp-idf/en/v6.0.1/esp32p4/get-started/index.html) for ESP32-P4:
+The included firmware was built with ESP-IDF v5.5.4 for ESP32-P4. To reproduce this snapshot as closely as possible, use the same ESP-IDF version:
 
 ```bash
 git clone --depth 1 --recurse-submodules --shallow-submodules \
-  -b v6.0.1 https://github.com/espressif/esp-idf.git ~/esp/esp-idf
-~/esp/esp-idf/install.sh esp32p4
-. ~/esp/esp-idf/export.sh
+  -b v5.5.4 https://github.com/espressif/esp-idf.git ~/esp/esp-idf-v5.5.4
+~/esp/esp-idf-v5.5.4/install.sh esp32p4
+. ~/esp/esp-idf-v5.5.4/export.sh
 ```
 
 Simulator builds also need SDL2 and mbedTLS:
@@ -88,8 +125,8 @@ brew install cmake sdl2 mbedtls
 This repository uses submodules:
 
 ```bash
-git clone --recursive https://github.com/odudex/Kern.git
-cd Kern
+git clone --recursive https://github.com/akg5188/KernSigner.git
+cd KernSigner
 ```
 
 If you already cloned without submodules:
@@ -100,30 +137,12 @@ git submodule update --init --recursive
 
 ## Build Firmware
 
-Select the board by passing the matching `sdkconfig.defaults.*` file. Use a separate build directory per board:
+Build the supported `wave_43` target with its matching `sdkconfig.defaults.wave_43` file:
 
 ```bash
-# wave_4b
-idf.py -B build_wave_4b \
-  -D SDKCONFIG=build_wave_4b/sdkconfig \
-  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_4b' \
-  build
-
-# wave_35
-idf.py -B build_wave_35 \
-  -D SDKCONFIG=build_wave_35/sdkconfig \
-  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_35' \
-  build
-
-# wave_5
-idf.py -B build_wave_5 \
-  -D SDKCONFIG=build_wave_5/sdkconfig \
-  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_5' \
-  build
-
-# wave_43
-idf.py -B build_wave_43 \
-  -D SDKCONFIG=build_wave_43/sdkconfig \
+. ~/esp/esp-idf-v5.5.4/export.sh
+idf.py -B build_wave_43_fresh \
+  -D SDKCONFIG=build_wave_43_fresh/sdkconfig \
   -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' \
   build
 ```
@@ -131,13 +150,13 @@ idf.py -B build_wave_43 \
 Flash and monitor with ESP-IDF:
 
 ```bash
-idf.py -B build_wave_43 -p /dev/ttyACM0 flash monitor
+idf.py -B build_wave_43_fresh -p /dev/ttyACM0 flash monitor
 ```
 
-When changing board configs in the same build directory, clean first:
+If the build directory contains stale configuration, clean first:
 
 ```bash
-idf.py -B build_wave_43 fullclean
+idf.py -B build_wave_43_fresh fullclean
 ```
 
 ## Desktop Simulator
@@ -206,7 +225,8 @@ Pre-release firmware, when published, is for testing. Do not use pre-release bui
 Merged binary flashing:
 
 ```bash
-esptool --chip esp32p4 --baud 460800 write-flash 0x0 kern-v0.0.7-rc1.bin
+esptool --chip esp32p4 --baud 460800 write-flash 0x0 \
+  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
 ```
 
 To preserve NVS data, flash individual binaries instead:
@@ -215,12 +235,22 @@ To preserve NVS data, flash individual binaries instead:
 esptool --chip esp32p4 --baud 460800 write-flash \
   0x2000 bootloader.bin \
   0x8000 partition-table.bin \
-  0x20000 firmware.bin
+  0xf000 ota_data_initial.bin \
+  0x20000 kernsigner-wave43-0.0.7-rc1-untested-app.bin
 ```
 
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Prebuilt firmware flashing guide](firmware/wave_43/README.zh-CN.md)
+- [Zero-background first-use guide](docs/零基础第一次上手教程.zh-CN.md)
+- [Beginner quick start](docs/USER_QUICK_START.zh-CN.md)
+- [Full operation manual](docs/全功能操作总手册.zh-CN.md)
+- [Mnemonic creation and BIP39 verification](docs/MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md)
+- [Backup and recovery guide](docs/BACKUP_AND_RECOVERY_GUIDE.zh-CN.md)
+- [Build, flash, and debug guide](docs/BUILD_FLASH_DEBUG_GUIDE.zh-CN.md)
+- [General troubleshooting](docs/TROUBLESHOOTING_GENERAL.zh-CN.md)
+- [Android build environment](docs/安卓构建环境准备.zh-CN.md)
 - [Third-party notices](docs/THIRD_PARTY.md)
 - [Hardware overview and OTG notes](docs/HARDWARE_OVERVIEW_AND_OTG.md)
 - [First delivery note](docs/README_FIRST_DELIVERY.md)
@@ -230,10 +260,11 @@ esptool --chip esp32p4 --baud 460800 write-flash \
 - [Security plan](docs/security-plan.md)
 - [Roadmap](ROADMAP.md)
 - [Contributing](CONTRIBUTING.md)
+- [Contributors and credits](CONTRIBUTORS.md)
 
 ## Inspirations
 
-Kern is strongly inspired by [Krux](https://github.com/selfcustody/krux), [Blockstream Jade](https://github.com/Blockstream/Jade), [SeedSigner](https://github.com/SeedSigner/seedsigner), [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner), [Specter-DIY](https://github.com/cryptoadvance/specter-diy), [Toporin](https://github.com/Toporin), and `satochip-signer` smart-card reference material.
+KernSigner is strongly inspired by [Kern](https://github.com/odudex/Kern), [Krux](https://github.com/selfcustody/krux), [Blockstream Jade](https://github.com/Blockstream/Jade), [SeedSigner](https://github.com/SeedSigner/seedsigner), [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner), [Specter-DIY](https://github.com/cryptoadvance/specter-diy), [Toporin/Satochip](https://github.com/Toporin), and `satochip-signer` smart-card reference material.
 
 Kern uses [libwally-core](https://github.com/ElementsProject/libwally-core/) for Bitcoin primitives.
 

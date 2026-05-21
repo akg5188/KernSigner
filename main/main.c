@@ -1,55 +1,115 @@
+#include "core/key.h"
+#include "core/mnemonic_slots.h"
 #include "core/pin.h"
-#include "core/session.h"
 #include "core/settings.h"
+#include "core/session.h"
 #include "core/wallet.h"
-#include "pages/login/login.h"
 #include "pages/pin/pin_page.h"
-#include "pages/screensaver.h"
-#include "ui/assets/kern_logo_lvgl.h"
+#include "pages/krux_shell/krux_shell.h"
+#include "smartcard/smartcard_ccid.h"
 #include "ui/theme.h"
-#include "utils/bip39_filter.h"
 #include <bsp/display.h>
 #include <bsp/esp-bsp.h>
 #include <bsp/pmic.h>
-#include <esp_check.h>
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_system.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <lvgl.h>
 #include <nvs_flash.h>
-#include <wally_core.h>
 
 static const char *TAG = "KERN_MAIN";
+static lv_obj_t *s_main_screen;
 
-// ---------------------------------------------------------------------------
-// Session expiry: lock the device and require PIN re-entry
-// ---------------------------------------------------------------------------
+static void show_pin_gate(void);
 
-static void session_expired_handler(void);
+#ifndef KERN_SMARTCARD_BOOT_PROBE
+#define KERN_SMARTCARD_BOOT_PROBE 0
+#endif
 
-static void post_unlock_cb(void) {
-  pin_page_destroy();
-
-  // Start session timeout
-  uint16_t timeout = pin_get_session_timeout();
-  if (timeout > 0)
-    session_start(timeout);
-
-  login_page_create(lv_screen_active());
+static void clear_sensitive_session(void) {
+  mnemonic_slots_clear_all();
+  wallet_unload();
+  key_unload();
 }
 
-static void screensaver_dismissed_cb(void) {
-  pin_page_create(lv_screen_active(), PIN_PAGE_UNLOCK, post_unlock_cb, NULL);
+static void start_locked_poweroff_guard(void) {
+  session_start_protected(0, PIN_DEFAULT_POWER_OFF_TIMEOUT_SEC);
+}
+
+static void restart_after_boot_failure(const char *reason) {
+  ESP_LOGE(TAG, "Boot failed: %s", reason);
+  vTaskDelay(pdMS_TO_TICKS(1500));
+  esp_restart();
+}
+
+static void start_krux_shell(void) {
+  if (!s_main_screen)
+    s_main_screen = lv_screen_active();
+
+  lv_obj_clean(s_main_screen);
+  krux_shell_create(s_main_screen);
+
+  uint16_t timeout = pin_get_session_timeout();
+  if (timeout > 0)
+    session_start_protected(timeout, PIN_DEFAULT_POWER_OFF_TIMEOUT_SEC);
+}
+
+static void pin_gate_complete(void) {
+  pin_page_destroy();
+  start_krux_shell();
+}
+
+static void pin_setup_cancelled(void) {
+  pin_page_destroy();
+  show_pin_gate();
+}
+
+static void show_pin_gate(void) {
+  if (!s_main_screen)
+    s_main_screen = lv_screen_active();
+
+  lv_obj_clean(s_main_screen);
+  if (pin_is_configured()) {
+    pin_page_create(s_main_screen, PIN_PAGE_UNLOCK, pin_gate_complete, NULL);
+  } else {
+    pin_page_create(s_main_screen, PIN_PAGE_SETUP, pin_gate_complete,
+                    pin_setup_cancelled);
+  }
 }
 
 static void session_expired_handler(void) {
-  wallet_unload();
-  lv_obj_clean(lv_screen_active());
-  screensaver_create(lv_screen_active(), screensaver_dismissed_cb);
+  clear_sensitive_session();
+  show_pin_gate();
 }
 
-// ---------------------------------------------------------------------------
+static void session_poweroff_handler(void) {
+  ESP_LOGW(TAG, "Inactivity power-off protection requested");
+  clear_sensitive_session();
+  (void)bsp_pmic_init();
+  if (bsp_pmic_power_off() == ESP_OK)
+    return;
+  esp_restart();
+}
+
+#if KERN_SMARTCARD_BOOT_PROBE
+static void smartcard_boot_probe_task(void *arg) {
+  (void)arg;
+
+  vTaskDelay(pdMS_TO_TICKS(4500));
+  ESP_LOGI(TAG, "SMARTCARD_BOOT_PROBE: begin");
+  esp_err_t ret = smartcard_ccid_probe(20000);
+
+  char report[768];
+  smartcard_ccid_format_report(report, sizeof(report));
+  ESP_LOGI(TAG, "SMARTCARD_BOOT_PROBE: result=%s", esp_err_to_name(ret));
+  ESP_LOGI(TAG, "SMARTCARD_BOOT_PROBE_REPORT_BEGIN\n%s\nSMARTCARD_BOOT_PROBE_REPORT_END",
+           report);
+
+  vTaskDelete(NULL);
+}
+#endif
 
 void app_main(void) {
   // Initialize NVS for persistent settings
@@ -61,13 +121,23 @@ void app_main(void) {
   }
   ESP_ERROR_CHECK(ret);
   settings_init();
+  (void)settings_set_permissive_signing(false);
+  ESP_ERROR_CHECK(pin_init());
+  session_set_expired_callback(session_expired_handler);
+  session_set_poweroff_callback(session_poweroff_handler);
 
-  bsp_display_start();
+  lv_display_t *disp = bsp_display_start();
+  if (!disp) {
+    restart_after_boot_failure("display init failed");
+  }
   ESP_LOGI(TAG, "Display initialized successfully");
 
   // Paint screen black early to overwrite stale framebuffer on warm reset.
-  bsp_display_lock(0);
+  if (!bsp_display_lock(0)) {
+    restart_after_boot_failure("display lock failed before splash clear");
+  }
   lv_obj_t *screen = lv_screen_active();
+  s_main_screen = screen;
   lv_obj_set_style_bg_color(screen, bg_color(), 0);
   lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
   lv_obj_invalidate(screen);
@@ -83,55 +153,36 @@ void app_main(void) {
   }
 
   theme_init();
-  bsp_display_lock(0);
+  if (!bsp_display_lock(0)) {
+    restart_after_boot_failure("display lock failed before UI start");
+  }
 
   // Set up screen theme background
   theme_apply_screen(screen);
-  // Force LVGL to render framebuffer
   lv_refr_now(NULL);
-  // Allow rendering to complete
+  bsp_display_unlock();
   vTaskDelay(pdMS_TO_TICKS(50));
 
-  // Now turn on backlight
-  bsp_display_brightness_set(settings_get_brightness());
-
-  // Show animated logo splash screen
-  kern_logo_animated(screen);
-
-  // Unlock display to allow LVGL to render the splash screen
-  bsp_display_unlock();
-
-  // Wait for a few seconds to show the splash
-  vTaskDelay(pdMS_TO_TICKS(3000));
-
-  // Initialize other libraries while displaying the splash screen
-  const int wally_res = wally_init(0);
-  if (wally_res != WALLY_OK) {
-    abort();
+  esp_err_t brightness_ret = bsp_display_brightness_set(settings_get_brightness());
+  if (brightness_ret != ESP_OK) {
+    ESP_LOGW(TAG, "Brightness set failed: %s", esp_err_to_name(brightness_ret));
   }
 
-  // Initialize BIP39 wordlist (needed for anti-phishing words)
-  bip39_filter_init();
-
-  // Initialize PIN module
-  pin_init();
-
-  // Set up session expiry callback
-  session_set_expired_callback(session_expired_handler);
-
-  // Lock display again for modifications
-  bsp_display_lock(0);
-
-  // Clear the screen
-  lv_obj_clean(screen);
-
-  // PIN gate: if PIN is configured, require unlock before login
-  if (pin_is_configured()) {
-    pin_page_create(screen, PIN_PAGE_UNLOCK, post_unlock_cb, NULL);
-  } else {
-    login_page_create(screen);
+  // Require PIN at boot. If no PIN exists yet, force PIN setup before the main
+  // wallet shell is reachable.
+  if (!bsp_display_lock(0)) {
+    restart_after_boot_failure("display lock failed before PIN gate");
   }
-
-  // Unlock display
+  show_pin_gate();
+  start_locked_poweroff_guard();
   bsp_display_unlock();
+
+#if KERN_SMARTCARD_BOOT_PROBE
+  BaseType_t probe_started =
+      xTaskCreatePinnedToCore(smartcard_boot_probe_task,
+                              "kern_card_boot_probe", 6144, NULL, 3, NULL, 0);
+  if (probe_started != pdPASS) {
+    ESP_LOGW(TAG, "SMARTCARD_BOOT_PROBE: task create failed");
+  }
+#endif
 }

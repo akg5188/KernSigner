@@ -42,6 +42,9 @@ LIBWALLY = libwally.a
 SRCS_DERIV = test_derivation_path.c
 TARGET_DERIV = test_derivation_path
 
+SRCS_CUSTOM_DERIV = test_custom_derivation.c
+TARGET_CUSTOM_DERIV = test_custom_derivation
+
 SRCS_SS_PARSE = test_ss_whitelist_parse.c
 TARGET_SS_PARSE = test_ss_whitelist_parse
 
@@ -66,11 +69,23 @@ PSBT_SRC = ../psbt.c ../psbt.h
 SRCS_PSBT_CLASSIFY = test_psbt_classify.c
 TARGET_PSBT_CLASSIFY = test_psbt_classify
 
+MNEMONIC_TOOLS_SRC = ../mnemonic_tools.c
+SRCS_MNEMONIC_TOOLS = test_mnemonic_tools.c
+TARGET_MNEMONIC_TOOLS = test_mnemonic_tools
+
+QR_RELAY_SRC = ../../qr/parser.c ../../../components/cUR/src/crc32.c ../../../components/bbqr/src/bbqr.c ../../../components/bbqr/src/base32.c ../../../components/bbqr/src/miniz.c ../../../components/cUR/src/bytewords.c ../../../components/cUR/src/fountain_decoder.c ../../../components/cUR/src/fountain_encoder.c ../../../components/cUR/src/fountain_utils.c ../../../components/cUR/src/ur.c ../../../components/cUR/src/ur_decoder.c ../../../components/cUR/src/utils.c ../../../components/cUR/src/sha256/sha256.c
+SRCS_QR_RELAY = test_qr_relay_parser.c
+TARGET_QR_RELAY = test_qr_relay_parser
+
+MESSAGE_SIGN_SRC = ../message_sign.c ../message_sign.h
+SRCS_MESSAGE_SIGN = test_message_sign.c
+TARGET_MESSAGE_SIGN = test_message_sign
+
 SS_SRC = ../ss_whitelist.c ../ss_whitelist.h
 KEY_SRC = ../key.c ../key.h ../../utils/secure_mem.h
 KEY_STUB_SRC = stubs/key_stub.c
 
-all: $(TARGET_DERIV) $(TARGET_SS_PARSE) $(TARGET_SS_WHITELISTED) $(TARGET_SS_REGEN) $(TARGET_PSB) $(TARGET_REG_MATCH) $(TARGET_REG_PARSE) $(TARGET_PSBT_CLASSIFY)
+all: $(TARGET_DERIV) $(TARGET_CUSTOM_DERIV) $(TARGET_SS_PARSE) $(TARGET_SS_WHITELISTED) $(TARGET_SS_REGEN) $(TARGET_PSB) $(TARGET_REG_MATCH) $(TARGET_REG_PARSE) $(TARGET_PSBT_CLASSIFY) $(TARGET_MNEMONIC_TOOLS) $(TARGET_QR_RELAY) $(TARGET_MESSAGE_SIGN)
 
 $(LIBWALLY): $(WALLY_SRC)
 	$(CC) $(CFLAGS) $(WALLY_CFLAGS) -c -o combined.o $<
@@ -78,6 +93,9 @@ $(LIBWALLY): $(WALLY_SRC)
 
 $(TARGET_DERIV): $(SRCS_DERIV) $(KEY_SRC) $(LIBWALLY)
 	$(CC) $(CFLAGS) $(TEST_INCS) -o $@ $(SRCS_DERIV) $(LIBWALLY)
+
+$(TARGET_CUSTOM_DERIV): $(SRCS_CUSTOM_DERIV) ../custom_derivation.c ../custom_derivation.h $(KEY_SRC) $(LIBWALLY)
+	$(CC) $(CFLAGS) $(TEST_INCS) -o $@ $(SRCS_CUSTOM_DERIV) $(LIBWALLY)
 
 $(TARGET_SS_PARSE): $(SRCS_SS_PARSE) $(SS_SRC) $(KEY_STUB_SRC) $(LIBWALLY)
 	$(CC) $(CFLAGS) $(TEST_INCS) -o $@ $(SRCS_SS_PARSE) $(KEY_STUB_SRC) $(LIBWALLY)
@@ -100,8 +118,18 @@ $(TARGET_REG_PARSE): $(SRCS_REG_PARSE) $(REGISTRY_SRC) $(REGISTRY_STUB_SRC) $(LI
 $(TARGET_PSBT_CLASSIFY): $(SRCS_PSBT_CLASSIFY) $(PSBT_SRC) $(SS_SRC) $(KEY_SRC) $(REGISTRY_SRC) $(LIBWALLY)
 	$(CC) $(CFLAGS) $(TEST_INCS) -o $@ $(SRCS_PSBT_CLASSIFY) $(LIBWALLY)
 
-run: $(TARGET_DERIV) $(TARGET_SS_PARSE) $(TARGET_SS_WHITELISTED) $(TARGET_SS_REGEN) $(TARGET_PSB) $(TARGET_REG_MATCH) $(TARGET_REG_PARSE) $(TARGET_PSBT_CLASSIFY)
+$(TARGET_MNEMONIC_TOOLS): $(SRCS_MNEMONIC_TOOLS) $(MNEMONIC_TOOLS_SRC) $(KEY_STUB_SRC) $(LIBWALLY)
+	$(CC) $(CFLAGS) $(TEST_INCS) -o $@ $(SRCS_MNEMONIC_TOOLS) $(MNEMONIC_TOOLS_SRC) $(KEY_STUB_SRC) $(LIBWALLY)
+
+$(TARGET_QR_RELAY): $(SRCS_QR_RELAY) $(QR_RELAY_SRC)
+	$(CC) $(CFLAGS) $(TEST_INCS) -I$(ROOT)/components/cUR/src -I$(ROOT)/components/bbqr/src -o $@ $(SRCS_QR_RELAY) $(QR_RELAY_SRC) -lm
+
+$(TARGET_MESSAGE_SIGN): $(SRCS_MESSAGE_SIGN) $(MESSAGE_SIGN_SRC) $(KEY_STUB_SRC) $(LIBWALLY)
+	$(CC) $(CFLAGS) $(TEST_INCS) -o $@ $(SRCS_MESSAGE_SIGN) $(KEY_STUB_SRC) $(LIBWALLY)
+
+run: $(TARGET_DERIV) $(TARGET_CUSTOM_DERIV) $(TARGET_SS_PARSE) $(TARGET_SS_WHITELISTED) $(TARGET_SS_REGEN) $(TARGET_PSB) $(TARGET_REG_MATCH) $(TARGET_REG_PARSE) $(TARGET_PSBT_CLASSIFY) $(TARGET_MNEMONIC_TOOLS) $(TARGET_QR_RELAY) $(TARGET_MESSAGE_SIGN)
 	./$(TARGET_DERIV)
+	./$(TARGET_CUSTOM_DERIV)
 	./$(TARGET_SS_PARSE)
 	./$(TARGET_SS_WHITELISTED)
 	./$(TARGET_SS_REGEN)
@@ -109,8 +137,11 @@ run: $(TARGET_DERIV) $(TARGET_SS_PARSE) $(TARGET_SS_WHITELISTED) $(TARGET_SS_REG
 	./$(TARGET_REG_MATCH)
 	./$(TARGET_REG_PARSE)
 	./$(TARGET_PSBT_CLASSIFY)
+	./$(TARGET_MNEMONIC_TOOLS)
+	./$(TARGET_QR_RELAY)
+	./$(TARGET_MESSAGE_SIGN)
 
 clean:
-	rm -f $(TARGET_DERIV) $(TARGET_SS_PARSE) $(TARGET_SS_WHITELISTED) $(TARGET_SS_REGEN) $(TARGET_PSB) $(TARGET_REG_MATCH) $(TARGET_REG_PARSE) $(TARGET_PSBT_CLASSIFY) $(LIBWALLY) combined.o
+	rm -f $(TARGET_DERIV) $(TARGET_CUSTOM_DERIV) $(TARGET_SS_PARSE) $(TARGET_SS_WHITELISTED) $(TARGET_SS_REGEN) $(TARGET_PSB) $(TARGET_REG_MATCH) $(TARGET_REG_PARSE) $(TARGET_PSBT_CLASSIFY) $(TARGET_MNEMONIC_TOOLS) $(TARGET_QR_RELAY) $(TARGET_MESSAGE_SIGN) $(LIBWALLY) combined.o
 
 .PHONY: all run clean

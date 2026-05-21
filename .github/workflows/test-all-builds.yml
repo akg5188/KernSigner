@@ -1,4 +1,4 @@
-name: Test All Builds
+name: Test Wave 43 Build
 on:
   push:
   pull_request:
@@ -7,11 +7,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: espressif/idf:v6.0.1
+    container: espressif/idf:v5.5.4
     strategy:
       fail-fast: true
       matrix:
-        board: [wave_4b, wave_35, wave_5, wave_43]
+        board: [wave_43]
     name: build (${{ matrix.board }})
     steps:
     - name: Checkout repo

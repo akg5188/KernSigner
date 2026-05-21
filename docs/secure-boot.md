@@ -1,5 +1,12 @@
 # Kern Secure Boot Guide (Phase 3)
 
+> **Current project status (2026-05-20)**: This document is a design and
+> production roadmap, not proof that the current firmware has completed secure
+> boot provisioning. The on-device flow described below
+> (`Settings -> Secure Boot`) is not implemented and verified on the current
+> Waveshare ESP32-P4 wallet build. Do not use this document alone as production
+> release approval.
+
 > **Warning**: Secure boot burns eFuses permanently. Practice every step on a development board before touching a production device. There is no undo.
 
 This document covers ESP32-P4 Secure Boot v2 as applied to the Kern hardware wallet — key generation, firmware signing, digest burning, and the various user scenarios for locking down a device.
@@ -708,6 +715,8 @@ eFuses must be burned in a specific order. Earlier phases may have already burne
 ---
 
 ## 10. Testing Checklist
+
+> 这份清单只适合开发板演练。不要只按本文直接锁生产设备；生产锁定前必须完成签名镜像、回滚验证、备份密钥、制造记录和 `COMMERCIAL_RELEASE_GATE.md` 的全部门禁。
 
 Complete these steps on a **development board** before any production device.
 

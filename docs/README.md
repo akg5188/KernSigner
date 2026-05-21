@@ -6,6 +6,9 @@ The short version: the codebase contains real wallet functionality and real-devi
 
 ## Start Here
 
+- [零基础第一次上手教程.zh-CN.md](零基础第一次上手教程.zh-CN.md): step-by-step first-use path for complete beginners.
+- [USER_QUICK_START.zh-CN.md](USER_QUICK_START.zh-CN.md): first-use guide for beginners.
+- [全功能操作总手册.zh-CN.md](全功能操作总手册.zh-CN.md): practical operation map for all current user-facing flows.
 - [README_FIRST_DELIVERY.md](README_FIRST_DELIVERY.md): human-friendly delivery entry point.
 - [PROJECT_NOTICE.md](PROJECT_NOTICE.md): project-wide AI, learning-only, and no-funds notice.
 - [DELIVERY_STATUS.md](DELIVERY_STATUS.md): current deliverable scope, acceptance steps, and known boundaries.
@@ -13,6 +16,20 @@ The short version: the codebase contains real wallet functionality and real-devi
 - [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md): conditions required before calling a build production-ready.
 - [THIRD_PARTY.md](THIRD_PARTY.md): third-party code, licenses, and attribution.
 - [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md): board details, OTG power rules, and smart-card cabling.
+- [连接钱包教程.zh-CN.md](连接钱包教程.zh-CN.md): beginner guide for connecting Web3 wallets, Bitcoin watch-only wallets, and signing QR/PSBT transactions.
+- [screens/gallery/README.md](screens/gallery/README.md): 常用 480x800 界面截图，方便 GitHub 预览和新手对照操作。
+- [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md): Android relay app guide for high-density Web3 QR codes.
+- [MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md](MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md): beginner guide for creating mnemonics and verifying them with the BIP39 tool.
+- [BACKUP_AND_RECOVERY_GUIDE.zh-CN.md](BACKUP_AND_RECOVERY_GUIDE.zh-CN.md): backup and recovery guide for mnemonics, entropy, QR, metal backups, KEF, and smart cards.
+- [UNTESTED_FIRMWARE_NOTICE.md](UNTESTED_FIRMWARE_NOTICE.md): explicit notice for included untested development firmware.
+
+## Build And Troubleshooting
+
+- [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md): build, flash, debug, simulator, and delivery commands.
+- [安卓构建环境准备.zh-CN.md](安卓构建环境准备.zh-CN.md): Android SDK/JDK setup and APK build guide for `wallet/`.
+- [TROUBLESHOOTING_GENERAL.zh-CN.md](TROUBLESHOOTING_GENERAL.zh-CN.md): general troubleshooting for display, touch, camera, QR, wallet, build, and flash issues.
+- [DOCUMENTATION_COVERAGE.md](DOCUMENTATION_COVERAGE.md): documentation coverage map and update rules.
+- [REPRODUCIBLE_BUILD.md](REPRODUCIBLE_BUILD.md): pinned local build inputs and included firmware rebuild notes.
 
 ## Real-Device Validation
 
@@ -30,6 +47,7 @@ The short version: the codebase contains real wallet functionality and real-devi
 - [SMARTCARD_MIGRATION_MATRIX_20260520.md](SMARTCARD_MIGRATION_MATRIX_20260520.md): migration matrix.
 - [SMARTCARD_TEST_VECTORS_AND_EVIDENCE.md](SMARTCARD_TEST_VECTORS_AND_EVIDENCE.md): test evidence.
 - [TROUBLESHOOTING_SMARTCARD_POWER_OTG.md](TROUBLESHOOTING_SMARTCARD_POWER_OTG.md): power and OTG troubleshooting.
+- [SMARTCARD_SATOCHIP_SEEDKEEPER_MIGRATION_NOTES.md](SMARTCARD_SATOCHIP_SEEDKEEPER_MIGRATION_NOTES.md): Satochip/SeedKeeper migration pitfalls and boundaries.
 - [KRUX_SATOCHIP_GAP_REPORT.md](KRUX_SATOCHIP_GAP_REPORT.md): Krux/Satochip feature gap audit.
 - [SATOCHIP_COMMERCIAL_REVIEW_20260520.md](SATOCHIP_COMMERCIAL_REVIEW_20260520.md): commercial-readiness review.
 - [SATOCHIP_SIGNER_FULL_FUNCTION_CATALOG_20260520.md](SATOCHIP_SIGNER_FULL_FUNCTION_CATALOG_20260520.md): reference feature catalog.
@@ -37,6 +55,7 @@ The short version: the codebase contains real wallet functionality and real-devi
 
 ## Security
 
+- [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md): 开发板 PIN、智能卡 PIN、PUK、错误次数和新手操作说明。
 - [security-plan.md](security-plan.md): security plan.
 - [secure-boot.md](secure-boot.md): secure boot notes.
 - [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md): production gate.

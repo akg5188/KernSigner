@@ -33,8 +33,8 @@ static const char *kb_map[] = {"q",
                                "b",
                                "n",
                                "m",
-                               LV_SYMBOL_BACKSPACE,
-                               LV_SYMBOL_OK,
+                               "删",
+                               "确定",
                                ""};
 
 static const char btn_to_char[] = {
@@ -130,12 +130,13 @@ ui_keyboard_t *ui_keyboard_create(lv_obj_t *parent, const char *title,
   lv_label_set_text(kb->input_label, "_");
   lv_obj_set_style_text_color(kb->input_label, highlight_color(), 0);
   lv_obj_set_style_text_font(kb->input_label, theme_font_medium(), 0);
-  lv_obj_align(kb->input_label, LV_ALIGN_TOP_MID, 0, 130);
+  lv_obj_align(kb->input_label, LV_ALIGN_TOP_MID, 0,
+               theme_get_screen_height() * 15 / 100);
 
   kb->btnmatrix = lv_buttonmatrix_create(parent);
   lv_buttonmatrix_set_map(kb->btnmatrix, kb_map);
   lv_obj_align(kb->btnmatrix, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_set_size(kb->btnmatrix, LV_PCT(100), LV_PCT(50));
+  lv_obj_set_size(kb->btnmatrix, LV_PCT(100), LV_PCT(46));
   theme_apply_btnmatrix(kb->btnmatrix);
 
   lv_obj_add_event_cb(kb->btnmatrix, kb_event_handler, LV_EVENT_VALUE_CHANGED,

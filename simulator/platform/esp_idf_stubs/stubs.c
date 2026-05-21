@@ -223,6 +223,8 @@ const esp_app_desc_t *esp_app_get_description(void) {
     static const esp_app_desc_t s_desc = {
         .version      = "sim-dev",
         .project_name = "kern_simulator",
+        .time         = "sim-time",
+        .date         = "sim-date",
         .idf_ver      = "v5.4-sim",
         .app_elf_sha256 = {0},
     };

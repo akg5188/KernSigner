@@ -8,7 +8,7 @@
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
 #include <bsp/pmic.h>
-#ifdef DEV_TOOLS_ENABLED
+#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
 #include "../dev_tools/dev_menu.h"
 #endif
 #include "../load_mnemonic/load_menu.h"
@@ -23,7 +23,7 @@ static lv_obj_t *power_button = NULL;
 static void power_button_cb(lv_event_t *e) {
   (void)e;
   // Pass NULL user_data to signal "no key to unload"
-  dialog_show_confirm("Power off?", ui_power_off_confirmed_cb, NULL,
+  dialog_show_confirm("确定关机？", ui_power_off_confirmed_cb, NULL,
                       DIALOG_STYLE_OVERLAY);
 }
 
@@ -41,7 +41,7 @@ static void return_from_load_menu_cb(void) { login_page_show(); }
 
 static void return_from_new_mnemonic_menu_cb(void) { login_page_show(); }
 
-#ifdef DEV_TOOLS_ENABLED
+#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
 static void return_from_dev_menu_cb(void) { login_page_show(); }
 #endif
 
@@ -64,7 +64,7 @@ static void settings_cb(void) {
   login_settings_page_show();
 }
 
-#ifdef DEV_TOOLS_ENABLED
+#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
 static void dev_tools_cb(void) {
   login_page_hide();
   dev_menu_page_create(lv_screen_active(), return_from_dev_menu_cb);
@@ -81,14 +81,14 @@ static void about_cb(void) {
 void login_page_create(lv_obj_t *parent) {
   login_screen = theme_create_page_container(parent);
 
-  login_menu = ui_menu_create(login_screen, "Login", NULL);
-  ui_menu_add_entry(login_menu, "Load Mnemonic", load_mnemonic_cb);
-  ui_menu_add_entry(login_menu, "New Mnemonic", new_mnemonic_cb);
-  ui_menu_add_entry(login_menu, "Settings", settings_cb);
-#ifdef DEV_TOOLS_ENABLED
-  ui_menu_add_entry(login_menu, "Developer Tools", dev_tools_cb);
+  login_menu = ui_menu_create(login_screen, "钱包", NULL);
+  ui_menu_add_entry(login_menu, "导入", load_mnemonic_cb);
+  ui_menu_add_entry(login_menu, "创建", new_mnemonic_cb);
+  ui_menu_add_entry(login_menu, "设置", settings_cb);
+#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
+  (void)dev_tools_cb;
 #endif
-  ui_menu_add_entry(login_menu, "About", about_cb);
+  ui_menu_add_entry(login_menu, "关于", about_cb);
   ui_menu_show(login_menu);
 
   // Power button at top-left (only useful with PMIC; without it there's

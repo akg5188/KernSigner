@@ -16,6 +16,12 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || (cd "$SCRIPT_DIR/.." && pwd))"
 
+if ! command -v clang-format >/dev/null 2>&1; then
+    echo "Error: clang-format is not installed or not on PATH." >&2
+    echo "Install it first, for example: sudo apt install clang-format" >&2
+    exit 127
+fi
+
 DIRS=(
     "$REPO_ROOT/main"
     "$REPO_ROOT/components/bbqr"
@@ -23,8 +29,6 @@ DIRS=(
     "$REPO_ROOT/components/k_quirc"
     "$REPO_ROOT/components/sd_card"
     "$REPO_ROOT/components/video"
-    "$REPO_ROOT/components/wave_4b"
-    "$REPO_ROOT/components/wave_35"
     "$REPO_ROOT/components/wave_43"
 )
 

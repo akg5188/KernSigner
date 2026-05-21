@@ -11,11 +11,26 @@ except ImportError as err:
 
 
 ICONS = [
+    ("LV_SYMBOL_OK", 0xF00C, "check"),
+    ("LV_SYMBOL_POWER", 0xF011, "power-off"),
+    ("LV_SYMBOL_SETTINGS", 0xF013, "gear"),
+    ("LV_SYMBOL_LEFT", 0xF053, "chevron-left"),
+    ("LV_SYMBOL_RIGHT", 0xF054, "chevron-right"),
+    ("LV_SYMBOL_EYE_OPEN", 0xF06E, "eye"),
+    ("LV_SYMBOL_EYE_CLOSE", 0xF070, "eye-slash"),
+    ("LV_SYMBOL_CHARGE", 0xF0E7, "bolt"),
+    ("LV_SYMBOL_BATTERY_FULL", 0xF240, "battery-full"),
+    ("LV_SYMBOL_BATTERY_3", 0xF241, "battery-three-quarters"),
+    ("LV_SYMBOL_BATTERY_2", 0xF242, "battery-half"),
+    ("LV_SYMBOL_BATTERY_1", 0xF243, "battery-quarter"),
+    ("LV_SYMBOL_BATTERY_EMPTY", 0xF244, "battery-empty"),
+    ("LV_SYMBOL_TRASH", 0xF2ED, "trash-can"),
     ("ICON_BITCOIN", 0xE0B4, "bitcoin-sign"),
     ("ICON_QR_CODE", 0xF029, "qrcode"),
     ("ICON_HELP", 0xF059, "circle-question"),
     ("ICON_DERIVATION", 0xF126, "code-branch"),
     ("ICON_FINGERPRINT", 0xF577, "fingerprint"),
+    ("LV_SYMBOL_BACKSPACE", 0xF55A, "delete-left"),
 ]
 
 

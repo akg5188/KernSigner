@@ -46,10 +46,10 @@ int wallet_format_derivation_compact(char *buf, size_t buf_size,
 
 bool wallet_init(wallet_network_t network) {
   if (wallet_initialized) {
-    return true;
+    return key_has_signing_key();
   }
 
-  if (!key_is_loaded()) {
+  if (!key_has_signing_key()) {
     return false;
   }
 
@@ -69,7 +69,9 @@ bool wallet_init(wallet_network_t network) {
   return true;
 }
 
-bool wallet_is_initialized(void) { return wallet_initialized; }
+bool wallet_is_initialized(void) {
+  return wallet_initialized && key_has_signing_key();
+}
 
 wallet_type_t wallet_get_type(void) { return wallet_type; }
 
@@ -82,7 +84,7 @@ const char *wallet_get_derivation(void) {
 }
 
 bool wallet_get_account_xpub(char **xpub_out) {
-  if (!wallet_initialized || !account_key || !xpub_out) {
+  if (!wallet_is_initialized() || !account_key || !xpub_out) {
     return false;
   }
 
@@ -92,7 +94,7 @@ bool wallet_get_account_xpub(char **xpub_out) {
 
 // chain: 0 = receive, 1 = change
 static bool derive_address(uint32_t chain, uint32_t index, char **address_out) {
-  if (!wallet_initialized || !account_key || chain > 1) {
+  if (!wallet_is_initialized() || !account_key || chain > 1) {
     return false;
   }
 
@@ -150,7 +152,8 @@ bool wallet_get_change_address(uint32_t index, char **address_out) {
 bool wallet_get_scriptpubkey(bool is_change, uint32_t index,
                              unsigned char *script_out,
                              size_t *script_len_out) {
-  if (!wallet_initialized || !account_key || !script_out || !script_len_out) {
+  if (!wallet_is_initialized() || !account_key || !script_out ||
+      !script_len_out) {
     return false;
   }
 

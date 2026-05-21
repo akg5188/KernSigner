@@ -10,6 +10,9 @@
 #include "../../ui/theme.h"
 #include "../scan/scan.h"
 #include "../settings/wallet_settings.h"
+#include "../krux_shell/krux_shell.h"
+#include "../shared/mnemonic_slots_page.h"
+#include "../shared/sensitive_pin.h"
 #include "addresses.h"
 #include "backup/backup_menu.h"
 #include "public_key.h"
@@ -18,36 +21,61 @@
 #include <string.h>
 
 static lv_obj_t *home_screen = NULL;
-static lv_obj_t *power_button = NULL;
+static lv_obj_t *home_button = NULL;
 static lv_obj_t *settings_button = NULL;
 static ui_menu_t *main_menu = NULL;
 static void menu_backup_cb(void);
+static void menu_backup_entry_cb(void);
 static void menu_xpub_cb(void);
+static void menu_xpub_entry_cb(void);
 static void menu_addresses_cb(void);
+static void menu_addresses_entry_cb(void);
+static void menu_slots_cb(void);
+static void menu_slots_entry_cb(void);
 static void menu_scan_cb(void);
+static void menu_scan_entry_cb(void);
+static void menu_wallet_settings_cb(void);
 static void return_from_backup_menu_cb(void);
 static void return_from_public_key_cb(void);
 static void return_from_addresses_cb(void);
+static void return_from_slots_cb(void);
+static void success_from_slots_cb(void);
 static void return_from_scan_cb(void);
 static void return_from_wallet_settings_cb(void);
 
 static void menu_backup_cb(void) {
-  home_page_hide();
   backup_menu_page_create(lv_screen_active(), return_from_backup_menu_cb);
   backup_menu_page_show();
 }
 
 static void menu_xpub_cb(void) {
-  home_page_hide();
   public_key_page_create(lv_screen_active(), return_from_public_key_cb);
   public_key_page_show();
 }
 
 static void menu_addresses_cb(void) {
-  home_page_hide();
   addresses_page_create(lv_screen_active(), return_from_addresses_cb);
   addresses_page_show();
 }
+
+static void menu_slots_cb(void) {
+  mnemonic_slots_page_create(lv_screen_active(), return_from_slots_cb,
+                             success_from_slots_cb);
+  mnemonic_slots_page_show();
+}
+
+static void require_home_pin(void (*action)(void)) {
+  home_page_hide();
+  sensitive_pin_require(action, home_page_show);
+}
+
+static void menu_backup_entry_cb(void) { require_home_pin(menu_backup_cb); }
+
+static void menu_xpub_entry_cb(void) { require_home_pin(menu_xpub_cb); }
+
+static void menu_addresses_entry_cb(void) { require_home_pin(menu_addresses_cb); }
+
+static void menu_slots_entry_cb(void) { require_home_pin(menu_slots_cb); }
 
 static char saved_fingerprint[9];
 static char saved_derivation[48];
@@ -78,19 +106,26 @@ static bool key_snapshot_changed(void) {
 
 static void menu_scan_cb(void) {
   save_key_snapshot();
-  home_page_hide();
   scan_page_create(lv_screen_active(), return_from_scan_cb);
   scan_page_show();
 }
 
+static void menu_scan_entry_cb(void) { require_home_pin(menu_scan_cb); }
+
 static void power_button_cb(lv_event_t *e) {
   (void)e;
   const char *msg =
-      bsp_pmic_is_available() ? "Power off?" : "Unload key and reboot?";
+      bsp_pmic_is_available() ? "确定关机？" : "卸载密钥并重启？";
   // Pass non-NULL user_data to signal "unload key before power-off"
   static const bool unload = true;
   dialog_show_confirm(msg, ui_power_off_confirmed_cb, (void *)&unload,
                       DIALOG_STYLE_OVERLAY);
+}
+
+static void home_button_cb(lv_event_t *e) {
+  (void)e;
+  home_page_hide();
+  (void)krux_shell_show_screen("home");
 }
 
 // Helper to refresh home if settings were changed
@@ -117,6 +152,18 @@ static void return_from_addresses_cb(void) {
   refresh_home_if_needed();
 }
 
+static void return_from_slots_cb(void) {
+  mnemonic_slots_page_destroy();
+  home_page_show();
+}
+
+static void success_from_slots_cb(void) {
+  mnemonic_slots_page_destroy();
+  home_page_destroy();
+  home_page_create(lv_screen_active());
+  home_page_show();
+}
+
 static void return_from_scan_cb(void) {
   scan_page_destroy();
   if (key_snapshot_changed() || wallet_settings_were_applied()) {
@@ -126,12 +173,15 @@ static void return_from_scan_cb(void) {
   home_page_show();
 }
 
-static void settings_button_cb(lv_event_t *e) {
-  (void)e;
-  home_page_hide();
+static void menu_wallet_settings_cb(void) {
   wallet_settings_page_create(lv_screen_active(),
                               return_from_wallet_settings_cb);
   wallet_settings_page_show();
+}
+
+static void settings_button_cb(lv_event_t *e) {
+  (void)e;
+  require_home_pin(menu_wallet_settings_cb);
 }
 
 static void return_from_wallet_settings_cb(void) {
@@ -156,14 +206,14 @@ void home_page_create(lv_obj_t *parent) {
   lv_obj_move_to_index(header, 0);
   ui_battery_create(header);
 
-  ui_menu_add_entry(main_menu, ICON_QR_CODE "  Scan", menu_scan_cb);
-  ui_menu_add_entry(main_menu, "Extended Public Key", menu_xpub_cb);
-  ui_menu_add_entry(main_menu, "Addresses", menu_addresses_cb);
-  ui_menu_add_entry(main_menu, "Back Up", menu_backup_cb);
+  ui_menu_add_entry(main_menu, "扫码签名", menu_scan_entry_cb);
+  ui_menu_add_entry(main_menu, "助记词", menu_slots_entry_cb);
+  ui_menu_add_entry(main_menu, "公钥", menu_xpub_entry_cb);
+  ui_menu_add_entry(main_menu, "地址", menu_addresses_entry_cb);
+  ui_menu_add_entry(main_menu, "备份", menu_backup_entry_cb);
 
-  // Power button at top-left (power-off on PMIC boards, unload+reboot
-  // otherwise)
-  power_button = ui_create_power_button(home_screen, power_button_cb);
+  // Always provide a way back to the Krux shell home.
+  home_button = ui_create_home_button(home_screen, home_button_cb);
 
   // Settings button at top-right
   settings_button = ui_create_settings_button(home_screen, settings_button_cb);
@@ -188,9 +238,9 @@ void home_page_hide(void) {
 }
 
 void home_page_destroy(void) {
-  if (power_button) {
-    lv_obj_del(power_button);
-    power_button = NULL;
+  if (home_button) {
+    lv_obj_del(home_button);
+    home_button = NULL;
   }
 
   if (settings_button) {

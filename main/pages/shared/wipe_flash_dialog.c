@@ -27,10 +27,10 @@ static void deferred_wipe_cb(lv_timer_t *timer) {
   }
 
   if (ret == ESP_OK) {
-    dialog_show_info("Wiped", "Flash storage erased", wipe_complete_cb, NULL,
+    dialog_show_info("已清空", "闪存存储已擦除", wipe_complete_cb, NULL,
                      DIALOG_STYLE_OVERLAY);
   } else {
-    dialog_show_error("Failed to wipe flash", NULL, 0);
+    dialog_show_error("清空闪存失败", NULL, 0);
   }
 }
 
@@ -39,7 +39,7 @@ static void wipe_flash_confirm_cb(bool confirmed, void *user_data) {
   if (!confirmed)
     return;
 
-  wipe_progress = dialog_show_progress("Wiping", "Erasing flash storage...",
+  wipe_progress = dialog_show_progress("正在清空", "正在擦除闪存存储...",
                                        DIALOG_STYLE_OVERLAY);
   wipe_timer = lv_timer_create(deferred_wipe_cb, 50, NULL);
   lv_timer_set_repeat_count(wipe_timer, 1);
@@ -48,8 +48,7 @@ static void wipe_flash_confirm_cb(bool confirmed, void *user_data) {
 void wipe_flash_dialog_start(void (*complete_cb)(void)) {
   wipe_done_cb = complete_cb;
   dialog_show_danger_confirm(
-      "All mnemonics and descriptors stored in flash will be permanently "
-      "erased.\nContinue?",
+      "闪存里的所有助记词和描述符都会被永久删除。\n是否继续？",
       wipe_flash_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
 

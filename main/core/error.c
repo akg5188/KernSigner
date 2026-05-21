@@ -3,36 +3,36 @@
 const char *kern_error_str(kern_error_t err) {
   switch (err) {
   case KERN_OK:
-    return "Success";
+    return "成功";
   case KERN_ERR_INVALID_INPUT:
-    return "Invalid input";
+    return "输入无效";
   case KERN_ERR_OUT_OF_MEMORY:
-    return "Out of memory";
+    return "内存不足";
   case KERN_ERR_CRYPTO_FAILURE:
-    return "Cryptographic error";
+    return "加密错误";
   case KERN_ERR_QR_PARSE_FAILED:
-    return "QR parse failed";
+    return "二维码解析失败";
   case KERN_ERR_MNEMONIC_INVALID:
-    return "Invalid mnemonic";
+    return "助记词无效";
   case KERN_ERR_PSBT_INVALID:
-    return "Invalid PSBT";
+    return "交易数据无效";
   case KERN_ERR_NOT_INITIALIZED:
-    return "Not initialized";
+    return "尚未初始化";
   case KERN_ERR_TIMEOUT:
-    return "Timeout";
+    return "超时";
   case KERN_ERR_CANCELLED:
-    return "Cancelled";
+    return "已取消";
   case KERN_ERR_IO:
-    return "I/O error";
+    return "读写错误";
   case KERN_ERR_NOT_FOUND:
-    return "Not found";
+    return "未找到";
   case KERN_ERR_ALREADY_EXISTS:
-    return "Already exists";
+    return "已经存在";
   case KERN_ERR_BUFFER_TOO_SMALL:
-    return "Buffer too small";
+    return "缓冲区太小";
   case KERN_ERR_UNSUPPORTED:
-    return "Not supported";
+    return "不支持";
   default:
-    return "Unknown error";
+    return "未知错误";
   }
 }

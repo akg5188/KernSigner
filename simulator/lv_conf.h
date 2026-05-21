@@ -47,6 +47,7 @@
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_24 1
 #define LV_FONT_MONTSERRAT_36 1
+#define LV_FONT_SOURCE_HAN_SANS_SC_16_CJK 0
 
 /*==================
  * WIDGETS

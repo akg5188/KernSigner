@@ -96,10 +96,10 @@ static void inline_delete_refresh_cb(void *user_data) {
   if (ret != ESP_OK || raw_count == 0) {
     storage_free_file_list(raw_filenames, raw_count);
     const char *loc_name =
-        (cfg.location == STORAGE_FLASH) ? "flash" : "SD card";
+        (cfg.location == STORAGE_FLASH) ? "闪存" : "存储卡";
     char msg[64];
-    snprintf(msg, sizeof(msg), "No %ss found on %s", cfg.item_type_name,
-             loc_name);
+    snprintf(msg, sizeof(msg), "在%s中没有找到%s文件", loc_name,
+             cfg.item_type_name);
     dialog_show_error(msg, back_cb, 0);
     return;
   }
@@ -115,26 +115,21 @@ static void inline_delete_confirm_cb(bool confirmed, void *user_data) {
   esp_err_t ret =
       cfg.delete_file(cfg.location, stored_filenames[pending_delete_index]);
   if (ret == ESP_OK) {
-    /* Capitalize item type for display */
-    char type_cap[16];
-    snprintf(type_cap, sizeof(type_cap), "%s", cfg.item_type_name);
-    type_cap[0] = (char)(type_cap[0] - 32); /* toupper */
-
     if (cfg.location == STORAGE_FLASH) {
       char detail[80];
       snprintf(detail, sizeof(detail),
-               "%s deleted.\nFor irrecoverable deletion\nuse Wipe Flash.",
-               type_cap);
-      dialog_show_info("Deleted", detail, inline_delete_refresh_cb, NULL,
+               "%s已删除。\n如需不可恢复删除，请使用清空闪存。",
+               cfg.item_type_name);
+      dialog_show_info("已删除", detail, inline_delete_refresh_cb, NULL,
                        DIALOG_STYLE_OVERLAY);
     } else {
       char detail[40];
-      snprintf(detail, sizeof(detail), "%s deleted", type_cap);
-      dialog_show_info("Deleted", detail, inline_delete_refresh_cb, NULL,
+      snprintf(detail, sizeof(detail), "%s已删除", cfg.item_type_name);
+      dialog_show_info("已删除", detail, inline_delete_refresh_cb, NULL,
                        DIALOG_STYLE_OVERLAY);
     }
   } else {
-    dialog_show_error("Failed to delete", NULL, 0);
+    dialog_show_error("删除失败", NULL, 0);
   }
 }
 
@@ -144,7 +139,7 @@ static void delete_action_cb(int idx) {
 
   pending_delete_index = idx;
   char msg[80];
-  snprintf(msg, sizeof(msg), "Delete \"%s\"?",
+  snprintf(msg, sizeof(msg), "删除“%s”？",
            display_names[idx] ? display_names[idx] : stored_filenames[idx]);
   dialog_show_danger_confirm(msg, inline_delete_confirm_cb, NULL,
                              DIALOG_STYLE_OVERLAY);
@@ -158,7 +153,7 @@ static void wipe_flash_cb(void) { wipe_flash_dialog_start(back_cb); }
 
 static void build_menu(void) {
   const char *title =
-      (cfg.location == STORAGE_FLASH) ? "Load from Flash" : "Load from SD Card";
+      (cfg.location == STORAGE_FLASH) ? "从闪存加载" : "从存储卡加载";
 
   browser_menu = ui_menu_create(browser_screen, title, back_cb);
   if (!browser_menu)
@@ -168,11 +163,11 @@ static void build_menu(void) {
     const char *label =
         display_names[i] ? display_names[i] : stored_filenames[i];
     ui_menu_add_entry_with_action(browser_menu, label, entry_selected_cb,
-                                  LV_SYMBOL_TRASH, delete_action_cb);
+                                  "删", delete_action_cb);
   }
 
   if (cfg.location == STORAGE_FLASH) {
-    ui_menu_add_entry(browser_menu, "Wipe Flash", wipe_flash_cb);
+    ui_menu_add_entry(browser_menu, "清空闪存", wipe_flash_cb);
     int wipe_idx = browser_menu->config.entry_count - 1;
     lv_obj_t *wipe_label = lv_obj_get_child(browser_menu->buttons[wipe_idx], 0);
     lv_obj_set_style_text_color(wipe_label, error_color(), 0);
@@ -199,10 +194,10 @@ static void deferred_list_cb(lv_timer_t *timer) {
   if (ret != ESP_OK || raw_count == 0) {
     storage_free_file_list(raw_filenames, raw_count);
     const char *loc_name =
-        (cfg.location == STORAGE_FLASH) ? "flash" : "SD card";
+        (cfg.location == STORAGE_FLASH) ? "闪存" : "存储卡";
     char msg[64];
-    snprintf(msg, sizeof(msg), "No %ss found on %s", cfg.item_type_name,
-             loc_name);
+    snprintf(msg, sizeof(msg), "在%s中没有找到%s文件", loc_name,
+             cfg.item_type_name);
     dialog_show_error(msg, back_cb, 0);
     return;
   }
@@ -222,7 +217,7 @@ void storage_browser_create(lv_obj_t *parent,
   browser_screen = theme_create_page_container(parent);
 
   loading_label = lv_label_create(browser_screen);
-  lv_label_set_text(loading_label, "Preparing storage...");
+  lv_label_set_text(loading_label, "正在准备存储...");
   lv_obj_set_style_text_font(loading_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(loading_label, main_color(), 0);
   lv_obj_align(loading_label, LV_ALIGN_CENTER, 0, 0);

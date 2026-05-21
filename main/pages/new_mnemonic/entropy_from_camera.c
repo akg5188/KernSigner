@@ -90,8 +90,10 @@ static void show_hash_display(void) {
   cleanup_ui();
 
   char title_text[32];
-  snprintf(title_text, sizeof(title_text), "%d Words - Entropy", total_words);
+  snprintf(title_text, sizeof(title_text), "%d 词 - 随机熵", total_words);
   title_label = theme_create_page_title(entropy_screen, title_text);
+  lv_obj_set_width(title_label, LV_PCT(58));
+  lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, theme_get_default_padding());
 
   back_btn = ui_create_back_button(entropy_screen, hash_back_cb);
 
@@ -106,7 +108,7 @@ static void show_hash_display(void) {
   for (int i = 0; i < 32; i++) {
     snprintf(hex_hash + i * 2, 3, "%02x", entropy_hash[i]);
   }
-  snprintf(display_text, sizeof(display_text), "SHA256 of snapshot:\n%s",
+  snprintf(display_text, sizeof(display_text), "快照 SHA256：\n%s",
            hex_hash);
 
   lv_obj_t *hash_label = lv_label_create(hash_container);
@@ -117,7 +119,7 @@ static void show_hash_display(void) {
   lv_obj_set_style_text_color(hash_label, highlight_color(), 0);
   lv_obj_set_style_text_font(hash_label, theme_font_small(), 0);
 
-  proceed_btn = theme_create_button(entropy_screen, "Proceed", true);
+  proceed_btn = theme_create_button(entropy_screen, "继续", true);
   lv_obj_align(proceed_btn, LV_ALIGN_BOTTOM_MID, 0, -40);
   lv_obj_add_event_cb(proceed_btn, proceed_cb, LV_EVENT_CLICKED, NULL);
 
@@ -144,18 +146,17 @@ static void proceed_cb(lv_event_t *e) {
   if (bip39_mnemonic_from_bytes(NULL, entropy_hash, entropy_len, &mnemonic) !=
           WALLY_OK ||
       !mnemonic) {
-    dialog_show_error("Failed to generate mnemonic", NULL, 0);
+    dialog_show_error("助记词生成失败", NULL, 0);
     return;
   }
 
   if (bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
     wally_free_string(mnemonic);
-    dialog_show_error("Invalid mnemonic generated", NULL, 0);
+    dialog_show_error("生成的助记词无效", NULL, 0);
     return;
   }
 
-  if (completed_mnemonic)
-    free(completed_mnemonic);
+  SECURE_FREE_STRING(completed_mnemonic);
   completed_mnemonic = strdup(mnemonic);
   wally_free_string(mnemonic);
 
@@ -182,10 +183,7 @@ void entropy_from_camera_page_create(lv_obj_t *parent,
 
   return_callback = return_cb;
 
-  if (completed_mnemonic) {
-    free(completed_mnemonic);
-    completed_mnemonic = NULL;
-  }
+  SECURE_FREE_STRING(completed_mnemonic);
 
   total_words = 0;
   hash_captured = false;

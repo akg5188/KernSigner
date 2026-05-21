@@ -769,25 +769,25 @@ bool kef_is_envelope(const uint8_t *data, size_t len) {
 const char *kef_error_str(kef_error_t err) {
   switch (err) {
   case KEF_OK:
-    return "OK";
+    return "成功";
   case KEF_ERR_INVALID_ARG:
-    return "invalid argument";
+    return "参数无效";
   case KEF_ERR_UNSUPPORTED_VERSION:
-    return "unsupported KEF version";
+    return "加密文件版本不支持";
   case KEF_ERR_ALLOC:
-    return "memory allocation failed";
+    return "内存分配失败";
   case KEF_ERR_CRYPTO:
-    return "cryptographic operation failed";
+    return "加密运算失败";
   case KEF_ERR_AUTH:
-    return "authentication failed";
+    return "认证失败";
   case KEF_ERR_COMPRESS:
-    return "compression failed";
+    return "压缩失败";
   case KEF_ERR_DECOMPRESS:
-    return "decompression failed";
+    return "解压失败";
   case KEF_ERR_ENVELOPE_TOO_SHORT:
-    return "envelope too short";
+    return "加密文件太短";
   case KEF_ERR_DUPLICATE_BLOCKS:
-    return "duplicate ECB blocks detected";
+    return "检测到重复加密块";
   }
-  return "unknown error";
+  return "未知错误";
 }

@@ -1,12 +1,12 @@
 #include "key_confirmation.h"
 #include "../../core/key.h"
+#include "../../core/mnemonic_slots.h"
 #include "../../core/settings.h"
 #include "../../core/wallet.h"
 #include "../../qr/encoder.h"
 #include "../../ui/assets/icons_36.h"
 #include "../../ui/dialog.h"
 #include "../../ui/theme.h"
-#include "../../utils/memory_utils.h"
 #include "../../utils/secure_mem.h"
 #include <lvgl.h>
 #include <string.h>
@@ -31,17 +31,27 @@ static void loading_timer_cb(lv_timer_t *timer) {
 
   wallet_network_t net = settings_get_default_network();
   wallet_policy_t pol = settings_get_default_policy();
-  wallet_set_policy(pol);
-  if (key_load_from_mnemonic(mnemonic_content, NULL,
+  char *passphrase = NULL;
+  (void)key_get_session_passphrase(&passphrase);
+  if (key_load_from_mnemonic(mnemonic_content, passphrase,
                              net == WALLET_NETWORK_TESTNET)) {
+    SECURE_FREE_STRING(passphrase);
+    wallet_cleanup();
+    wallet_set_policy(pol);
+    key_apply_pending_source_material(mnemonic_content);
     if (!wallet_init(net)) {
-      dialog_show_error("Failed to initialize wallet", return_callback, 0);
+      SECURE_FREE_STRING(mnemonic_content);
+      dialog_show_error("钱包初始化失败", return_callback, 0);
       return;
     }
+    (void)mnemonic_slots_add_current(NULL);
+    SECURE_FREE_STRING(mnemonic_content);
     if (success_callback)
       success_callback();
   } else {
-    dialog_show_error("Failed to load key", return_callback, 0);
+    SECURE_FREE_STRING(passphrase);
+    SECURE_FREE_STRING(mnemonic_content);
+    dialog_show_error("密钥加载失败", return_callback, 0);
   }
 }
 
@@ -72,7 +82,7 @@ static void create_ui(const char *fingerprint_hex) {
 
   lv_obj_t *center = theme_create_flex_column(key_confirmation_screen);
   lv_obj_set_style_pad_row(center, 20, 0);
-  lv_obj_align(center, LV_ALIGN_TOP_MID, 0, 0);
+  lv_obj_align(center, LV_ALIGN_CENTER, 0, -20);
 
   lv_obj_t *fp_row = theme_create_flex_row(center);
   lv_obj_set_style_pad_column(fp_row, 8, 0);
@@ -98,6 +108,9 @@ static void create_ui(const char *fingerprint_hex) {
   lv_obj_set_style_text_font(fp_text, theme_font_medium(), 0);
   lv_obj_set_style_text_color(fp_text, highlight_color(), 0);
 
+  lv_obj_t *hint = theme_create_label(center, "正在加载钱包", true);
+  lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
+
   loading_timer = lv_timer_create(loading_timer_cb, LOADING_DELAY_MS, NULL);
   lv_timer_set_repeat_count(loading_timer, 1);
 }
@@ -109,10 +122,10 @@ void key_confirmation_page_create(lv_obj_t *parent, void (*return_cb)(void),
   return_callback = return_cb;
   success_callback = success_cb;
 
-  SAFE_FREE_STATIC(mnemonic_content);
+  SECURE_FREE_STRING(mnemonic_content);
   mnemonic_content = mnemonic_qr_to_mnemonic(content, content_len, NULL);
   if (!mnemonic_content) {
-    dialog_show_error("Invalid mnemonic phrase", return_callback, 0);
+    dialog_show_error("助记词无效", return_callback, 0);
     return;
   }
 
@@ -120,14 +133,20 @@ void key_confirmation_page_create(lv_obj_t *parent, void (*return_cb)(void),
   unsigned char seed[BIP39_SEED_LEN_512];
   struct ext_key *master_key = NULL;
 
-  if (bip39_mnemonic_to_seed512(mnemonic_content, NULL, seed, sizeof(seed)) !=
-          WALLY_OK ||
+  char *passphrase = NULL;
+  (void)key_get_session_passphrase(&passphrase);
+
+  if (bip39_mnemonic_to_seed512(mnemonic_content, passphrase, seed,
+                                sizeof(seed)) != WALLY_OK ||
       bip32_key_from_seed_alloc(seed, sizeof(seed), BIP32_VER_MAIN_PRIVATE, 0,
                                 &master_key) != WALLY_OK) {
+    SECURE_FREE_STRING(passphrase);
     secure_memzero(seed, sizeof(seed));
-    dialog_show_error("Failed to process mnemonic", return_callback, 0);
+    SECURE_FREE_STRING(mnemonic_content);
+    dialog_show_error("助记词处理失败", return_callback, 0);
     return;
   }
+  SECURE_FREE_STRING(passphrase);
 
   bip32_key_get_fingerprint(master_key, fingerprint, BIP32_KEY_FINGERPRINT_LEN);
   secure_memzero(seed, sizeof(seed));
@@ -136,11 +155,14 @@ void key_confirmation_page_create(lv_obj_t *parent, void (*return_cb)(void),
   char *fingerprint_hex = NULL;
   if (wally_hex_from_bytes(fingerprint, BIP32_KEY_FINGERPRINT_LEN,
                            &fingerprint_hex) != WALLY_OK) {
-    dialog_show_error("Failed to format fingerprint", return_callback, 0);
+    secure_memzero(fingerprint, sizeof(fingerprint));
+    SECURE_FREE_STRING(mnemonic_content);
+    dialog_show_error("指纹格式化失败", return_callback, 0);
     return;
   }
 
   create_ui(fingerprint_hex);
+  secure_memzero(fingerprint, sizeof(fingerprint));
   wally_free_string(fingerprint_hex);
 }
 
@@ -159,7 +181,7 @@ void key_confirmation_page_destroy(void) {
     lv_timer_del(loading_timer);
     loading_timer = NULL;
   }
-  SAFE_FREE_STATIC(mnemonic_content);
+  SECURE_FREE_STRING(mnemonic_content);
   if (key_confirmation_screen) {
     lv_obj_del(key_confirmation_screen);
     key_confirmation_screen = NULL;

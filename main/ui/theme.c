@@ -9,6 +9,10 @@
 #if !defined(ICONS_36) || ICONS_36
 #include "assets/icons_36.h"
 #endif
+#include "assets/krux_cn_20.h"
+#include "assets/krux_cn_28.h"
+
+static int max_i(int a, int b) { return a > b ? a : b; }
 
 // Minimalist theme colors
 #define COLOR_BG lv_color_hex(0x000000)       // Black background
@@ -45,24 +49,26 @@ typedef struct {
 } theme_font_pair_t;
 
 static theme_font_pair_t font_pair_for_size(uint16_t size) {
+  // The LVGL built-in CJK font is a limited subset. Use the generated Krux
+  // Chinese UI subset first so visible Chinese text does not render as boxes.
   switch (size) {
-#if LV_FONT_MONTSERRAT_16 && (!defined(ICONS_16) || ICONS_16)
+#if !defined(ICONS_16) || ICONS_16
   case 16:
-    return (theme_font_pair_t){&lv_font_montserrat_16, &icons_16};
+    return (theme_font_pair_t){&krux_cn_20, &icons_16};
 #endif
-#if LV_FONT_MONTSERRAT_24 && (!defined(ICONS_24) || ICONS_24)
+#if !defined(ICONS_24) || ICONS_24
   case 24:
-    return (theme_font_pair_t){&lv_font_montserrat_24, &icons_24};
+    return (theme_font_pair_t){&krux_cn_28, &icons_24};
 #endif
-#if LV_FONT_MONTSERRAT_36 && (!defined(ICONS_36) || ICONS_36)
+#if !defined(ICONS_36) || ICONS_36
   case 36:
-    return (theme_font_pair_t){&lv_font_montserrat_36, &icons_36};
+    return (theme_font_pair_t){&krux_cn_28, &icons_36};
 #endif
   default:
-#if LV_FONT_MONTSERRAT_24 && (!defined(ICONS_24) || ICONS_24)
-    return (theme_font_pair_t){&lv_font_montserrat_24, &icons_24};
+#if !defined(ICONS_24) || ICONS_24
+    return (theme_font_pair_t){&krux_cn_28, &icons_24};
 #else
-#error "theme requires LV_FONT_MONTSERRAT_24 and icons_24"
+    return (theme_font_pair_t){&krux_cn_20, NULL};
 #endif
   }
 }
@@ -71,16 +77,29 @@ void theme_init(void) {
   scr_w = lv_disp_get_hor_res(NULL);
   scr_h = lv_disp_get_ver_res(NULL);
 
-  // Pre-compute all proportional sizes
-  sz_button_width = scr_w * 5 / 24;  // 150 @ 720
-  sz_button_height = scr_w * 5 / 36; // 100 @ 720
-  sz_button_spacing = scr_w / 36;    //  20 @ 720
-  sz_default_padding = scr_w / 24;   //  30 @ 720
-  sz_min_touch = scr_w / 8;          //  90 @ 720
-  sz_corner_btn_w = scr_w / 6;       // 120 @ 720
-  sz_corner_btn_h = scr_w / 8;       //  90 @ 720
-  sz_small_padding = scr_w / 72;     //  10 @ 720
-  sz_logo = scr_w * 5 / 18;          // 200 @ 720
+  // Pre-compute all proportional sizes. 480x800 uses tighter chrome so the
+  // wallet content gets the tall screen instead of feeling like a 720x720 port.
+  if (scr_w <= 520 && scr_h >= 760) {
+    sz_button_width = scr_w * 5 / 18;
+    sz_button_height = 62;
+    sz_button_spacing = 10;
+    sz_default_padding = 18;
+    sz_min_touch = 58;
+    sz_corner_btn_w = 80;
+    sz_corner_btn_h = 54;
+    sz_small_padding = 8;
+    sz_logo = 120;
+  } else {
+    sz_button_width = scr_w * 5 / 24;  // 150 @ 720
+    sz_button_height = scr_w * 5 / 36; // 100 @ 720
+    sz_button_spacing = scr_w / 36;    //  20 @ 720
+    sz_default_padding = scr_w / 24;   //  30 @ 720
+    sz_min_touch = scr_w / 8;          //  90 @ 720
+    sz_corner_btn_w = scr_w / 6;       // 120 @ 720
+    sz_corner_btn_h = scr_w / 8;       //  90 @ 720
+    sz_small_padding = scr_w / 72;     //  10 @ 720
+    sz_logo = scr_w * 5 / 18;          // 200 @ 720
+  }
 
   ui_font_policy_t policy = ui_font_policy_for_display(scr_w, scr_h);
   theme_font_pair_t small = font_pair_for_size(policy.small_px);
@@ -166,9 +185,11 @@ void theme_apply_frame(lv_obj_t *target_frame) {
 
   lv_obj_set_style_bg_color(target_frame, COLOR_PANEL, 0);
   lv_obj_set_style_bg_opa(target_frame, LV_OPA_90, 0);
-  lv_obj_set_style_border_color(target_frame, COLOR_WHITE, 0);
-  lv_obj_set_style_border_width(target_frame, 2, 0);
-  lv_obj_set_style_radius(target_frame, 6, 0);
+  lv_obj_set_style_border_color(target_frame, COLOR_ORANGE, 0);
+  lv_obj_set_style_border_width(target_frame, 1, 0);
+  lv_obj_set_style_radius(target_frame, 14, 0);
+  lv_obj_set_style_pad_all(target_frame, theme_get_default_padding(), 0);
+  lv_obj_set_style_shadow_width(target_frame, 0, 0);
 }
 
 void theme_apply_solid_rectangle(lv_obj_t *target_rectangle) {
@@ -188,7 +209,8 @@ void theme_apply_label(lv_obj_t *label, bool is_secondary) {
   if (!label)
     return;
 
-  lv_obj_set_style_text_color(label, COLOR_GRAY, 0);
+  lv_obj_set_style_text_color(label, is_secondary ? COLOR_GRAY : COLOR_WHITE,
+                              0);
   lv_obj_set_style_text_font(label, theme_font_small(), 0);
   lv_obj_set_style_bg_opa(label, LV_OPA_TRANSP, 0);
   lv_obj_set_style_border_width(label, 0, 0);
@@ -208,13 +230,18 @@ void theme_apply_touch_button(lv_obj_t *btn, bool is_primary) {
   if (!btn)
     return;
 
-  // Default state - minimal transparent background
-  lv_obj_set_style_bg_color(btn, COLOR_BG, LV_STATE_DEFAULT);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_30, LV_STATE_DEFAULT);
+  // Soft panel buttons read clearly on the 480x800 glass without visual noise.
+  lv_obj_set_style_bg_color(btn, is_primary ? COLOR_PANEL : COLOR_BG,
+                            LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(btn, is_primary ? LV_OPA_90 : LV_OPA_50,
+                          LV_STATE_DEFAULT);
   lv_obj_set_style_text_color(btn, COLOR_WHITE, LV_STATE_DEFAULT);
-  lv_obj_set_style_border_width(btn, 0, LV_STATE_DEFAULT);
+  lv_obj_set_style_border_color(btn, is_primary ? COLOR_ORANGE : COLOR_PANEL,
+                                LV_STATE_DEFAULT);
+  lv_obj_set_style_border_width(btn, 1, LV_STATE_DEFAULT);
   lv_obj_set_style_radius(btn, 12, LV_STATE_DEFAULT);
-  lv_obj_set_style_pad_all(btn, 15, LV_STATE_DEFAULT);
+  lv_obj_set_style_pad_all(btn, max_i(10, theme_get_small_padding() * 2),
+                           LV_STATE_DEFAULT);
   lv_obj_set_style_shadow_width(btn, 0, LV_STATE_DEFAULT);
 
   // Pressed state - orange background
@@ -301,7 +328,11 @@ lv_obj_t *theme_create_label(lv_obj_t *parent, const char *text,
 
 lv_obj_t *theme_create_page_title(lv_obj_t *parent, const char *text) {
   lv_obj_t *label = theme_create_label(parent, text ? text : "", false);
-  lv_obj_set_style_text_font(label, theme_font_small(), 0);
+  lv_obj_set_width(label, LV_PCT(72));
+  lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_font(label, theme_font_medium(), 0);
+  lv_obj_set_style_text_color(label, main_color(), 0);
   lv_obj_align(label, LV_ALIGN_TOP_MID, 0, theme_get_default_padding());
   return label;
 }
@@ -366,6 +397,7 @@ lv_obj_t *theme_create_dropdown(lv_obj_t *parent, const char *options) {
   lv_obj_set_style_text_color(dd, COLOR_WHITE, 0);
   lv_obj_set_style_text_font(dd, theme_font_small(), 0);
   lv_obj_set_style_border_color(dd, COLOR_ORANGE, 0);
+  lv_dropdown_set_symbol(dd, "v");
   lv_obj_add_event_cb(dd, dropdown_open_cb, LV_EVENT_READY, NULL);
   return dd;
 }

@@ -18,8 +18,7 @@ static void back_confirm_cb(bool result, void *user_data) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("Are you sure you want to go back?", back_confirm_cb,
-                      NULL, DIALOG_STYLE_OVERLAY);
+  dialog_show_confirm("放弃输入？", back_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
 
 static void confirm_passphrase_cb(bool result, void *user_data) {
@@ -30,10 +29,7 @@ static void confirm_passphrase_cb(bool result, void *user_data) {
 
 static void keyboard_ready_cb(lv_event_t *e) {
   (void)e;
-  char prompt[128];
-  snprintf(prompt, sizeof(prompt), "Confirm passphrase:\n\"%s\"",
-           lv_textarea_get_text(text_input.textarea));
-  dialog_show_confirm(prompt, confirm_passphrase_cb, NULL,
+  dialog_show_confirm("应用到钱包？", confirm_passphrase_cb, NULL,
                       DIALOG_STYLE_OVERLAY);
 }
 
@@ -50,13 +46,13 @@ void passphrase_page_create(lv_obj_t *parent, void (*return_cb)(void),
   lv_obj_clear_flag(passphrase_screen, LV_OBJ_FLAG_SCROLLABLE);
 
   // Create title label
-  theme_create_page_title(passphrase_screen, "Enter Passphrase");
+  theme_create_page_title(passphrase_screen, "密码短语");
 
   // Back button
   ui_create_back_button(passphrase_screen, back_btn_cb);
 
   // Text input (textarea + keyboard)
-  ui_text_input_create(&text_input, passphrase_screen, "passphrase", false,
+  ui_text_input_create(&text_input, passphrase_screen, "输入口令", true,
                        keyboard_ready_cb);
 }
 

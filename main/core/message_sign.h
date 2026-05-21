@@ -10,6 +10,7 @@ typedef struct {
 
 bool message_sign_parse(const char *content, parsed_sign_message_t *result);
 void message_sign_free_parsed(parsed_sign_message_t *parsed);
+bool message_sign_path_allowed(const char *derivation_path, bool is_testnet);
 bool message_sign_sign(const char *derivation_path, const char *message,
                        char **signature_b64_out);
 bool message_sign_get_address(const char *derivation_path, bool is_testnet,

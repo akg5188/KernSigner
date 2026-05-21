@@ -1,7 +1,9 @@
 #include "message_sign.h"
 #include "../utils/secure_mem.h"
 #include "key.h"
+#include "wallet.h"
 #include <esp_log.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wally_address.h>
@@ -10,6 +12,87 @@
 #include <wally_script.h>
 
 static const char *TAG = "message_sign";
+
+static bool parse_path_component(const char **cursor, uint32_t *value_out,
+                                 bool *hardened_out) {
+  if (!cursor || !*cursor || !value_out || !hardened_out)
+    return false;
+
+  const char *p = *cursor;
+  if (*p < '0' || *p > '9')
+    return false;
+
+  uint32_t value = 0;
+  if (*p == '0' && p[1] >= '0' && p[1] <= '9')
+    return false;
+
+  while (*p >= '0' && *p <= '9') {
+    uint32_t digit = (uint32_t)(*p - '0');
+    if (value > UINT32_MAX / 10 ||
+        (value == UINT32_MAX / 10 && digit > UINT32_MAX % 10))
+      return false;
+    value = value * 10 + digit;
+    p++;
+  }
+
+  bool hardened = false;
+  if (*p == '\'' || *p == 'h') {
+    hardened = true;
+    p++;
+  }
+
+  *cursor = p;
+  *value_out = value;
+  *hardened_out = hardened;
+  return true;
+}
+
+bool message_sign_path_allowed(const char *derivation_path, bool is_testnet) {
+  if (!derivation_path)
+    return false;
+
+  const char *p = derivation_path;
+  if (*p == 'm') {
+    p++;
+    if (*p == '/')
+      p++;
+    else if (*p != '\0')
+      return false;
+  }
+
+  uint32_t path[5] = {0};
+  bool hardened[5] = {0};
+  size_t depth = 0;
+  while (*p && depth < 5) {
+    if (!parse_path_component(&p, &path[depth], &hardened[depth]))
+      return false;
+    depth++;
+    if (*p == '/') {
+      p++;
+      if (*p == '\0')
+        return false;
+    } else if (*p != '\0') {
+      return false;
+    }
+  }
+
+  if (*p != '\0' || depth != 5)
+    return false;
+
+  const uint32_t expected_coin = is_testnet ? 1u : 0u;
+  if (path[0] != 84 || path[1] != expected_coin)
+    return false;
+  if (!hardened[0] || !hardened[1] || !hardened[2])
+    return false;
+  if (hardened[3] || hardened[4])
+    return false;
+  if (path[2] != wallet_get_account())
+    return false;
+  if (path[3] != 0)
+    return false;
+
+  return true;
+}
 
 bool message_sign_parse(const char *content, parsed_sign_message_t *result) {
   if (!content || !result) {
@@ -74,13 +157,25 @@ void message_sign_free_parsed(parsed_sign_message_t *parsed) {
   }
   free(parsed->derivation_path);
   parsed->derivation_path = NULL;
-  free(parsed->message);
+  SECURE_FREE_STRING(parsed->message);
   parsed->message = NULL;
 }
 
 bool message_sign_sign(const char *derivation_path, const char *message,
                        char **signature_b64_out) {
-  if (!derivation_path || !message || !signature_b64_out) {
+  if (!key_has_signing_key() || !derivation_path || !message ||
+      !signature_b64_out) {
+    return false;
+  }
+
+  const bool is_testnet = (wallet_get_network() == WALLET_NETWORK_TESTNET);
+  if (wallet_get_policy() != WALLET_POLICY_SINGLESIG) {
+    ESP_LOGE(TAG, "Refusing BTC message signing outside single-sig wallet");
+    return false;
+  }
+  if (!message_sign_path_allowed(derivation_path, is_testnet)) {
+    ESP_LOGE(TAG, "Refusing unsupported BTC message path: %s",
+             derivation_path);
     return false;
   }
 
@@ -138,7 +233,18 @@ bool message_sign_sign(const char *derivation_path, const char *message,
 
 bool message_sign_get_address(const char *derivation_path, bool is_testnet,
                               char **address_out) {
-  if (!derivation_path || !address_out) {
+  if (!key_has_signing_key() || !derivation_path || !address_out) {
+    return false;
+  }
+
+  if (wallet_get_policy() != WALLET_POLICY_SINGLESIG) {
+    ESP_LOGE(TAG, "Refusing BTC message address outside single-sig wallet");
+    return false;
+  }
+
+  if (!message_sign_path_allowed(derivation_path, is_testnet)) {
+    ESP_LOGE(TAG, "Unsupported BTC message path for selected network: %s",
+             derivation_path);
     return false;
   }
 

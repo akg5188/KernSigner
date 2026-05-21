@@ -128,7 +128,7 @@ lv_obj_t *settings_row_action(lv_obj_t *parent, const char *label,
 
   /* `>` rendered via the same trailing-icon helper as `?` so the
    * trailing edges of action and toggle/dropdown rows line up. */
-  make_trailing_icon(row, LV_SYMBOL_RIGHT, NULL, NULL);
+  make_trailing_icon(row, ">", NULL, NULL);
 
   lv_obj_set_user_data(row, NULL);
   return row;

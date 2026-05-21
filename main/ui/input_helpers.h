@@ -24,13 +24,23 @@ void ui_text_input_show(ui_text_input_t *input);
 void ui_text_input_hide(ui_text_input_t *input);
 void ui_text_input_destroy(ui_text_input_t *input);
 
-// Creates back button at top-left with LV_SYMBOL_LEFT
+// Applies the firmware-safe text keyboard maps; no icon glyphs are required.
+void ui_keyboard_apply_safe_text_map(lv_obj_t *keyboard);
+
+// Makes Chinese safe-keyboard labels act as functions if a default LVGL
+// keyboard inserts them before our keyboard callback gets control.
+void ui_textarea_enable_safe_keyboard_shortcuts(lv_obj_t *textarea);
+
+// Creates back button at top-left.
 lv_obj_t *ui_create_back_button(lv_obj_t *parent, lv_event_cb_t event_cb);
 
-// Creates power button at top-left with LV_SYMBOL_POWER
+// Creates home button at top-left.
+lv_obj_t *ui_create_home_button(lv_obj_t *parent, lv_event_cb_t event_cb);
+
+// Creates power button at top-left.
 lv_obj_t *ui_create_power_button(lv_obj_t *parent, lv_event_cb_t event_cb);
 
-// Creates settings button at top-right with LV_SYMBOL_SETTINGS
+// Creates settings button at top-right.
 lv_obj_t *ui_create_settings_button(lv_obj_t *parent, lv_event_cb_t event_cb);
 
 // Dialog confirm callback: attempts PMIC power-off with fallback.

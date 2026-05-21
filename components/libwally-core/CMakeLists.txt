@@ -1,3 +1,7 @@
+if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/upstream/src/amalgamation/combined.c")
+    message(FATAL_ERROR "libwally-core upstream is missing. Kern wallet builds must fail closed; run the dependency checkout/update step before building firmware.")
+endif()
+
 idf_component_register(SRCS
                        "upstream/src/amalgamation/combined.c"
                        INCLUDE_DIRS

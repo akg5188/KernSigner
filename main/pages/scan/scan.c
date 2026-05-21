@@ -5,18 +5,28 @@
 
 #include "scan.h"
 #include "../../../components/cUR/src/types/bytes_type.h"
+#include "../../../components/cUR/src/types/cbor_data.h"
+#include "../../../components/cUR/src/types/cbor_decoder.h"
+#include "../../../components/cUR/src/types/cbor_encoder.h"
 #include "../../../components/cUR/src/types/psbt.h"
+#include "../../../components/cUR/src/ur_encoder.h"
+#include "../../core/eip712.h"
+#include "../../core/evm.h"
 #include "../../core/key.h"
 #include "../../core/message_sign.h"
+#include "../../core/mnemonic_slots.h"
 #include "../../core/psbt.h"
 #include "../../core/storage.h"
+#include "../../core/custom_derivation.h"
 #include "../../core/wallet.h"
 #include "../../qr/encoder.h"
 #include "../../qr/parser.h"
 #include "../../qr/scanner.h"
 #include "../../qr/viewer.h"
+#include "../../smartcard/smartcard_satochip.h"
 #include "../../ui/assets/icons_24.h"
 #include "../../ui/dialog.h"
+#include "../../ui/input_helpers.h"
 #include "../../ui/menu.h"
 #include "../../ui/sankey.h"
 #include "../../ui/theme.h"
@@ -24,18 +34,32 @@
 #include "../load_descriptor_storage.h"
 #include "../shared/address_checker.h"
 #include "../shared/descriptor_loader.h"
+#include "../shared/mnemonic_slots_page.h"
+#include "../shared/sensitive_pin.h"
+#include <ctype.h>
+#include <esp_err.h>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/idf_additions.h>
+#include <freertos/task.h>
+#include <inttypes.h>
 #include <lvgl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <wally_address.h>
 #include <wally_bip32.h>
 #include <wally_bip39.h>
 #include <wally_core.h>
+#include <wally_crypto.h>
 #include <wally_psbt.h>
 #include <wally_psbt_members.h>
 #include <wally_script.h>
 #include <wally_transaction.h>
+
+static const char *TAG = "KERN_SCAN";
 
 typedef enum {
   OUTPUT_TYPE_SELF_TRANSFER,
@@ -73,6 +97,117 @@ static bool is_message_sign = false;
 
 // Mnemonic data
 static char *scanned_mnemonic = NULL;
+static bool web3_info_active = false;
+static bool smartcard_web3_mode = false;
+static bool unified_scan_mode = false;
+static bool pending_web3_from_ur = false;
+
+#define WEB3_DEFAULT_DERIVATION_PATH "m/44'/60'/0'/0/0"
+#define WEB3_REQUEST_TYPE_LEGACY_TX 1
+#define WEB3_REQUEST_TYPE_TYPED_DATA 2
+#define WEB3_REQUEST_TYPE_PERSONAL 3
+#define WEB3_REQUEST_TYPE_TYPED_TX 4
+#define WEB3_REQUEST_ID_BYTES_MAX 128
+
+typedef enum {
+  WEB3_REQUEST_ID_NONE = 0,
+  WEB3_REQUEST_ID_STRING,
+  WEB3_REQUEST_ID_UINT,
+  WEB3_REQUEST_ID_BYTES,
+  WEB3_REQUEST_ID_UUID,
+} web3_request_id_kind_t;
+
+typedef struct {
+  bool valid;
+  char wallet[48];
+  char action[64];
+  char chain[64];
+  char origin[128];
+  char request_id[96];
+  uint8_t request_id_uuid[16];
+  uint8_t request_id_bytes[WEB3_REQUEST_ID_BYTES_MAX];
+  size_t request_id_bytes_len;
+  uint64_t request_id_uint;
+  uint64_t request_id_tag;
+  web3_request_id_kind_t request_id_kind;
+  char path[96];
+  char address[72];
+  int request_type_id;
+  int chain_id;
+  uint8_t *sign_data;
+  size_t sign_data_len;
+  char detail[256];
+} web3_sign_request_t;
+
+typedef enum {
+  WEB3_SIGN_SOURCE_NONE = 0,
+  WEB3_SIGN_SOURCE_SMARTCARD = 1,
+  WEB3_SIGN_SOURCE_MNEMONIC = 2,
+} web3_sign_source_t;
+
+typedef enum {
+  BTC_SIGN_SOURCE_NONE = 0,
+  BTC_SIGN_SOURCE_MNEMONIC,
+  BTC_SIGN_SOURCE_SMARTCARD,
+} btc_sign_source_t;
+
+typedef struct {
+  const uint8_t *payload;
+  size_t payload_len;
+  const uint8_t *next;
+  bool is_list;
+} web3_rlp_item_t;
+
+typedef struct {
+  int tx_type;
+  char chain_id[48];
+  char nonce[48];
+  char gas_limit[48];
+  char gas_price[80];
+  char max_priority_fee[80];
+  char max_fee[80];
+  char value[96];
+  char to[48];
+  char data_len[32];
+  char access_list_count[32];
+  char error[96];
+  bool has_to;
+  bool valid;
+} web3_tx_summary_t;
+
+static web3_sign_request_t pending_web3_request;
+static web3_sign_source_t pending_web3_source = WEB3_SIGN_SOURCE_NONE;
+static bool web3_summary_back_to_choice = false;
+static btc_sign_source_t pending_btc_source = BTC_SIGN_SOURCE_NONE;
+static ui_text_input_t btc_satochip_pin_input;
+static bool btc_satochip_pin_input_active = false;
+static ui_text_input_t web3_pin_input;
+static bool web3_pin_input_active = false;
+
+#define WEB3_SATOCHIP_SIGN_TASK_STACK_SIZE 16384
+#define WEB3_SATOCHIP_SIGN_TASK_PSRAM_STACK_SIZE 32768
+
+static lv_obj_t *web3_sign_progress_dialog;
+static lv_timer_t *web3_sign_poll_timer;
+static TaskHandle_t web3_sign_task_handle;
+static volatile bool web3_sign_task_done;
+static volatile bool web3_sign_task_with_caps;
+static esp_err_t web3_sign_task_err = ESP_OK;
+static char web3_sign_task_pin[80];
+static char web3_sign_task_path[96];
+static uint8_t web3_sign_task_digest[32];
+static smartcard_satochip_signature_t web3_sign_task_sig;
+
+#define BTC_SATOCHIP_SIGN_TASK_STACK_SIZE 32768
+static lv_obj_t *btc_satochip_sign_progress_dialog;
+static lv_timer_t *btc_satochip_sign_poll_timer;
+static TaskHandle_t btc_satochip_sign_task_handle;
+static volatile bool btc_satochip_sign_task_done;
+static volatile bool btc_satochip_sign_task_with_caps;
+static esp_err_t btc_satochip_sign_task_err = ESP_OK;
+static char btc_satochip_sign_task_pin[80];
+static char btc_satochip_sign_task_detail[256];
+static size_t btc_satochip_signatures_added;
 
 // Forward declarations
 static void back_button_cb(lv_event_t *e);
@@ -95,6 +230,654 @@ static void message_sign_button_cb(lv_event_t *e);
 static void handle_descriptor_content(const char *descriptor_str);
 static void handle_address_content(const char *content);
 static void handle_mnemonic_content(const char *data, size_t len);
+static void show_scanned_sign_payload(void);
+static void return_from_sign_slots_cb(void);
+static void show_btc_source_choice(void);
+static void btc_source_mnemonic_cb(lv_event_t *e);
+static void btc_source_satochip_cb(lv_event_t *e);
+static void btc_source_back_cb(lv_event_t *e);
+static void btc_satochip_pin_ready_cb(lv_event_t *e);
+static void btc_satochip_pin_back_cb(lv_event_t *e);
+static bool handle_web3_relay_content(const char *content);
+static void web3_relay_info_done_cb(void *user_data);
+static void web3_request_clear(web3_sign_request_t *req);
+static void web3_show_source_choice(void);
+static void web3_show_pin_input(const web3_sign_request_t *req);
+static void web3_show_request_summary(void);
+static void web3_show_request_summary_for_source(web3_sign_source_t source,
+                                                 bool back_to_choice);
+static void web3_source_mnemonic_cb(lv_event_t *e);
+static void web3_source_satochip_cb(lv_event_t *e);
+static void web3_summary_back_cb(lv_event_t *e);
+static void web3_summary_sign_cb(lv_event_t *e);
+static void web3_pin_sign_after_summary_cb(lv_event_t *e);
+static void web3_mnemonic_sign_cb(lv_timer_t *timer);
+static bool web3_sign_with_mnemonic(void);
+static lv_obj_t *web3_prepare_page(void);
+static const char *web3_source_display_name(web3_sign_source_t source);
+static const char *web3_request_action_label(const web3_sign_request_t *req);
+static void web3_add_detail_field(lv_obj_t *parent, const char *title,
+                                  const char *value, bool wrap);
+static void web3_add_transaction_details(lv_obj_t *parent,
+                                         const web3_sign_request_t *req);
+static void web3_resume_current_step(void);
+static bool web3_compose_signature_bytes(const web3_sign_request_t *req,
+                                         const uint8_t compact[64],
+                                         uint8_t recovery_id,
+                                         uint8_t signature[72],
+                                         size_t *signature_len);
+static bool contains_ci(const char *haystack, const char *needle);
+
+static int max_i(int a, int b) { return a > b ? a : b; }
+
+static void short_middle(char *dst, size_t dst_len, const char *src,
+                         size_t prefix, size_t suffix) {
+  if (!dst || dst_len == 0)
+    return;
+  dst[0] = '\0';
+  if (!src)
+    return;
+  size_t len = strlen(src);
+  if (len <= prefix + suffix + 3 || dst_len <= prefix + suffix + 4) {
+    snprintf(dst, dst_len, "%s", src);
+    return;
+  }
+  snprintf(dst, dst_len, "%.*s...%s", (int)prefix, src, src + len - suffix);
+}
+
+static lv_obj_t *web3_prepare_page(void) {
+  qr_scanner_page_hide();
+  qr_scanner_page_destroy();
+  if (!scan_screen)
+    scan_screen = theme_create_page_container(lv_screen_active());
+  lv_obj_move_foreground(scan_screen);
+  lv_obj_clean(scan_screen);
+  theme_apply_screen(scan_screen);
+  lv_obj_clear_flag(scan_screen, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_flex_flow(scan_screen, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(scan_screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(scan_screen, theme_get_default_padding(), 0);
+  lv_obj_set_style_pad_gap(scan_screen, theme_get_small_padding(), 0);
+  return scan_screen;
+}
+
+static const char *web3_source_display_name(web3_sign_source_t source) {
+  switch (source) {
+  case WEB3_SIGN_SOURCE_SMARTCARD:
+    return "智能卡";
+  case WEB3_SIGN_SOURCE_MNEMONIC:
+    return "助记词";
+  default:
+    return "来源";
+  }
+}
+
+static const char *web3_request_action_label(const web3_sign_request_t *req) {
+  if (!req)
+    return "签名";
+  switch (req->request_type_id) {
+  case WEB3_REQUEST_TYPE_PERSONAL:
+    return "消息签名";
+  case WEB3_REQUEST_TYPE_TYPED_DATA:
+    return "结构化签名";
+  case WEB3_REQUEST_TYPE_LEGACY_TX:
+  case WEB3_REQUEST_TYPE_TYPED_TX:
+    return "交易签名";
+  default:
+    break;
+  }
+  if (contains_ci(req->action, "personalSign"))
+    return "消息签名";
+  if (contains_ci(req->action, "TypedData"))
+    return "结构化签名";
+  if (contains_ci(req->action, "signTransaction"))
+    return "交易签名";
+  return "签名";
+}
+
+static bool web3_bytes_are_readable_text(const uint8_t *data, size_t len) {
+  if (!data || len == 0)
+    return false;
+  size_t readable = 0;
+  for (size_t i = 0; i < len; i++) {
+    uint8_t c = data[i];
+    if (c == '\n' || c == '\r' || c == '\t' ||
+        (c >= 0x20 && c < 0x7f) || c >= 0x80) {
+      readable++;
+    }
+  }
+  return readable * 100U / len >= 92U;
+}
+
+static char *web3_pretty_json_like_alloc(const uint8_t *data, size_t len) {
+  if (!data || len == 0)
+    return NULL;
+  size_t first = 0;
+  while (first < len && isspace((unsigned char)data[first]))
+    first++;
+  if (first >= len || (data[first] != '{' && data[first] != '['))
+    return NULL;
+
+  size_t cap = len * 3U + 1U;
+  char *out = malloc(cap);
+  if (!out)
+    return NULL;
+  size_t pos = 0;
+  int depth = 0;
+  bool in_string = false;
+  bool escaped = false;
+
+  for (size_t i = 0; i < len && pos + 4 < cap; i++) {
+    char c = (char)data[i];
+    if (in_string) {
+      out[pos++] = c;
+      if (escaped)
+        escaped = false;
+      else if (c == '\\')
+        escaped = true;
+      else if (c == '"')
+        in_string = false;
+      continue;
+    }
+
+    if (c == '"') {
+      in_string = true;
+      out[pos++] = c;
+    } else if (c == '{' || c == '[') {
+      out[pos++] = c;
+      out[pos++] = '\n';
+      depth++;
+      for (int j = 0; j < depth && pos + 2 < cap; j++)
+        out[pos++] = ' ';
+    } else if (c == '}' || c == ']') {
+      out[pos++] = '\n';
+      if (depth > 0)
+        depth--;
+      for (int j = 0; j < depth && pos + 2 < cap; j++)
+        out[pos++] = ' ';
+      out[pos++] = c;
+    } else if (c == ',') {
+      out[pos++] = c;
+      out[pos++] = '\n';
+      for (int j = 0; j < depth && pos + 2 < cap; j++)
+        out[pos++] = ' ';
+    } else if (c == ':') {
+      out[pos++] = c;
+      out[pos++] = ' ';
+    } else if (!isspace((unsigned char)c)) {
+      out[pos++] = c;
+    }
+  }
+  out[pos] = '\0';
+  return out;
+}
+
+static char *web3_format_full_data_alloc(const uint8_t *data, size_t len,
+                                         bool prefer_text) {
+  if (!data || len == 0) {
+    char *empty = malloc(2);
+    if (empty)
+      snprintf(empty, 2, "-");
+    return empty;
+  }
+
+  if (prefer_text || web3_bytes_are_readable_text(data, len)) {
+    char *pretty = web3_pretty_json_like_alloc(data, len);
+    if (pretty)
+      return pretty;
+    char *text = malloc(len + 1);
+    if (!text)
+      return NULL;
+    memcpy(text, data, len);
+    text[len] = '\0';
+    return text;
+  }
+
+  size_t line_breaks = len / 24U;
+  size_t cap = len * 2U + len / 4U + line_breaks + 8U;
+  char *hex = malloc(cap);
+  if (!hex)
+    return NULL;
+  size_t pos = 0;
+  for (size_t i = 0; i < len && pos + 4 < cap; i++) {
+    pos += (size_t)snprintf(hex + pos, cap - pos, "%02x", data[i]);
+    if (i + 1U < len) {
+      if ((i + 1U) % 24U == 0)
+        hex[pos++] = '\n';
+      else if ((i + 1U) % 4U == 0)
+        hex[pos++] = ' ';
+    }
+  }
+  hex[pos] = '\0';
+  return hex;
+}
+
+static void web3_add_detail_field(lv_obj_t *parent, const char *title,
+                                  const char *value, bool wrap) {
+  if (!parent || !title)
+    return;
+
+  lv_obj_t *box = lv_obj_create(parent);
+  lv_obj_set_width(box, LV_PCT(100));
+  lv_obj_set_height(box, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_bg_color(box, bg_color(), 0);
+  lv_obj_set_style_bg_opa(box, LV_OPA_50, 0);
+  lv_obj_set_style_border_color(box, lv_color_hex(0x343434), 0);
+  lv_obj_set_style_border_width(box, 1, 0);
+  lv_obj_set_style_radius(box, 10, 0);
+  lv_obj_set_style_pad_all(box, theme_get_small_padding(), 0);
+  lv_obj_set_style_pad_gap(box, 3, 0);
+  lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t *label = theme_create_label(box, title, true);
+  lv_obj_set_width(label, LV_PCT(100));
+  lv_obj_set_style_text_color(label, highlight_color(), 0);
+  lv_obj_set_style_text_font(label, theme_font_small(), 0);
+
+  lv_obj_t *text = theme_create_label(box, value ? value : "-", false);
+  lv_obj_set_width(text, LV_PCT(100));
+  lv_label_set_long_mode(text, wrap ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_font(text, theme_font_small(), 0);
+  lv_obj_set_style_text_line_space(text, 3, 0);
+}
+
+static bool web3_rlp_read_item(const uint8_t *cursor, const uint8_t *end,
+                               web3_rlp_item_t *item) {
+  if (!cursor || !end || cursor >= end || !item)
+    return false;
+
+  uint8_t prefix = *cursor++;
+  size_t len = 0;
+  item->payload = NULL;
+  item->payload_len = 0;
+  item->next = NULL;
+  item->is_list = false;
+
+  if (prefix <= 0x7f) {
+    item->payload = cursor - 1;
+    item->payload_len = 1;
+    item->next = cursor;
+    return true;
+  }
+  if (prefix <= 0xb7) {
+    len = (size_t)(prefix - 0x80);
+    if ((size_t)(end - cursor) < len)
+      return false;
+    item->payload = cursor;
+    item->payload_len = len;
+    item->next = cursor + len;
+    return true;
+  }
+  if (prefix <= 0xbf) {
+    size_t len_of_len = (size_t)(prefix - 0xb7);
+    if (len_of_len == 0 || len_of_len > sizeof(size_t) ||
+        (size_t)(end - cursor) < len_of_len)
+      return false;
+    for (size_t i = 0; i < len_of_len; i++)
+      len = (len << 8) | cursor[i];
+    cursor += len_of_len;
+    if ((size_t)(end - cursor) < len)
+      return false;
+    item->payload = cursor;
+    item->payload_len = len;
+    item->next = cursor + len;
+    return true;
+  }
+  if (prefix <= 0xf7) {
+    len = (size_t)(prefix - 0xc0);
+    if ((size_t)(end - cursor) < len)
+      return false;
+    item->payload = cursor;
+    item->payload_len = len;
+    item->next = cursor + len;
+    item->is_list = true;
+    return true;
+  }
+
+  size_t len_of_len = (size_t)(prefix - 0xf7);
+  if (len_of_len == 0 || len_of_len > sizeof(size_t) ||
+      (size_t)(end - cursor) < len_of_len)
+    return false;
+  for (size_t i = 0; i < len_of_len; i++)
+    len = (len << 8) | cursor[i];
+  cursor += len_of_len;
+  if ((size_t)(end - cursor) < len)
+    return false;
+  item->payload = cursor;
+  item->payload_len = len;
+  item->next = cursor + len;
+  item->is_list = true;
+  return true;
+}
+
+static size_t web3_rlp_collect_list(const web3_rlp_item_t *list,
+                                    web3_rlp_item_t *items,
+                                    size_t max_items) {
+  if (!list || !list->is_list || !items || max_items == 0)
+    return 0;
+  const uint8_t *cursor = list->payload;
+  const uint8_t *end = list->payload + list->payload_len;
+  size_t count = 0;
+  while (cursor < end && count < max_items) {
+    if (!web3_rlp_read_item(cursor, end, &items[count]))
+      return 0;
+    cursor = items[count].next;
+    count++;
+  }
+  return cursor == end ? count : 0;
+}
+
+static void web3_quantity_to_decimal(const uint8_t *bytes, size_t len,
+                                     char *out, size_t out_len) {
+  if (!out || out_len == 0)
+    return;
+  out[0] = '\0';
+  if (!bytes || len == 0) {
+    snprintf(out, out_len, "0");
+    return;
+  }
+
+  char digits[96] = "0";
+  size_t digit_len = 1;
+  for (size_t i = 0; i < len; i++) {
+    unsigned carry = bytes[i];
+    for (size_t pos = digit_len; pos > 0; pos--) {
+      unsigned v = (unsigned)(digits[pos - 1] - '0') * 256U + carry;
+      digits[pos - 1] = (char)('0' + (v % 10U));
+      carry = v / 10U;
+    }
+    while (carry > 0 && digit_len + 1 < sizeof(digits)) {
+      memmove(digits + 1, digits, digit_len);
+      digits[0] = (char)('0' + (carry % 10U));
+      digit_len++;
+      carry /= 10U;
+    }
+    if (carry > 0) {
+      snprintf(out, out_len, "数值过大");
+      return;
+    }
+  }
+  digits[digit_len] = '\0';
+  snprintf(out, out_len, "%s", digits);
+}
+
+static void web3_rlp_quantity_text(const web3_rlp_item_t *item, char *out,
+                                   size_t out_len) {
+  if (!item || item->is_list) {
+    snprintf(out, out_len, "-");
+    return;
+  }
+  web3_quantity_to_decimal(item->payload, item->payload_len, out, out_len);
+}
+
+static void web3_rlp_address_text(const web3_rlp_item_t *item, char *out,
+                                  size_t out_len, bool *has_to) {
+  if (has_to)
+    *has_to = false;
+  if (!out || out_len == 0)
+    return;
+  out[0] = '\0';
+  if (!item || item->is_list) {
+    snprintf(out, out_len, "-");
+    return;
+  }
+  if (item->payload_len == 0) {
+    snprintf(out, out_len, "合约创建");
+    return;
+  }
+  if (item->payload_len != 20) {
+    snprintf(out, out_len, "地址长度异常(%u)", (unsigned)item->payload_len);
+    return;
+  }
+  size_t pos = 0;
+  pos += snprintf(out + pos, out_len - pos, "0x");
+  for (size_t i = 0; i < item->payload_len && pos + 2 < out_len; i++)
+    pos += snprintf(out + pos, out_len - pos, "%02x", item->payload[i]);
+  if (has_to)
+    *has_to = true;
+}
+
+static const char *web3_tx_type_label(int tx_type) {
+  switch (tx_type) {
+  case 0:
+    return "Legacy";
+  case 1:
+    return "EIP-2930";
+  case 2:
+    return "EIP-1559";
+  default:
+    return "未知";
+  }
+}
+
+static void web3_parse_tx_summary(const web3_sign_request_t *req,
+                                  web3_tx_summary_t *summary) {
+  if (!summary)
+    return;
+  memset(summary, 0, sizeof(*summary));
+  if (!req || !req->sign_data || req->sign_data_len == 0) {
+    snprintf(summary->error, sizeof(summary->error), "交易数据为空");
+    return;
+  }
+
+  const uint8_t *data = req->sign_data;
+  size_t len = req->sign_data_len;
+  summary->tx_type =
+      req->request_type_id == WEB3_REQUEST_TYPE_TYPED_TX ? data[0] : 0;
+  if (req->request_type_id == WEB3_REQUEST_TYPE_TYPED_TX) {
+    if (len < 2 || (summary->tx_type != 1 && summary->tx_type != 2)) {
+      snprintf(summary->error, sizeof(summary->error), "不支持的交易类型");
+      return;
+    }
+    data++;
+    len--;
+  }
+
+  web3_rlp_item_t root;
+  if (!web3_rlp_read_item(data, data + len, &root) || root.next != data + len ||
+      !root.is_list) {
+    snprintf(summary->error, sizeof(summary->error), "交易 RLP 解析失败");
+    return;
+  }
+
+  web3_rlp_item_t fields[12];
+  size_t count = web3_rlp_collect_list(&root, fields, 12);
+  if (summary->tx_type == 0) {
+    if (count < 6) {
+      snprintf(summary->error, sizeof(summary->error), "Legacy 字段不足");
+      return;
+    }
+    web3_rlp_quantity_text(&fields[0], summary->nonce,
+                           sizeof(summary->nonce));
+    web3_rlp_quantity_text(&fields[1], summary->gas_price,
+                           sizeof(summary->gas_price));
+    web3_rlp_quantity_text(&fields[2], summary->gas_limit,
+                           sizeof(summary->gas_limit));
+    web3_rlp_address_text(&fields[3], summary->to, sizeof(summary->to),
+                          &summary->has_to);
+    web3_rlp_quantity_text(&fields[4], summary->value,
+                           sizeof(summary->value));
+    snprintf(summary->data_len, sizeof(summary->data_len), "%u 字节",
+             (unsigned)fields[5].payload_len);
+    if (count > 6 && !fields[6].is_list && fields[6].payload_len > 0) {
+      web3_rlp_quantity_text(&fields[6], summary->chain_id,
+                             sizeof(summary->chain_id));
+    } else {
+      snprintf(summary->chain_id, sizeof(summary->chain_id), "%d",
+               req->chain_id);
+    }
+    summary->valid = true;
+    return;
+  }
+
+  if (summary->tx_type == 1) {
+    if (count < 8) {
+      snprintf(summary->error, sizeof(summary->error), "EIP-2930 字段不足");
+      return;
+    }
+    web3_rlp_quantity_text(&fields[0], summary->chain_id,
+                           sizeof(summary->chain_id));
+    web3_rlp_quantity_text(&fields[1], summary->nonce,
+                           sizeof(summary->nonce));
+    web3_rlp_quantity_text(&fields[2], summary->gas_price,
+                           sizeof(summary->gas_price));
+    web3_rlp_quantity_text(&fields[3], summary->gas_limit,
+                           sizeof(summary->gas_limit));
+    web3_rlp_address_text(&fields[4], summary->to, sizeof(summary->to),
+                          &summary->has_to);
+    web3_rlp_quantity_text(&fields[5], summary->value,
+                           sizeof(summary->value));
+    snprintf(summary->data_len, sizeof(summary->data_len), "%u 字节",
+             (unsigned)fields[6].payload_len);
+    snprintf(summary->access_list_count, sizeof(summary->access_list_count),
+             "%u 项", fields[7].is_list
+                         ? (unsigned)web3_rlp_collect_list(&fields[7], fields,
+                                                           12)
+                         : 0U);
+    summary->valid = true;
+    return;
+  }
+
+  if (summary->tx_type == 2) {
+    if (count < 9) {
+      snprintf(summary->error, sizeof(summary->error), "EIP-1559 字段不足");
+      return;
+    }
+    web3_rlp_quantity_text(&fields[0], summary->chain_id,
+                           sizeof(summary->chain_id));
+    web3_rlp_quantity_text(&fields[1], summary->nonce,
+                           sizeof(summary->nonce));
+    web3_rlp_quantity_text(&fields[2], summary->max_priority_fee,
+                           sizeof(summary->max_priority_fee));
+    web3_rlp_quantity_text(&fields[3], summary->max_fee,
+                           sizeof(summary->max_fee));
+    web3_rlp_quantity_text(&fields[4], summary->gas_limit,
+                           sizeof(summary->gas_limit));
+    web3_rlp_address_text(&fields[5], summary->to, sizeof(summary->to),
+                          &summary->has_to);
+    web3_rlp_quantity_text(&fields[6], summary->value,
+                           sizeof(summary->value));
+    snprintf(summary->data_len, sizeof(summary->data_len), "%u 字节",
+             (unsigned)fields[7].payload_len);
+    snprintf(summary->access_list_count, sizeof(summary->access_list_count),
+             "%u 项", fields[8].is_list
+                         ? (unsigned)web3_rlp_collect_list(&fields[8], fields,
+                                                           12)
+                         : 0U);
+    summary->valid = true;
+    return;
+  }
+
+  snprintf(summary->error, sizeof(summary->error), "不支持的交易类型");
+}
+
+static void web3_add_transaction_details(lv_obj_t *parent,
+                                         const web3_sign_request_t *req) {
+  if (!parent || !req ||
+      (req->request_type_id != WEB3_REQUEST_TYPE_LEGACY_TX &&
+       req->request_type_id != WEB3_REQUEST_TYPE_TYPED_TX)) {
+    return;
+  }
+
+  web3_tx_summary_t tx;
+  web3_parse_tx_summary(req, &tx);
+  if (!tx.valid) {
+    web3_add_detail_field(parent, "交易解析", tx.error[0] ? tx.error : "失败",
+                          true);
+    return;
+  }
+
+  web3_add_detail_field(parent, "交易类型", web3_tx_type_label(tx.tx_type),
+                        false);
+  web3_add_detail_field(parent, "交易链 ID", tx.chain_id, false);
+  web3_add_detail_field(parent, "收款地址", tx.to, true);
+  web3_add_detail_field(parent, "金额(wei)", tx.value, true);
+  web3_add_detail_field(parent, "Nonce", tx.nonce, false);
+  web3_add_detail_field(parent, "Gas Limit", tx.gas_limit, false);
+  if (tx.tx_type == 0 || tx.tx_type == 1) {
+    web3_add_detail_field(parent, "Gas Price", tx.gas_price, true);
+  } else if (tx.tx_type == 2) {
+    web3_add_detail_field(parent, "Priority Fee", tx.max_priority_fee, true);
+    web3_add_detail_field(parent, "Max Fee", tx.max_fee, true);
+  }
+  web3_add_detail_field(parent, "交易数据", tx.data_len, false);
+  if (tx.tx_type == 1 || tx.tx_type == 2)
+    web3_add_detail_field(parent, "Access List", tx.access_list_count, false);
+}
+
+static void web3_add_full_sign_data_details(lv_obj_t *parent,
+                                            const web3_sign_request_t *req) {
+  if (!parent || !req || !req->sign_data || req->sign_data_len == 0)
+    return;
+
+  const bool is_text = req->request_type_id == WEB3_REQUEST_TYPE_PERSONAL ||
+                       req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA;
+  const char *title = "完整数据";
+  if (req->request_type_id == WEB3_REQUEST_TYPE_PERSONAL)
+    title = "消息原文";
+  else if (req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA)
+    title = "完整 TypedData";
+  else if (req->request_type_id == WEB3_REQUEST_TYPE_LEGACY_TX ||
+           req->request_type_id == WEB3_REQUEST_TYPE_TYPED_TX)
+    title = "交易原文";
+
+  char *full = web3_format_full_data_alloc(req->sign_data, req->sign_data_len,
+                                           is_text);
+  if (!full)
+    return;
+  web3_add_detail_field(parent, title, full, true);
+  free(full);
+}
+
+static void web3_resume_current_step(void) {
+  if (pending_web3_source == WEB3_SIGN_SOURCE_SMARTCARD) {
+    web3_pin_sign_after_summary_cb(NULL);
+  } else if (pending_web3_source == WEB3_SIGN_SOURCE_MNEMONIC) {
+    web3_show_request_summary_for_source(WEB3_SIGN_SOURCE_MNEMONIC, true);
+  } else {
+    web3_show_source_choice();
+  }
+}
+
+static bool web3_compose_signature_bytes(const web3_sign_request_t *req,
+                                         const uint8_t compact[64],
+                                         uint8_t recovery_id,
+                                         uint8_t signature[72],
+                                         size_t *signature_len) {
+  if (!req || !compact || !signature || !signature_len)
+    return false;
+
+  memcpy(signature, compact, 64);
+  if (req->request_type_id == WEB3_REQUEST_TYPE_LEGACY_TX &&
+      (contains_ci(req->wallet, "OKX") ||
+       contains_ci(req->wallet, "Bitget") ||
+       contains_ci(req->origin, "okx") ||
+       contains_ci(req->origin, "bitget") ||
+       contains_ci(req->origin, "bitkeep")) &&
+      req->chain_id > 0) {
+    uint64_t v = (uint64_t)req->chain_id * 2ULL + 35ULL +
+                 (uint64_t)(recovery_id & 1U);
+    uint8_t v_bytes[8];
+    size_t v_len = 0;
+    bool seen = false;
+    for (int i = 7; i >= 0; i--) {
+      uint8_t b = (uint8_t)(v >> (unsigned)(i * 8));
+      if (b || seen || i == 0) {
+        seen = true;
+        v_bytes[v_len++] = b;
+      }
+    }
+    memcpy(signature + 64, v_bytes, v_len);
+    *signature_len = 64 + v_len;
+  } else {
+    signature[64] = recovery_id & 1U;
+    *signature_len = 65;
+  }
+
+  return true;
+}
 
 // Format satoshis as Bitcoin with visual grouping: "1.00 000 000"
 static void format_btc(char *buf, size_t buf_size, uint64_t sats) {
@@ -143,7 +926,7 @@ static lv_obj_t *create_address_label(lv_obj_t *parent, const char *address,
   return label;
 }
 
-// Create a row with: [prefix text] [BTC icon] [formatted value]
+// Create a row with: [prefix text] [BTC] [formatted value]
 static lv_obj_t *create_btc_value_row(lv_obj_t *parent, const char *prefix,
                                       uint64_t sats, lv_color_t color) {
   lv_obj_t *row = theme_create_flex_row(parent);
@@ -157,7 +940,9 @@ static lv_obj_t *create_btc_value_row(lv_obj_t *parent, const char *prefix,
   lv_obj_set_style_text_color(prefix_label, color, 0);
 
   lv_obj_t *icon_label = lv_label_create(row);
-  lv_label_set_text(icon_label, ICON_BITCOIN);
+  // Avoid the Bitcoin glyph here: the bundled Chinese font does not contain it
+  // on all builds, and LVGL renders missing glyphs as square boxes.
+  lv_label_set_text(icon_label, "BTC");
   lv_obj_set_style_text_font(icon_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(icon_label, color, 0);
 
@@ -169,6 +954,206 @@ static lv_obj_t *create_btc_value_row(lv_obj_t *parent, const char *prefix,
   lv_obj_set_style_text_color(value_label, color, 0);
 
   return row;
+}
+
+static bool btc_keypath_to_path(const unsigned char *keypath,
+                                size_t keypath_len, char *out,
+                                size_t out_len) {
+  if (!keypath || keypath_len < BIP32_KEY_FINGERPRINT_LEN ||
+      ((keypath_len - BIP32_KEY_FINGERPRINT_LEN) % 4U) != 0 || !out ||
+      out_len < 2) {
+    return false;
+  }
+
+  size_t pos = 0;
+  int written = snprintf(out, out_len, "m");
+  if (written < 0 || (size_t)written >= out_len)
+    return false;
+  pos = (size_t)written;
+
+  size_t depth = (keypath_len - BIP32_KEY_FINGERPRINT_LEN) / 4U;
+  for (size_t i = 0; i < depth; i++) {
+    const unsigned char *p = keypath + BIP32_KEY_FINGERPRINT_LEN + i * 4U;
+    uint32_t child = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+                     ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+    bool hardened = (child & BIP32_INITIAL_HARDENED_CHILD) != 0;
+    child &= ~BIP32_INITIAL_HARDENED_CHILD;
+    written = snprintf(out + pos, out_len - pos, "/%" PRIu32 "%s", child,
+                       hardened ? "'" : "");
+    if (written < 0 || (size_t)written >= out_len - pos)
+      return false;
+    pos += (size_t)written;
+  }
+  return true;
+}
+
+static uint32_t btc_input_sighash_byte(const struct wally_psbt *psbt,
+                                       size_t index) {
+  size_t sighash = 0;
+  if (wally_psbt_get_input_sighash(psbt, index, &sighash) != WALLY_OK ||
+      sighash == 0) {
+    return WALLY_SIGHASH_ALL;
+  }
+  return (uint32_t)(sighash & 0xffU);
+}
+
+static bool btc_input_signature_hash(struct wally_psbt *psbt,
+                                     const struct wally_tx *tx, size_t index,
+                                     uint8_t out[WALLY_TXHASH_LEN],
+                                     char *detail, size_t detail_len) {
+  size_t script_len = 0;
+  if (wally_psbt_get_input_signing_script_len(psbt, index, &script_len) !=
+          WALLY_OK ||
+      script_len == 0) {
+    snprintf(detail, detail_len, "输入 %zu 缺少签名脚本。", index);
+    return false;
+  }
+
+  unsigned char *script = malloc(script_len);
+  if (!script) {
+    snprintf(detail, detail_len, "输入 %zu 内存不足。", index);
+    return false;
+  }
+
+  size_t written = 0;
+  bool ok = false;
+  if (wally_psbt_get_input_signing_script(psbt, index, script, script_len,
+                                          &written) != WALLY_OK ||
+      written != script_len) {
+    snprintf(detail, detail_len, "输入 %zu 读取签名脚本失败。", index);
+    goto done;
+  }
+
+  size_t scriptcode_len = 0;
+  if (wally_psbt_get_input_scriptcode_len(psbt, index, script, script_len,
+                                          &scriptcode_len) != WALLY_OK ||
+      scriptcode_len == 0) {
+    snprintf(detail, detail_len, "输入 %zu 生成 scriptCode 失败。", index);
+    goto done;
+  }
+
+  unsigned char *scriptcode = malloc(scriptcode_len);
+  if (!scriptcode) {
+    snprintf(detail, detail_len, "输入 %zu scriptCode 内存不足。", index);
+    goto done;
+  }
+
+  written = 0;
+  if (wally_psbt_get_input_scriptcode(psbt, index, script, script_len,
+                                      scriptcode, scriptcode_len,
+                                      &written) != WALLY_OK ||
+      written != scriptcode_len) {
+    snprintf(detail, detail_len, "输入 %zu 读取 scriptCode 失败。", index);
+    free(scriptcode);
+    goto done;
+  }
+
+  if (wally_psbt_get_input_signature_hash(psbt, index, tx, scriptcode,
+                                          scriptcode_len, 0, out,
+                                          WALLY_TXHASH_LEN) != WALLY_OK) {
+    snprintf(detail, detail_len, "输入 %zu 计算签名哈希失败。", index);
+    free(scriptcode);
+    goto done;
+  }
+
+  ok = true;
+  free(scriptcode);
+
+done:
+  free(script);
+  return ok;
+}
+
+static size_t psbt_sign_with_satochip(struct wally_psbt *psbt, const char *pin,
+                                      bool sign_testnet, char *detail,
+                                      size_t detail_len) {
+  if (detail && detail_len)
+    detail[0] = '\0';
+  if (!psbt || !pin || !pin[0]) {
+    snprintf(detail, detail_len, "缺少交易或智能卡 PIN。");
+    return 0;
+  }
+
+  struct wally_tx *tx = NULL;
+  if (wally_psbt_get_global_tx_alloc(psbt, &tx) != WALLY_OK || !tx) {
+    snprintf(detail, detail_len, "暂只支持 BlueWallet 常见 PSBT v0。");
+    return 0;
+  }
+
+  size_t signatures_added = 0;
+  for (size_t i = 0; i < psbt->num_inputs; i++) {
+    const struct wally_map *keypaths = &psbt->inputs[i].keypaths;
+    for (size_t j = 0; j < keypaths->num_items; j++) {
+      const struct wally_map_item *item = &keypaths->items[j];
+      if (!item->key || item->key_len != EC_PUBLIC_KEY_LEN || !item->value)
+        continue;
+
+      char path[96];
+      if (!btc_keypath_to_path(item->value, item->value_len, path,
+                               sizeof(path))) {
+        continue;
+      }
+
+      uint8_t digest[WALLY_TXHASH_LEN];
+      if (!btc_input_signature_hash(psbt, tx, i, digest, detail, detail_len))
+        continue;
+
+      smartcard_satochip_signature_t sig;
+      memset(&sig, 0, sizeof(sig));
+      esp_err_t err = smartcard_satochip_sign_evm_digest(pin, path, digest,
+                                                         &sig, 25000);
+      if (err != ESP_OK || !sig.has_signature) {
+        snprintf(detail, detail_len, "输入 %zu 智能卡签名失败：%s\n%s", i,
+                 esp_err_to_name(err), sig.detail);
+        secure_memzero(&sig, sizeof(sig));
+        secure_memzero(digest, sizeof(digest));
+        continue;
+      }
+
+      if (!sig.has_compressed_pubkey ||
+          memcmp(sig.compressed_pubkey, item->key, EC_PUBLIC_KEY_LEN) != 0) {
+        snprintf(detail, detail_len, "输入 %zu 路径不属于当前智能卡：%s", i,
+                 path);
+        secure_memzero(&sig, sizeof(sig));
+        secure_memzero(digest, sizeof(digest));
+        continue;
+      }
+
+      unsigned char der[EC_SIGNATURE_DER_MAX_LEN + 1];
+      size_t der_len = 0;
+      if (wally_ec_sig_to_der(sig.compact, sizeof(sig.compact), der,
+                              sizeof(der), &der_len) != WALLY_OK ||
+          der_len + 1 > sizeof(der)) {
+        snprintf(detail, detail_len, "输入 %zu 签名 DER 编码失败。", i);
+        secure_memzero(&sig, sizeof(sig));
+        secure_memzero(digest, sizeof(digest));
+        continue;
+      }
+
+      der[der_len++] = (unsigned char)btc_input_sighash_byte(psbt, i);
+      if (wally_psbt_add_input_signature(psbt, i, item->key, item->key_len,
+                                         der, der_len) == WALLY_OK) {
+        signatures_added++;
+      } else {
+        snprintf(detail, detail_len, "输入 %zu 写入 PSBT 签名失败。", i);
+      }
+
+      secure_memzero(der, sizeof(der));
+      secure_memzero(&sig, sizeof(sig));
+      secure_memzero(digest, sizeof(digest));
+      break;
+    }
+  }
+
+  wally_tx_free(tx);
+  if (signatures_added > 0) {
+    snprintf(detail, detail_len, "智能卡签名完成：%zu 个输入。",
+             signatures_added);
+  } else if (detail && detail_len && detail[0] == '\0') {
+    snprintf(detail, detail_len, "没有找到当前智能卡可签名的输入。");
+  }
+  (void)sign_testnet;
+  return signatures_added;
 }
 
 // Classify output as self-transfer, change, or spend
@@ -213,12 +1198,30 @@ static output_type_t classify_output(size_t output_index,
 }
 
 static void back_button_cb(lv_event_t *e) {
-  if (return_callback) {
-    return_callback();
+  (void)e;
+  if (web3_sign_task_handle &&
+      !__atomic_load_n(&web3_sign_task_done, __ATOMIC_ACQUIRE)) {
+    dialog_show_error("签名处理中，请等待完成。", NULL, 1600);
+    return;
   }
+
+  void (*cb)(void) = return_callback;
+  scan_page_destroy();
+  if (cb)
+    cb();
 }
 
 // --- Content detection ---
+
+static char *scan_strndup(const char *text, size_t len) {
+  char *out = malloc(len + 1);
+  if (!out)
+    return NULL;
+  if (len > 0)
+    memcpy(out, text, len);
+  out[len] = '\0';
+  return out;
+}
 
 static bool is_descriptor_prefix(const char *data) {
   return strncmp(data, "wsh(", 4) == 0 || strncmp(data, "sh(", 3) == 0 ||
@@ -239,7 +1242,7 @@ static bool is_valid_address(const char *data) {
     const char *start = data + 8;
     const char *query = strchr(start, '?');
     size_t addr_len = query ? (size_t)(query - start) : strlen(start);
-    stripped = strndup(start, addr_len);
+    stripped = scan_strndup(start, addr_len);
     if (!stripped)
       return false;
     addr = stripped;
@@ -259,6 +1262,1823 @@ static bool is_valid_address(const char *data) {
                                      &written) == WALLY_OK);
   free(stripped);
   return valid;
+}
+
+static bool contains_ci(const char *haystack, const char *needle) {
+  if (!haystack || !needle || !*needle)
+    return false;
+
+  size_t needle_len = strlen(needle);
+  for (const char *p = haystack; *p; p++) {
+    if (strncasecmp(p, needle, needle_len) == 0)
+      return true;
+  }
+  return false;
+}
+
+static bool starts_ci(const char *text, const char *prefix) {
+  return text && prefix && strncasecmp(text, prefix, strlen(prefix)) == 0;
+}
+
+static bool looks_like_web3_relay_content(const char *content) {
+  if (!content || !*content)
+    return false;
+
+  return starts_ci(content, "ur:eth-sign-request") ||
+         starts_ci(content, "ethereum:") ||
+         starts_ci(content, "tp:web3RelayNative-") ||
+         starts_ci(content, "tp:signTransaction-") ||
+         starts_ci(content, "tp:personalSign-") ||
+         starts_ci(content, "tp:signPersonalMessage-") ||
+         starts_ci(content, "tp:signTypedData-") ||
+         starts_ci(content, "tp:signTypedDataV4-") ||
+         starts_ci(content, "tp:signTypeData-") ||
+         starts_ci(content, "tp:signTypeDataV4-") ||
+         (content[0] == '{' &&
+          (contains_ci(content, "\"protocol\":\"keystone-eth\"") ||
+           contains_ci(content, "\"qr_type\":\"eth-sign-request\"") ||
+           contains_ci(content, "\"response_protocol\":\"eth-signature\""))) ||
+         (content[0] == '{' &&
+          (contains_ci(content, "\"payload\":\"tp:sign") ||
+           contains_ci(content, "\"payload\":\"ethereum:") ||
+           contains_ci(content, "\"action\":\"EVM")));
+}
+
+static const char *json_value_start(const char *json, const char *key) {
+  if (!json || !key)
+    return NULL;
+
+  char pattern[48];
+  snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+  const char *p = strstr(json, pattern);
+  if (!p)
+    return NULL;
+  p += strlen(pattern);
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  if (*p != ':')
+    return NULL;
+  p++;
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  return p;
+}
+
+static bool json_string_value(const char *json, const char *key, char *out,
+                              size_t out_len) {
+  if (!out || out_len == 0)
+    return false;
+  out[0] = '\0';
+
+  const char *p = json_value_start(json, key);
+  if (!p || *p != '"')
+    return false;
+  p++;
+
+  size_t pos = 0;
+  while (*p && *p != '"' && pos + 1 < out_len) {
+    if (*p == '\\' && p[1]) {
+      p++;
+      switch (*p) {
+      case 'n':
+        out[pos++] = '\n';
+        break;
+      case 'r':
+        out[pos++] = '\r';
+        break;
+      case 't':
+        out[pos++] = '\t';
+        break;
+      default:
+        out[pos++] = *p;
+        break;
+      }
+    } else {
+      out[pos++] = *p;
+    }
+    p++;
+  }
+  out[pos] = '\0';
+  return *p == '"';
+}
+
+static bool json_int_value(const char *json, const char *key, long *out) {
+  if (!out)
+    return false;
+
+  const char *p = json_value_start(json, key);
+  if (!p)
+    return false;
+  if (*p == '"')
+    p++;
+
+  char *end = NULL;
+  long value = strtol(p, &end, 10);
+  if (end == p)
+    return false;
+
+  *out = value;
+  return true;
+}
+
+static void web3_relay_info_done_cb(void *user_data) {
+  (void)user_data;
+  web3_info_active = false;
+  smartcard_web3_mode = false;
+  pending_web3_from_ur = false;
+  if (return_callback)
+    return_callback();
+}
+
+static void web3_request_clear(web3_sign_request_t *req) {
+  if (!req)
+    return;
+  if (req->sign_data) {
+    secure_memzero(req->sign_data, req->sign_data_len);
+    free(req->sign_data);
+  }
+  memset(req, 0, sizeof(*req));
+}
+
+static void web3_set_request_id_string(web3_sign_request_t *req,
+                                       const char *value) {
+  if (!req || !value || !value[0])
+    return;
+  snprintf(req->request_id, sizeof(req->request_id), "%s", value);
+  req->request_id_kind = WEB3_REQUEST_ID_STRING;
+}
+
+static int web3_hex_value(char c) {
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F')
+    return c - 'A' + 10;
+  return -1;
+}
+
+static bool web3_uuid_text_to_bytes(const char *text, uint8_t out[16]) {
+  if (!text || !out || strlen(text) != 36)
+    return false;
+  if (text[8] != '-' || text[13] != '-' || text[18] != '-' ||
+      text[23] != '-') {
+    return false;
+  }
+
+  size_t out_pos = 0;
+  int high = -1;
+  for (size_t i = 0; text[i]; i++) {
+    if (text[i] == '-')
+      continue;
+    int v = web3_hex_value(text[i]);
+    if (v < 0)
+      return false;
+    if (high < 0) {
+      high = v;
+    } else {
+      if (out_pos >= 16)
+        return false;
+      out[out_pos++] = (uint8_t)((high << 4) | v);
+      high = -1;
+    }
+  }
+  return high < 0 && out_pos == 16;
+}
+
+static void web3_set_request_id_text_fallback(web3_sign_request_t *req,
+                                              const char *value) {
+  if (!req || !value)
+    return;
+  while (*value && isspace((unsigned char)*value))
+    value++;
+  char trimmed[96];
+  snprintf(trimmed, sizeof(trimmed), "%s", value);
+  size_t len = strlen(trimmed);
+  while (len > 0 && isspace((unsigned char)trimmed[len - 1]))
+    trimmed[--len] = '\0';
+  if (!trimmed[0])
+    return;
+
+  uint8_t uuid_bytes[16];
+  if (web3_uuid_text_to_bytes(trimmed, uuid_bytes)) {
+    snprintf(req->request_id, sizeof(req->request_id), "%s", trimmed);
+    memcpy(req->request_id_uuid, uuid_bytes, sizeof(req->request_id_uuid));
+    req->request_id_kind = WEB3_REQUEST_ID_UUID;
+    return;
+  }
+
+  web3_set_request_id_string(req, trimmed);
+}
+
+static bool web3_set_request_id_bytes(web3_sign_request_t *req,
+                                      const uint8_t *bytes, size_t len,
+                                      uint64_t tag,
+                                      web3_request_id_kind_t kind) {
+  if (!req || !bytes || len == 0 || len > sizeof(req->request_id_bytes))
+    return false;
+  memcpy(req->request_id_bytes, bytes, len);
+  req->request_id_bytes_len = len;
+  req->request_id_tag = tag;
+  req->request_id_kind = kind;
+  size_t pos = 0;
+  for (size_t i = 0; i < len && pos + 2 < sizeof(req->request_id); i++) {
+    int n = snprintf(req->request_id + pos, sizeof(req->request_id) - pos,
+                     "%02x", bytes[i]);
+    if (n < 0)
+      break;
+    pos += (size_t)n;
+  }
+  return true;
+}
+
+static char *web3_strndup(const char *text, size_t len) {
+  char *out = malloc(len + 1);
+  if (!out)
+    return NULL;
+  if (len > 0)
+    memcpy(out, text, len);
+  out[len] = '\0';
+  return out;
+}
+
+static void web3_uppercase_in_place(char *text) {
+  if (!text)
+    return;
+  for (char *p = text; *p; p++)
+    *p = (char)toupper((unsigned char)*p);
+}
+
+static char *web3_url_decode_alloc(const char *input, size_t input_len) {
+  if (!input)
+    return NULL;
+  char *out = malloc(input_len + 1);
+  if (!out)
+    return NULL;
+
+  size_t pos = 0;
+  for (size_t i = 0; i < input_len; i++) {
+    char c = input[i];
+    if (c == '%' && i + 2 < input_len) {
+      int hi = web3_hex_value(input[i + 1]);
+      int lo = web3_hex_value(input[i + 2]);
+      if (hi >= 0 && lo >= 0) {
+        out[pos++] = (char)((hi << 4) | lo);
+        i += 2;
+        continue;
+      }
+    }
+    out[pos++] = (c == '+') ? ' ' : c;
+  }
+  out[pos] = '\0';
+  return out;
+}
+
+static bool web3_query_param_decode(const char *query, const char *key,
+                                    char *out, size_t out_len) {
+  if (!query || !key || !out || out_len == 0)
+    return false;
+  out[0] = '\0';
+
+  size_t key_len = strlen(key);
+  const char *p = query;
+  while (*p) {
+    const char *part_end = strchr(p, '&');
+    if (!part_end)
+      part_end = p + strlen(p);
+
+    const char *eq = memchr(p, '=', (size_t)(part_end - p));
+    if (eq && (size_t)(eq - p) == key_len && strncmp(p, key, key_len) == 0) {
+      char *decoded =
+          web3_url_decode_alloc(eq + 1, (size_t)(part_end - eq - 1));
+      if (!decoded)
+        return false;
+      snprintf(out, out_len, "%s", decoded);
+      free(decoded);
+      return true;
+    }
+
+    p = (*part_end == '&') ? part_end + 1 : part_end;
+  }
+  return false;
+}
+
+static bool web3_query_param_decode_alloc(const char *query, const char *key,
+                                          char **out) {
+  if (!query || !key || !out)
+    return false;
+  *out = NULL;
+
+  size_t key_len = strlen(key);
+  const char *p = query;
+  while (*p) {
+    const char *part_end = strchr(p, '&');
+    if (!part_end)
+      part_end = p + strlen(p);
+
+    const char *eq = memchr(p, '=', (size_t)(part_end - p));
+    if (eq && (size_t)(eq - p) == key_len && strncmp(p, key, key_len) == 0) {
+      *out = web3_url_decode_alloc(eq + 1, (size_t)(part_end - eq - 1));
+      return *out != NULL;
+    }
+
+    p = (*part_end == '&') ? part_end + 1 : part_end;
+  }
+  return false;
+}
+
+static bool web3_query_data_decode(const char *query, char **out) {
+  if (!query || !out)
+    return false;
+  *out = NULL;
+
+  const char *p = query;
+  while (*p) {
+    const char *part_end = strchr(p, '&');
+    if (!part_end)
+      part_end = p + strlen(p);
+
+    const char *eq = memchr(p, '=', (size_t)(part_end - p));
+    if (eq && (size_t)(eq - p) == 4 && strncmp(p, "data", 4) == 0) {
+      *out = web3_url_decode_alloc(eq + 1, (size_t)(part_end - eq - 1));
+      return *out != NULL;
+    }
+
+    p = (*part_end == '&') ? part_end + 1 : part_end;
+  }
+
+  return false;
+}
+
+static bool web3_json_string_value_alloc(const char *json, const char *key,
+                                         char **out) {
+  if (!json || !key || !out)
+    return false;
+  *out = NULL;
+
+  char pattern[64];
+  snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+  const char *p = strstr(json, pattern);
+  if (!p)
+    return false;
+  p += strlen(pattern);
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  if (*p != ':')
+    return false;
+  p++;
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  if (*p != '"')
+    return false;
+  p++;
+
+  size_t cap = strlen(p) + 1;
+  char *buf = malloc(cap);
+  if (!buf)
+    return false;
+  size_t pos = 0;
+  while (*p && *p != '"') {
+    if (*p == '\\' && p[1]) {
+      p++;
+      switch (*p) {
+      case 'n':
+        buf[pos++] = '\n';
+        break;
+      case 'r':
+        buf[pos++] = '\r';
+        break;
+      case 't':
+        buf[pos++] = '\t';
+        break;
+      case 'b':
+        buf[pos++] = '\b';
+        break;
+      case 'f':
+        buf[pos++] = '\f';
+        break;
+      default:
+        buf[pos++] = *p;
+        break;
+      }
+    } else {
+      buf[pos++] = *p;
+    }
+    p++;
+  }
+  if (*p != '"') {
+    free(buf);
+    return false;
+  }
+  buf[pos] = '\0';
+  *out = buf;
+  return true;
+}
+
+static bool web3_json_string_value_copy(const char *json, const char *key,
+                                        char *out, size_t out_len) {
+  if (!out || out_len == 0)
+    return false;
+  out[0] = '\0';
+  char *tmp = NULL;
+  if (!web3_json_string_value_alloc(json, key, &tmp))
+    return false;
+  snprintf(out, out_len, "%s", tmp);
+  free(tmp);
+  return true;
+}
+
+static bool web3_json_raw_value_alloc(const char *json, const char *key,
+                                      char **out) {
+  if (!json || !key || !out)
+    return false;
+  *out = NULL;
+
+  const char *p = json_value_start(json, key);
+  if (!p)
+    return false;
+
+  const char *start = p;
+  const char *end = NULL;
+  bool in_string = false;
+  bool escaped = false;
+  int depth = 0;
+
+  if (*p == '{' || *p == '[') {
+    for (; *p; p++) {
+      char c = *p;
+      if (in_string) {
+        if (escaped) {
+          escaped = false;
+        } else if (c == '\\') {
+          escaped = true;
+        } else if (c == '"') {
+          in_string = false;
+        }
+        continue;
+      }
+      if (c == '"') {
+        in_string = true;
+      } else if (c == '{' || c == '[') {
+        depth++;
+      } else if (c == '}' || c == ']') {
+        depth--;
+        if (depth == 0) {
+          end = p + 1;
+          break;
+        }
+      }
+    }
+  } else {
+    for (; *p; p++) {
+      char c = *p;
+      if (in_string) {
+        if (escaped) {
+          escaped = false;
+        } else if (c == '\\') {
+          escaped = true;
+        } else if (c == '"') {
+          in_string = false;
+          if (p > start)
+            end = p + 1;
+        }
+        continue;
+      }
+      if (c == '"') {
+        in_string = true;
+      } else if (c == ',' || c == '}' || c == ']') {
+        end = p;
+        break;
+      }
+    }
+    if (!end)
+      end = p;
+  }
+
+  if (!end || end <= start)
+    return false;
+  while (end > start && isspace((unsigned char)end[-1]))
+    end--;
+  *out = web3_strndup(start, (size_t)(end - start));
+  return *out != NULL;
+}
+
+static bool web3_json_int_value(const char *json, const char *key, int *out) {
+  if (!json || !key || !out)
+    return false;
+  char text[48];
+  if (web3_json_string_value_copy(json, key, text, sizeof(text))) {
+    char *end = NULL;
+    long value = strtol(text, &end, 10);
+    if (end != text) {
+      *out = (int)value;
+      return true;
+    }
+  }
+
+  char pattern[64];
+  snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+  const char *p = strstr(json, pattern);
+  if (!p)
+    return false;
+  p += strlen(pattern);
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  if (*p != ':')
+    return false;
+  p++;
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  char *end = NULL;
+  long value = strtol(p, &end, 10);
+  if (end == p)
+    return false;
+  *out = (int)value;
+  return true;
+}
+
+static bool web3_hex_to_bytes_alloc(const char *hex, uint8_t **out,
+                                    size_t *out_len) {
+  if (!hex || !out || !out_len)
+    return false;
+  *out = NULL;
+  *out_len = 0;
+
+  while (isspace((unsigned char)*hex))
+    hex++;
+  if (hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X'))
+    hex += 2;
+
+  size_t hex_len = 0;
+  for (const char *p = hex; *p; p++) {
+    if (isspace((unsigned char)*p))
+      continue;
+    if (web3_hex_value(*p) < 0)
+      return false;
+    hex_len++;
+  }
+  if (hex_len == 0 || (hex_len % 2U) != 0)
+    return false;
+
+  uint8_t *buf = malloc(hex_len / 2U);
+  if (!buf)
+    return false;
+
+  int high = -1;
+  size_t pos = 0;
+  for (const char *p = hex; *p; p++) {
+    if (isspace((unsigned char)*p))
+      continue;
+    int value = web3_hex_value(*p);
+    if (high < 0) {
+      high = value;
+    } else {
+      buf[pos++] = (uint8_t)((high << 4) | value);
+      high = -1;
+    }
+  }
+
+  *out = buf;
+  *out_len = pos;
+  return true;
+}
+
+static bool web3_copy_sign_data(web3_sign_request_t *req, const uint8_t *data,
+                                size_t len) {
+  if (!req || (!data && len > 0) || len == 0)
+    return false;
+  uint8_t *copy = malloc(len);
+  if (!copy)
+    return false;
+  memcpy(copy, data, len);
+  if (req->sign_data) {
+    secure_memzero(req->sign_data, req->sign_data_len);
+    free(req->sign_data);
+  }
+  req->sign_data = copy;
+  req->sign_data_len = len;
+  return true;
+}
+
+static bool web3_copy_sign_data_from_hex(web3_sign_request_t *req,
+                                         const char *hex) {
+  uint8_t *bytes = NULL;
+  size_t len = 0;
+  if (!web3_hex_to_bytes_alloc(hex, &bytes, &len))
+    return false;
+  bool ok = web3_copy_sign_data(req, bytes, len);
+  secure_memzero(bytes, len);
+  free(bytes);
+  return ok;
+}
+
+static bool web3_decode_personal_message_alloc(const char *message,
+                                               uint8_t **out,
+                                               size_t *out_len) {
+  if (!message || !out || !out_len)
+    return false;
+  *out = NULL;
+  *out_len = 0;
+  if (starts_ci(message, "0x")) {
+    if (web3_hex_to_bytes_alloc(message, out, out_len))
+      return true;
+  }
+
+  size_t len = strlen(message);
+  uint8_t *buf = malloc(len ? len : 1);
+  if (!buf)
+    return false;
+  if (len > 0)
+    memcpy(buf, message, len);
+  *out = buf;
+  *out_len = len;
+  return true;
+}
+
+static bool web3_parse_tp_payload(const char *payload,
+                                  web3_sign_request_t *req) {
+  if (!payload || !req || !starts_ci(payload, "tp:"))
+    return false;
+
+  const char *dash = strchr(payload, '-');
+  if (!dash || dash == payload)
+    return false;
+
+  size_t action_len = (size_t)(dash - payload);
+  if (action_len >= sizeof(req->action))
+    action_len = sizeof(req->action) - 1;
+  memcpy(req->action, payload, action_len);
+  req->action[action_len] = '\0';
+
+  const char *query = dash + 1;
+  if (*query == '?')
+    query++;
+
+  char *data_json = NULL;
+  if (!web3_query_data_decode(query, &data_json))
+    return false;
+
+  char text[128];
+  if (web3_query_param_decode(query, "chain_id", text, sizeof(text)) ||
+      web3_query_param_decode(query, "blockchainId", text, sizeof(text))) {
+    char *end = NULL;
+    long value = strtol(strrchr(text, ':') ? strrchr(text, ':') + 1 : text,
+                        &end, 10);
+    if (end != text)
+      req->chain_id = (int)value;
+  }
+  if (web3_query_param_decode(query, "requestId", text, sizeof(text)))
+    web3_set_request_id_text_fallback(req, text);
+  if (web3_query_param_decode(query, "path", text, sizeof(text)) && text[0])
+    snprintf(req->path, sizeof(req->path), "%s", text);
+
+  bool ok = false;
+  if (contains_ci(req->action, "personalSign") ||
+      contains_ci(req->action, "signPersonalMessage") ||
+      contains_ci(req->action, "ethSign") ||
+      contains_ci(req->action, "signMessage")) {
+    char *message = NULL;
+    if (web3_json_string_value_alloc(data_json, "message", &message)) {
+      uint8_t *bytes = NULL;
+      size_t bytes_len = 0;
+      if (web3_decode_personal_message_alloc(message, &bytes, &bytes_len)) {
+        req->request_type_id = WEB3_REQUEST_TYPE_PERSONAL;
+        ok = web3_copy_sign_data(req, bytes, bytes_len);
+        secure_memzero(bytes, bytes_len);
+        free(bytes);
+      }
+      free(message);
+    }
+  } else if (contains_ci(req->action, "signTypedData") ||
+             contains_ci(req->action, "signTypeData")) {
+    char *typed_json = NULL;
+    if (!web3_json_string_value_alloc(data_json, "message", &typed_json))
+      (void)web3_json_raw_value_alloc(data_json, "message", &typed_json);
+    if (typed_json && typed_json[0]) {
+      req->request_type_id = WEB3_REQUEST_TYPE_TYPED_DATA;
+      ok = web3_copy_sign_data(req, (const uint8_t *)typed_json,
+                               strlen(typed_json));
+      snprintf(req->detail, sizeof(req->detail),
+               "TypedData 已识别，请核对完整内容后再签名。");
+    } else {
+      snprintf(req->detail, sizeof(req->detail),
+               "signTypedData 缺少 message 字段。");
+      ok = false;
+    }
+    free(typed_json);
+  } else if (contains_ci(req->action, "signTransaction")) {
+    snprintf(req->detail, sizeof(req->detail),
+             "TP 交易二维码需要 request_sign_data_hex，当前二维码缺少可直接签名数据。");
+    ok = false;
+  }
+
+  (void)web3_json_string_value_copy(data_json, "address", req->address,
+                                    sizeof(req->address));
+  free(data_json);
+  return ok;
+}
+
+static bool web3_parse_native_relay_query(const char *content,
+                                          web3_sign_request_t *req) {
+  if (!starts_ci(content, "tp:web3RelayNative-") || !req)
+    return false;
+
+  const char *query = strchr(content, '-');
+  if (!query)
+    return false;
+  query++;
+  if (*query == '?')
+    query++;
+
+  char text[1024];
+  (void)web3_query_param_decode(query, "wallet_name", req->wallet,
+                                sizeof(req->wallet));
+  if (!req->wallet[0])
+    (void)web3_query_param_decode(query, "wallet", req->wallet,
+                                  sizeof(req->wallet));
+  (void)web3_query_param_decode(query, "action", req->action,
+                                sizeof(req->action));
+  (void)web3_query_param_decode(query, "chain", req->chain,
+                                sizeof(req->chain));
+  (void)web3_query_param_decode(query, "origin", req->origin,
+                                sizeof(req->origin));
+  if (web3_query_param_decode(query, "request_id", text, sizeof(text)))
+    web3_set_request_id_text_fallback(req, text);
+  (void)web3_query_param_decode(query, "path", req->path, sizeof(req->path));
+  (void)web3_query_param_decode(query, "address", req->address,
+                                sizeof(req->address));
+  if (!req->address[0])
+    (void)web3_query_param_decode(query, "expected_address", req->address,
+                                  sizeof(req->address));
+
+  if (web3_query_param_decode(query, "request_data_type_id", text,
+                              sizeof(text))) {
+    req->request_type_id = atoi(text);
+  }
+  if (web3_query_param_decode(query, "chain_id", text, sizeof(text)))
+    req->chain_id = atoi(text);
+  char *sign_hex = NULL;
+  if (web3_query_param_decode_alloc(query, "request_sign_data_hex",
+                                    &sign_hex) &&
+      sign_hex && sign_hex[0]) {
+    bool ok = web3_copy_sign_data_from_hex(req, sign_hex);
+    free(sign_hex);
+    return ok;
+  }
+  free(sign_hex);
+
+  char *payload = NULL;
+  if (web3_query_param_decode_alloc(query, "payload", &payload)) {
+    bool ok = web3_parse_tp_payload(payload, req);
+    free(payload);
+    return ok;
+  }
+  return false;
+}
+
+static bool web3_parse_json_envelope(const char *content,
+                                     web3_sign_request_t *req) {
+  if (!content || content[0] != '{' || !req)
+    return false;
+
+  (void)web3_json_string_value_copy(content, "wallet_name", req->wallet,
+                                    sizeof(req->wallet));
+  if (!req->wallet[0])
+    (void)web3_json_string_value_copy(content, "wallet", req->wallet,
+                                      sizeof(req->wallet));
+  (void)web3_json_string_value_copy(content, "action", req->action,
+                                    sizeof(req->action));
+  (void)web3_json_string_value_copy(content, "chain", req->chain,
+                                    sizeof(req->chain));
+  (void)web3_json_string_value_copy(content, "origin", req->origin,
+                                    sizeof(req->origin));
+  char request_id_text[128];
+  if (web3_json_string_value_copy(content, "request_id", request_id_text,
+                                  sizeof(request_id_text)) ||
+      web3_json_string_value_copy(content, "requestId", request_id_text,
+                                  sizeof(request_id_text))) {
+    web3_set_request_id_text_fallback(req, request_id_text);
+  }
+  (void)web3_json_string_value_copy(content, "address_path", req->path,
+                                    sizeof(req->path));
+  if (!req->path[0])
+    (void)web3_json_string_value_copy(content, "path", req->path,
+                                      sizeof(req->path));
+  (void)web3_json_string_value_copy(content, "address", req->address,
+                                    sizeof(req->address));
+  if (!req->address[0])
+    (void)web3_json_string_value_copy(content, "expected_address",
+                                      req->address, sizeof(req->address));
+  (void)web3_json_int_value(content, "request_data_type_id",
+                            &req->request_type_id);
+  (void)web3_json_int_value(content, "chain_id", &req->chain_id);
+
+  char *sign_hex = NULL;
+  if (web3_json_string_value_alloc(content, "request_sign_data_hex",
+                                   &sign_hex) &&
+      sign_hex[0]) {
+    bool ok = web3_copy_sign_data_from_hex(req, sign_hex);
+    free(sign_hex);
+    return ok;
+  }
+  free(sign_hex);
+
+  char *payload = NULL;
+  bool ok = false;
+  if (web3_json_string_value_alloc(content, "payload", &payload)) {
+    ok = web3_parse_tp_payload(payload, req);
+    free(payload);
+  }
+  return ok;
+}
+
+static bool web3_parse_sign_request(const char *content,
+                                    web3_sign_request_t *req) {
+  if (!content || !req)
+    return false;
+  web3_request_clear(req);
+  req->chain_id = 1;
+  snprintf(req->path, sizeof(req->path), "%s", WEB3_DEFAULT_DERIVATION_PATH);
+
+  bool ok = false;
+  if (starts_ci(content, "tp:web3RelayNative-")) {
+    ok = web3_parse_native_relay_query(content, req);
+  } else if (content[0] == '{') {
+    ok = web3_parse_json_envelope(content, req);
+  } else if (starts_ci(content, "tp:")) {
+    ok = web3_parse_tp_payload(content, req);
+  }
+
+  if (!req->wallet[0])
+    snprintf(req->wallet, sizeof(req->wallet), "Web3");
+  if (!req->action[0]) {
+    const char *label = "EVM 签名";
+    if (req->request_type_id == WEB3_REQUEST_TYPE_PERSONAL)
+      label = "personalSign";
+    else if (req->request_type_id == WEB3_REQUEST_TYPE_LEGACY_TX ||
+             req->request_type_id == WEB3_REQUEST_TYPE_TYPED_TX)
+      label = "交易签名";
+    else if (req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA)
+      label = "TypedData";
+    snprintf(req->action, sizeof(req->action), "%s", label);
+  }
+  if (!req->chain[0])
+    snprintf(req->chain, sizeof(req->chain), "EVM %d", req->chain_id);
+  if (req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA &&
+      !req->detail[0]) {
+    snprintf(req->detail, sizeof(req->detail),
+             "TypedData 已识别，请核对完整内容后再签名。");
+  }
+
+  req->valid = ok && req->sign_data && req->sign_data_len > 0 &&
+               req->request_type_id > 0;
+  if (!req->valid && !req->detail[0]) {
+    snprintf(req->detail, sizeof(req->detail),
+             "这个 Web3 二维码缺少可签名数据。请用 OKX/Bitget 的 Keystone 硬件钱包签名码，或用树莓派中转码。");
+  }
+  return req->valid;
+}
+
+static bool web3_keypath_to_text(cbor_value_t *value, char *out,
+                                 size_t out_len) {
+  if (!out || out_len == 0)
+    return false;
+  out[0] = '\0';
+  if (!value)
+    return false;
+  if (cbor_value_get_type(value) == CBOR_TYPE_TAG) {
+    if (cbor_value_get_tag(value) != 304)
+      return false;
+    value = cbor_value_get_tag_content(value);
+  }
+  if (!value || cbor_value_get_type(value) != CBOR_TYPE_MAP)
+    return false;
+
+  cbor_value_t *components = cbor_map_get_int(value, 1);
+  if (!components || cbor_value_get_type(components) != CBOR_TYPE_ARRAY)
+    return false;
+
+  size_t count = cbor_value_get_array_size(components);
+  if ((count % 2U) != 0)
+    return false;
+
+  size_t pos = 0;
+  int written = snprintf(out, out_len, "m");
+  if (written < 0 || (size_t)written >= out_len)
+    return false;
+  pos = (size_t)written;
+
+  for (size_t i = 0; i < count; i += 2) {
+    cbor_value_t *index_val = cbor_value_get_array_item(components, i);
+    cbor_value_t *hardened_val = cbor_value_get_array_item(components, i + 1);
+    if (!index_val || !hardened_val ||
+        cbor_value_get_type(hardened_val) != CBOR_TYPE_BOOL)
+      return false;
+
+    char component[32];
+    if (cbor_value_get_type(index_val) == CBOR_TYPE_UNSIGNED_INT) {
+      snprintf(component, sizeof(component), "%llu%s",
+               (unsigned long long)cbor_value_get_uint(index_val),
+               cbor_value_get_bool(hardened_val) ? "'" : "");
+    } else if (cbor_value_get_type(index_val) == CBOR_TYPE_ARRAY &&
+               cbor_value_get_array_size(index_val) == 0) {
+      snprintf(component, sizeof(component), "*%s",
+               cbor_value_get_bool(hardened_val) ? "'" : "");
+    } else {
+      return false;
+    }
+
+    written = snprintf(out + pos, out_len - pos, "/%s", component);
+    if (written < 0 || (size_t)written >= out_len - pos)
+      return false;
+    pos += (size_t)written;
+  }
+
+  return true;
+}
+
+static bool web3_store_request_id_from_cbor(cbor_value_t *value,
+                                            web3_sign_request_t *req) {
+  if (!value || !req)
+    return false;
+
+  uint64_t tag = 0;
+  if (cbor_value_get_type(value) == CBOR_TYPE_TAG) {
+    tag = cbor_value_get_tag(value);
+    value = cbor_value_get_tag_content(value);
+  }
+  if (!value)
+    return false;
+
+  switch (cbor_value_get_type(value)) {
+  case CBOR_TYPE_STRING: {
+    const char *text = cbor_value_get_string(value);
+    if (!text || !text[0])
+      return false;
+    if (tag != 0 && tag != 37) {
+      web3_set_request_id_string(req, text);
+      req->request_id_tag = tag;
+    } else {
+      web3_set_request_id_text_fallback(req, text);
+    }
+    return true;
+  }
+  case CBOR_TYPE_UNSIGNED_INT:
+    req->request_id_uint = cbor_value_get_uint(value);
+    req->request_id_tag = (tag != 0 && tag != 37) ? tag : 0;
+    snprintf(req->request_id, sizeof(req->request_id), "%llu",
+             (unsigned long long)req->request_id_uint);
+    req->request_id_kind = WEB3_REQUEST_ID_UINT;
+    return true;
+  case CBOR_TYPE_BYTES: {
+    size_t len = 0;
+    const uint8_t *bytes = cbor_value_get_bytes(value, &len);
+    if (!bytes || len == 0)
+      return false;
+    web3_request_id_kind_t kind =
+        (tag == 37 && len == sizeof(req->request_id_uuid))
+            ? WEB3_REQUEST_ID_UUID
+            : WEB3_REQUEST_ID_BYTES;
+    uint64_t preserved_tag = (kind != WEB3_REQUEST_ID_UUID && tag != 37) ? tag : 0;
+    if (!web3_set_request_id_bytes(req, bytes, len, preserved_tag, kind))
+      return false;
+    if (kind == WEB3_REQUEST_ID_UUID)
+      memcpy(req->request_id_uuid, bytes, sizeof(req->request_id_uuid));
+    return true;
+  }
+  default:
+    return false;
+  }
+}
+
+static bool web3_parse_eth_sign_request_cbor(const uint8_t *cbor_data,
+                                             size_t cbor_len,
+                                             web3_sign_request_t *req) {
+  if (!cbor_data || cbor_len == 0 || !req)
+    return false;
+
+  web3_request_clear(req);
+  req->chain_id = 1;
+  snprintf(req->wallet, sizeof(req->wallet), "Keystone");
+  snprintf(req->path, sizeof(req->path), "%s", WEB3_DEFAULT_DERIVATION_PATH);
+
+  cbor_value_t *decoded = cbor_decode(cbor_data, cbor_len);
+  cbor_value_t *root = decoded;
+  if (!decoded)
+    return false;
+  if (cbor_value_get_type(root) == CBOR_TYPE_TAG)
+    root = cbor_value_get_tag_content(root);
+  if (!root || cbor_value_get_type(root) != CBOR_TYPE_MAP) {
+    cbor_value_free(decoded);
+    return false;
+  }
+
+  bool ok = false;
+  cbor_value_t *sign_data = cbor_map_get_int(root, 2);
+  if (!sign_data || cbor_value_get_type(sign_data) != CBOR_TYPE_BYTES)
+    goto done;
+  size_t sign_data_len = 0;
+  const uint8_t *sign_data_bytes =
+      cbor_value_get_bytes(sign_data, &sign_data_len);
+  if (!web3_copy_sign_data(req, sign_data_bytes, sign_data_len))
+    goto done;
+
+  cbor_value_t *data_type = cbor_map_get_int(root, 3);
+  req->request_type_id =
+      (data_type && cbor_value_get_type(data_type) == CBOR_TYPE_UNSIGNED_INT)
+          ? (int)cbor_value_get_uint(data_type)
+          : WEB3_REQUEST_TYPE_LEGACY_TX;
+  cbor_value_t *chain_id = cbor_map_get_int(root, 4);
+  if (chain_id && cbor_value_get_type(chain_id) == CBOR_TYPE_UNSIGNED_INT)
+    req->chain_id = (int)cbor_value_get_uint(chain_id);
+
+  (void)web3_keypath_to_text(cbor_map_get_int(root, 5), req->path,
+                             sizeof(req->path));
+  cbor_value_t *address = cbor_map_get_int(root, 6);
+  if (address && cbor_value_get_type(address) == CBOR_TYPE_BYTES) {
+    size_t address_len = 0;
+    const uint8_t *address_bytes = cbor_value_get_bytes(address, &address_len);
+    if (address_bytes && address_len == 20) {
+      size_t pos = 0;
+      pos += snprintf(req->address + pos, sizeof(req->address) - pos, "0x");
+      for (size_t i = 0; i < address_len && pos + 2 < sizeof(req->address);
+           i++) {
+        pos += snprintf(req->address + pos, sizeof(req->address) - pos,
+                        "%02x", address_bytes[i]);
+      }
+    }
+  }
+  cbor_value_t *origin = cbor_map_get_int(root, 7);
+  if (origin && cbor_value_get_type(origin) == CBOR_TYPE_STRING) {
+    const char *origin_text = cbor_value_get_string(origin);
+    snprintf(req->origin, sizeof(req->origin), "%s",
+             origin_text ? origin_text : "");
+  }
+  (void)web3_store_request_id_from_cbor(cbor_map_get_int(root, 1), req);
+
+  if (contains_ci(req->origin, "bitget") || contains_ci(req->origin, "bitkeep"))
+    snprintf(req->wallet, sizeof(req->wallet), "Bitget Wallet");
+  else if (contains_ci(req->origin, "okx") || contains_ci(req->origin, "okex"))
+    snprintf(req->wallet, sizeof(req->wallet), "OKX Wallet");
+  snprintf(req->chain, sizeof(req->chain), "EVM %d", req->chain_id);
+  snprintf(req->action, sizeof(req->action), "%s",
+           req->request_type_id == WEB3_REQUEST_TYPE_PERSONAL
+               ? "personalSign"
+               : (req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA
+                      ? "TypedData"
+                      : "交易签名"));
+  req->valid = true;
+  ok = true;
+
+done:
+  cbor_value_free(decoded);
+  if (!ok)
+    web3_request_clear(req);
+  return ok;
+}
+
+static bool web3_make_digest(const web3_sign_request_t *req, uint8_t digest[32],
+                             char *err, size_t err_len) {
+  if (err && err_len > 0)
+    err[0] = '\0';
+  if (!req || !digest)
+    return false;
+  if (req->request_type_id == WEB3_REQUEST_TYPE_PERSONAL) {
+    char prefix[64];
+    int n = snprintf(prefix, sizeof(prefix), "\x19"
+                     "Ethereum Signed Message:\n%u",
+                     (unsigned)req->sign_data_len);
+    if (n < 0)
+      n = 0;
+    size_t prefix_len = (size_t)n;
+    uint8_t *buf = malloc(prefix_len + req->sign_data_len);
+    if (!buf) {
+      memset(digest, 0, 32);
+      if (err && err_len > 0)
+        snprintf(err, err_len, "内存不足");
+      return false;
+    }
+    memcpy(buf, prefix, prefix_len);
+    memcpy(buf + prefix_len, req->sign_data, req->sign_data_len);
+    evm_keccak256(buf, prefix_len + req->sign_data_len, digest);
+    secure_memzero(buf, prefix_len + req->sign_data_len);
+    free(buf);
+    return true;
+  }
+
+  if (req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA) {
+    char *typed_json = malloc(req->sign_data_len + 1U);
+    if (!typed_json) {
+      memset(digest, 0, 32);
+      if (err && err_len > 0)
+        snprintf(err, err_len, "内存不足");
+      return false;
+    }
+    memcpy(typed_json, req->sign_data, req->sign_data_len);
+    typed_json[req->sign_data_len] = '\0';
+    bool ok = eip712_hash_typed_data_json(typed_json, digest, err, err_len);
+    secure_memzero(typed_json, req->sign_data_len);
+    free(typed_json);
+    if (!ok)
+      memset(digest, 0, 32);
+    return ok;
+  }
+
+  evm_keccak256(req->sign_data, req->sign_data_len, digest);
+  return true;
+}
+
+static bool web3_build_eth_signature_ur(const web3_sign_request_t *req,
+                                        const uint8_t *signature,
+                                        size_t signature_len, char **out_ur) {
+  if (!req || !signature || !out_ur)
+    return false;
+  *out_ur = NULL;
+
+  cbor_value_t *map = cbor_value_new_map();
+  if (!map)
+    return false;
+
+  bool ok = true;
+  if (req->request_id_kind != WEB3_REQUEST_ID_NONE || req->request_id[0]) {
+    cbor_value_t *request_id_value = NULL;
+    if (req->request_id_kind == WEB3_REQUEST_ID_UUID) {
+      cbor_value_t *uuid_bytes =
+          cbor_value_new_bytes(req->request_id_uuid, sizeof(req->request_id_uuid));
+      request_id_value = uuid_bytes ? cbor_value_new_tag(37, uuid_bytes) : NULL;
+      if (!request_id_value)
+        cbor_value_free(uuid_bytes);
+    } else if (req->request_id_kind == WEB3_REQUEST_ID_BYTES) {
+      request_id_value = cbor_value_new_bytes(req->request_id_bytes,
+                                              req->request_id_bytes_len);
+    } else if (req->request_id_kind == WEB3_REQUEST_ID_UINT) {
+      request_id_value = cbor_value_new_unsigned_int(req->request_id_uint);
+    } else {
+      request_id_value = cbor_value_new_string(req->request_id);
+    }
+    if (request_id_value && req->request_id_kind != WEB3_REQUEST_ID_UUID &&
+        req->request_id_tag != 0) {
+      cbor_value_t *tagged =
+          cbor_value_new_tag(req->request_id_tag, request_id_value);
+      if (tagged) {
+        request_id_value = tagged;
+      } else {
+        cbor_value_free(request_id_value);
+        request_id_value = NULL;
+      }
+    }
+    ok = request_id_value &&
+         cbor_map_set(map, cbor_value_new_unsigned_int(1), request_id_value);
+    if (!ok)
+      cbor_value_free(request_id_value);
+  }
+  if (ok) {
+    ok = cbor_map_set(map, cbor_value_new_unsigned_int(2),
+                      cbor_value_new_bytes(signature, signature_len));
+  }
+  if (ok && req->origin[0]) {
+    ok = cbor_map_set(map, cbor_value_new_unsigned_int(3),
+                      cbor_value_new_string(req->origin));
+  }
+
+  size_t cbor_len = 0;
+  uint8_t *cbor = ok ? cbor_encode(map, &cbor_len) : NULL;
+  cbor_value_free(map);
+  if (!cbor)
+    return false;
+
+  ok = ur_encoder_encode_single("eth-signature", cbor, cbor_len, out_ur);
+  if (ok && out_ur && *out_ur)
+    web3_uppercase_in_place(*out_ur);
+  ESP_LOGD(TAG,
+           "ETH_SIGNATURE_QR build ok=%d cbor=%u sig=%u req_id_kind=%d len=%u",
+           ok ? 1 : 0, (unsigned)cbor_len, (unsigned)signature_len,
+           (int)req->request_id_kind,
+           (unsigned)(ok && *out_ur ? strlen(*out_ur) : 0));
+  free(cbor);
+  return ok && *out_ur;
+}
+
+static void web3_pin_input_cleanup(void) {
+  if (web3_pin_input_active) {
+    ui_text_input_destroy(&web3_pin_input);
+    memset(&web3_pin_input, 0, sizeof(web3_pin_input));
+    web3_pin_input_active = false;
+  }
+}
+
+static void web3_pin_back_cb(lv_event_t *event) {
+  (void)event;
+  web3_pin_input_cleanup();
+  web3_show_request_summary();
+}
+
+static void web3_pin_sign_after_summary_cb(lv_event_t *event) {
+  (void)event;
+  web3_show_pin_input(&pending_web3_request);
+}
+
+static void web3_show_sign_result_qr(char *response_ur) {
+  saved_return_callback = return_callback;
+  if (!qr_viewer_page_create(lv_screen_active(), response_ur, "Web3 签名结果",
+                             return_from_qr_viewer_cb)) {
+    dialog_show_error("签名结果二维码创建失败", return_callback, 0);
+    free(response_ur);
+    return;
+  }
+
+  free(response_ur);
+  web3_request_clear(&pending_web3_request);
+  pending_web3_source = WEB3_SIGN_SOURCE_NONE;
+  scan_page_hide();
+  scan_page_destroy();
+  qr_viewer_page_show();
+}
+
+static void web3_sign_task(void *arg) {
+  (void)arg;
+  memset(&web3_sign_task_sig, 0, sizeof(web3_sign_task_sig));
+  const bool delete_with_caps = web3_sign_task_with_caps;
+  ESP_LOGD(TAG, "WEB3_SIGN begin");
+  web3_sign_task_err = smartcard_satochip_sign_evm_digest(
+      web3_sign_task_pin, web3_sign_task_path, web3_sign_task_digest,
+      &web3_sign_task_sig, 25000);
+  ESP_LOGD(TAG, "WEB3_SIGN done err=%s SW=%04X",
+           esp_err_to_name(web3_sign_task_err), web3_sign_task_sig.sw);
+  secure_memzero(web3_sign_task_pin, sizeof(web3_sign_task_pin));
+  secure_memzero(web3_sign_task_digest, sizeof(web3_sign_task_digest));
+  __atomic_store_n(&web3_sign_task_done, true, __ATOMIC_RELEASE);
+  if (delete_with_caps) {
+    vTaskDeleteWithCaps(NULL);
+    return;
+  }
+  vTaskDelete(NULL);
+}
+
+static void web3_sign_finish_ui(void) {
+  if (web3_sign_progress_dialog) {
+    lv_obj_del(web3_sign_progress_dialog);
+    web3_sign_progress_dialog = NULL;
+  }
+
+  if (web3_sign_task_err != ESP_OK) {
+    char msg[384];
+    snprintf(msg, sizeof(msg), "智能卡签名失败：%s\n%s",
+             esp_err_to_name(web3_sign_task_err), web3_sign_task_sig.detail);
+    dialog_show_error(msg, web3_resume_current_step, 0);
+    secure_memzero(&web3_sign_task_sig, sizeof(web3_sign_task_sig));
+    return;
+  }
+
+  if (pending_web3_request.address[0] && web3_sign_task_sig.has_address &&
+      strcasecmp(pending_web3_request.address, web3_sign_task_sig.address) != 0) {
+    char msg[384];
+    snprintf(msg, sizeof(msg),
+             "签名地址不一致，已拒绝。\n请求：%s\n智能卡：%s",
+             pending_web3_request.address, web3_sign_task_sig.address);
+    dialog_show_error(msg, web3_resume_current_step, 0);
+    secure_memzero(&web3_sign_task_sig, sizeof(web3_sign_task_sig));
+    return;
+  }
+
+  size_t signature_len = 0;
+  uint8_t signature[72];
+  if (!web3_compose_signature_bytes(&pending_web3_request,
+                                    web3_sign_task_sig.compact,
+                                    web3_sign_task_sig.recovery_id, signature,
+                                    &signature_len)) {
+    secure_memzero(signature, sizeof(signature));
+    secure_memzero(&web3_sign_task_sig, sizeof(web3_sign_task_sig));
+    dialog_show_error("签名结果编码失败", web3_resume_current_step, 0);
+    return;
+  }
+
+  char *response_ur = NULL;
+  bool ok = web3_build_eth_signature_ur(&pending_web3_request, signature,
+                                        signature_len, &response_ur);
+  secure_memzero(signature, sizeof(signature));
+  secure_memzero(&web3_sign_task_sig, sizeof(web3_sign_task_sig));
+
+  if (!ok || !response_ur) {
+    dialog_show_error("签名结果编码失败", web3_resume_current_step, 0);
+    free(response_ur);
+    return;
+  }
+
+  web3_show_sign_result_qr(response_ur);
+}
+
+static void web3_sign_poll_cb(lv_timer_t *timer) {
+  (void)timer;
+  if (!__atomic_load_n(&web3_sign_task_done, __ATOMIC_ACQUIRE))
+    return;
+
+  if (web3_sign_poll_timer) {
+    lv_timer_del(web3_sign_poll_timer);
+    web3_sign_poll_timer = NULL;
+  }
+  web3_sign_task_handle = NULL;
+  web3_sign_task_with_caps = false;
+  web3_sign_finish_ui();
+}
+
+static void web3_pin_ready_cb(lv_event_t *event) {
+  (void)event;
+  if (!web3_pin_input.textarea)
+    return;
+  const char *pin_text = lv_textarea_get_text(web3_pin_input.textarea);
+  if (!pin_text || pin_text[0] == '\0') {
+    dialog_show_error("请输入智能卡 PIN", NULL, 1600);
+    return;
+  }
+  char pin_copy[80];
+  snprintf(pin_copy, sizeof(pin_copy), "%s", pin_text);
+  web3_pin_input_cleanup();
+
+  if (web3_sign_task_handle) {
+    secure_memzero(pin_copy, sizeof(pin_copy));
+    dialog_show_error("智能卡忙", NULL, 1600);
+    return;
+  }
+
+  snprintf(web3_sign_task_pin, sizeof(web3_sign_task_pin), "%s", pin_copy);
+  snprintf(web3_sign_task_path, sizeof(web3_sign_task_path), "%s",
+           pending_web3_request.path[0] ? pending_web3_request.path
+                                        : WEB3_DEFAULT_DERIVATION_PATH);
+  secure_memzero(pin_copy, sizeof(pin_copy));
+  char digest_err[192];
+  if (!web3_make_digest(&pending_web3_request, web3_sign_task_digest,
+                        digest_err, sizeof(digest_err))) {
+    secure_memzero(web3_sign_task_pin, sizeof(web3_sign_task_pin));
+    char msg[256];
+    snprintf(msg, sizeof(msg), "签名数据解析失败\n%s",
+             digest_err[0] ? digest_err : "请检查二维码内容");
+    dialog_show_error(msg, web3_show_request_summary, 0);
+    return;
+  }
+  memset(&web3_sign_task_sig, 0, sizeof(web3_sign_task_sig));
+  __atomic_store_n(&web3_sign_task_done, false, __ATOMIC_RELEASE);
+  web3_sign_task_with_caps = false;
+  web3_sign_task_err = ESP_ERR_INVALID_STATE;
+
+  ESP_LOGD(TAG,
+           "Creating Satochip sign task; internal=%u min_internal=%u spiram=%u",
+           (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+           (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+           (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+  web3_sign_task_with_caps = true;
+  BaseType_t ok = xTaskCreatePinnedToCoreWithCaps(
+      web3_sign_task, "satochip_sign",
+      WEB3_SATOCHIP_SIGN_TASK_PSRAM_STACK_SIZE, NULL, 4,
+      &web3_sign_task_handle, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (ok != pdPASS) {
+    ESP_LOGW(TAG,
+             "Satochip sign task PSRAM stack failed; internal=%u min_internal=%u spiram=%u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    web3_sign_task_with_caps = false;
+    ok = xTaskCreatePinnedToCore(
+        web3_sign_task, "satochip_sign", WEB3_SATOCHIP_SIGN_TASK_STACK_SIZE,
+        NULL, 4, &web3_sign_task_handle, 1);
+  }
+  if (ok != pdPASS) {
+    ESP_LOGE(TAG,
+             "Satochip sign task create failed; internal=%u min_internal=%u spiram=%u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    secure_memzero(web3_sign_task_pin, sizeof(web3_sign_task_pin));
+    secure_memzero(web3_sign_task_digest, sizeof(web3_sign_task_digest));
+    web3_sign_task_handle = NULL;
+    web3_sign_task_with_caps = false;
+    dialog_show_error("智能卡签名任务启动失败", return_callback, 0);
+    web3_request_clear(&pending_web3_request);
+    return;
+  }
+
+  web3_sign_progress_dialog =
+      dialog_show_progress("智能卡签名", "签名中",
+                           DIALOG_STYLE_OVERLAY);
+  lv_refr_now(NULL);
+  web3_sign_poll_timer = lv_timer_create(web3_sign_poll_cb, 100, NULL);
+}
+
+static void web3_show_pin_input(const web3_sign_request_t *req) {
+  lv_obj_t *root = web3_prepare_page();
+
+  lv_obj_t *title = theme_create_page_title(root, "智能卡 PIN");
+  lv_obj_set_width(title, LV_PCT(62));
+
+  lv_obj_t *card = lv_obj_create(root);
+  lv_obj_set_width(card, LV_PCT(100));
+  lv_obj_set_height(card, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_scroll_dir(card, LV_DIR_VER);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+  theme_apply_frame(card);
+  lv_obj_set_style_pad_all(card, theme_get_small_padding() + 4, 0);
+  lv_obj_set_style_pad_gap(card, theme_get_small_padding(), 0);
+  lv_obj_set_style_margin_top(card, theme_get_default_padding() * 2, 0);
+
+  char wallet_line[96];
+  snprintf(wallet_line, sizeof(wallet_line), "%s / %s",
+           req->wallet[0] ? req->wallet : "Web3",
+           req->chain[0] ? req->chain : "EVM");
+  web3_add_detail_field(card, "钱包", wallet_line, true);
+  web3_add_detail_field(card, "路径",
+                        req->path[0] ? req->path : WEB3_DEFAULT_DERIVATION_PATH,
+                        true);
+  web3_add_detail_field(card, "地址", req->address[0] ? req->address : "-",
+                        true);
+
+  web3_pin_input_cleanup();
+  ui_text_input_create(&web3_pin_input, root, "智能卡 PIN", true,
+                       web3_pin_ready_cb);
+  web3_pin_input_active = true;
+  if (web3_pin_input.keyboard)
+    lv_obj_add_event_cb(web3_pin_input.keyboard, web3_pin_back_cb,
+                        LV_EVENT_CANCEL, NULL);
+  if (web3_pin_input.textarea)
+    lv_obj_add_event_cb(web3_pin_input.textarea, web3_pin_back_cb,
+                        LV_EVENT_CANCEL, NULL);
+
+  (void)ui_create_back_button(root, web3_pin_back_cb);
+}
+
+static void web3_source_back_cb(lv_event_t *e) {
+  (void)e;
+  web3_request_clear(&pending_web3_request);
+  pending_web3_source = WEB3_SIGN_SOURCE_NONE;
+  web3_summary_back_to_choice = false;
+  pending_web3_from_ur = false;
+  if (return_callback)
+    return_callback();
+}
+
+static void web3_source_satochip_cb(lv_event_t *e) {
+  (void)e;
+  pending_web3_source = WEB3_SIGN_SOURCE_SMARTCARD;
+  pending_web3_from_ur = false;
+  web3_show_request_summary_for_source(WEB3_SIGN_SOURCE_SMARTCARD, true);
+}
+
+static void web3_source_mnemonic_cb(lv_event_t *e) {
+  (void)e;
+  pending_web3_source = WEB3_SIGN_SOURCE_MNEMONIC;
+  pending_web3_from_ur = false;
+  web3_show_request_summary_for_source(WEB3_SIGN_SOURCE_MNEMONIC, true);
+}
+
+static void add_web3_source_button(lv_obj_t *parent, const char *label,
+                                   lv_event_cb_t cb) {
+  lv_obj_t *btn = lv_btn_create(parent);
+  bool wide = theme_get_screen_width() >= 420;
+  lv_obj_set_size(btn, wide ? LV_PCT(46) : LV_PCT(100),
+                  wide ? 96 : max_i(72, theme_get_min_touch_size()));
+  theme_apply_touch_button(btn, false);
+  lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_t *text = lv_label_create(btn);
+  lv_label_set_text(text, label);
+  lv_obj_center(text);
+  theme_apply_button_label(text, false);
+}
+
+static void web3_show_source_choice(void) {
+  pending_web3_source = WEB3_SIGN_SOURCE_NONE;
+  web3_summary_back_to_choice = false;
+  lv_obj_t *root = web3_prepare_page();
+
+  lv_obj_t *title = theme_create_page_title(root, "签名方式");
+  lv_obj_set_width(title, LV_PCT(62));
+
+  lv_obj_t *row = lv_obj_create(root);
+  lv_obj_set_width(row, LV_PCT(100));
+  lv_obj_set_height(row, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW_WRAP);
+  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(row, 0, 0);
+  lv_obj_set_style_pad_all(row, 0, 0);
+  lv_obj_set_style_pad_gap(row, theme_get_small_padding(), 0);
+  lv_obj_set_style_margin_top(row, theme_get_default_padding() * 2, 0);
+
+  add_web3_source_button(row, "助记词", web3_source_mnemonic_cb);
+  add_web3_source_button(row, "智能卡", web3_source_satochip_cb);
+
+  (void)ui_create_back_button(root, web3_source_back_cb);
+}
+
+static void web3_show_request_summary(void) {
+  if (pending_web3_source == WEB3_SIGN_SOURCE_NONE) {
+    web3_show_source_choice();
+    return;
+  }
+  web3_show_request_summary_for_source(pending_web3_source, true);
+}
+
+static void web3_summary_back_cb(lv_event_t *e) {
+  (void)e;
+  if (web3_summary_back_to_choice) {
+    pending_web3_source = WEB3_SIGN_SOURCE_NONE;
+    web3_show_source_choice();
+    return;
+  }
+
+  web3_request_clear(&pending_web3_request);
+  pending_web3_source = WEB3_SIGN_SOURCE_NONE;
+  pending_web3_from_ur = false;
+  if (return_callback)
+    return_callback();
+}
+
+static void web3_summary_sign_cb(lv_event_t *e) {
+  (void)e;
+  if (pending_web3_source == WEB3_SIGN_SOURCE_SMARTCARD) {
+    web3_pin_sign_after_summary_cb(NULL);
+    return;
+  }
+  if (pending_web3_source == WEB3_SIGN_SOURCE_MNEMONIC) {
+    if (web3_sign_progress_dialog) {
+      lv_obj_del(web3_sign_progress_dialog);
+      web3_sign_progress_dialog = NULL;
+    }
+    web3_sign_progress_dialog =
+        dialog_show_progress("助记词签名", "签名中", DIALOG_STYLE_OVERLAY);
+    lv_timer_t *t = lv_timer_create(web3_mnemonic_sign_cb, 50, NULL);
+    lv_timer_set_repeat_count(t, 1);
+    return;
+  }
+
+  web3_show_source_choice();
+}
+
+static void web3_show_request_summary_for_source(web3_sign_source_t source,
+                                                 bool back_to_choice) {
+  if (!pending_web3_request.valid) {
+    web3_show_source_choice();
+    return;
+  }
+
+  pending_web3_source = source;
+  web3_summary_back_to_choice = back_to_choice;
+
+  lv_obj_t *root = web3_prepare_page();
+  lv_obj_t *title = theme_create_page_title(root, "确认签名");
+  lv_obj_set_width(title, LV_PCT(62));
+
+  lv_obj_t *card = lv_obj_create(root);
+  lv_obj_set_width(card, LV_PCT(100));
+  lv_obj_set_flex_grow(card, 1);
+  lv_obj_set_scroll_dir(card, LV_DIR_VER);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+  theme_apply_frame(card);
+  lv_obj_set_style_pad_gap(card, theme_get_small_padding(), 0);
+  lv_obj_set_style_margin_top(card, theme_get_default_padding() * 2, 0);
+
+  web3_add_detail_field(card, "来源", web3_source_display_name(source),
+                        false);
+  web3_add_detail_field(card, "钱包",
+                        pending_web3_request.wallet[0]
+                            ? pending_web3_request.wallet
+                            : "Web3",
+                        true);
+  web3_add_detail_field(card, "动作",
+                        web3_request_action_label(&pending_web3_request),
+                        false);
+  web3_add_detail_field(card, "链",
+                        pending_web3_request.chain[0]
+                            ? pending_web3_request.chain
+                            : "EVM",
+                        false);
+  web3_add_detail_field(card, "DApp",
+                        pending_web3_request.origin[0]
+                            ? pending_web3_request.origin
+                            : "-",
+                        true);
+  web3_add_detail_field(card, "请求 ID",
+                        pending_web3_request.request_id[0]
+                            ? pending_web3_request.request_id
+                            : "-",
+                        true);
+  web3_add_detail_field(card, "路径",
+                        pending_web3_request.path[0] ? pending_web3_request.path
+                                                      : WEB3_DEFAULT_DERIVATION_PATH,
+                        true);
+  web3_add_detail_field(card, "地址",
+                        pending_web3_request.address[0]
+                            ? pending_web3_request.address
+                            : "-",
+                        true);
+
+  web3_add_transaction_details(card, &pending_web3_request);
+
+  char len_text[32];
+  snprintf(len_text, sizeof(len_text), "%u 字节",
+           (unsigned)pending_web3_request.sign_data_len);
+  web3_add_detail_field(card, "数据长度", len_text, false);
+
+  web3_add_full_sign_data_details(card, &pending_web3_request);
+
+  if (pending_web3_request.detail[0])
+    web3_add_detail_field(card, "说明", pending_web3_request.detail, true);
+
+  lv_obj_t *button_row = lv_obj_create(root);
+  lv_obj_set_width(button_row, LV_PCT(100));
+  lv_obj_set_height(button_row, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(button_row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(button_row, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_bg_opa(button_row, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(button_row, 0, 0);
+  lv_obj_set_style_pad_all(button_row, 0, 0);
+  lv_obj_set_style_pad_gap(button_row, theme_get_small_padding(), 0);
+  lv_obj_set_style_margin_top(button_row, theme_get_small_padding(), 0);
+
+  lv_obj_t *sign_btn = lv_btn_create(button_row);
+  lv_obj_set_size(sign_btn, LV_PCT(100), LV_SIZE_CONTENT);
+  theme_apply_touch_button(sign_btn, false);
+  lv_obj_add_event_cb(sign_btn, web3_summary_sign_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_clear_flag(sign_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
+  lv_obj_t *sign_label = lv_label_create(sign_btn);
+  const char *sign_text =
+      source == WEB3_SIGN_SOURCE_SMARTCARD ? "输入 PIN" : "签名";
+  lv_label_set_text(sign_label, sign_text);
+  lv_obj_center(sign_label);
+  theme_apply_button_label(sign_label, false);
+
+  (void)ui_create_back_button(root, web3_summary_back_cb);
+}
+
+static void web3_mnemonic_sign_cb(lv_timer_t *timer) {
+  (void)timer;
+  if (web3_sign_progress_dialog) {
+    lv_obj_del(web3_sign_progress_dialog);
+    web3_sign_progress_dialog = NULL;
+  }
+  if (!web3_sign_with_mnemonic()) {
+    web3_show_request_summary();
+  }
+}
+
+static bool web3_sign_with_mnemonic(void) {
+  if (!key_has_signing_key()) {
+    dialog_show_error("请先导入助记词", web3_show_request_summary, 0);
+    return false;
+  }
+
+  const char *path = pending_web3_request.path[0]
+                         ? pending_web3_request.path
+                         : WEB3_DEFAULT_DERIVATION_PATH;
+
+  char derived_address[EVM_ADDRESS_HEX_LEN + 1] = {0};
+  if (!custom_derivation_get_address(path, CUSTOM_ADDR_EVM, false,
+                                     derived_address,
+                                     sizeof(derived_address))) {
+    dialog_show_error("助记词地址派生失败", web3_show_request_summary, 0);
+    return false;
+  }
+  if (pending_web3_request.address[0] &&
+      strcasecmp(pending_web3_request.address, derived_address) != 0) {
+    char msg[384];
+    snprintf(msg, sizeof(msg),
+             "签名地址不一致，已拒绝。\n请求：%s\n助记词：%s",
+             pending_web3_request.address, derived_address);
+    dialog_show_error(msg, web3_show_request_summary, 0);
+    return false;
+  }
+
+  uint8_t digest[32];
+  char digest_err[192];
+  if (!web3_make_digest(&pending_web3_request, digest, digest_err,
+                        sizeof(digest_err))) {
+    char msg[256];
+    snprintf(msg, sizeof(msg), "签名数据解析失败\n%s",
+             digest_err[0] ? digest_err : "请检查二维码内容");
+    dialog_show_error(msg, web3_show_request_summary, 0);
+    return false;
+  }
+
+  struct ext_key *derived_key = NULL;
+  if (!key_get_derived_key(path, &derived_key) || !derived_key) {
+    secure_memzero(digest, sizeof(digest));
+    dialog_show_error("助记词路径派生失败", web3_show_request_summary, 0);
+    return false;
+  }
+
+  uint8_t recoverable_sig[EC_SIGNATURE_RECOVERABLE_LEN];
+  int ret = wally_ec_sig_from_bytes(
+      derived_key->priv_key + 1, EC_PRIVATE_KEY_LEN, digest,
+      EC_MESSAGE_HASH_LEN, EC_FLAG_ECDSA | EC_FLAG_RECOVERABLE,
+      recoverable_sig, sizeof(recoverable_sig));
+  secure_memzero(digest, sizeof(digest));
+  bip32_key_free(derived_key);
+
+  if (ret != WALLY_OK) {
+    secure_memzero(recoverable_sig, sizeof(recoverable_sig));
+    dialog_show_error("助记词签名失败", web3_show_request_summary, 0);
+    return false;
+  }
+
+  uint8_t signature[72];
+  size_t signature_len = 0;
+  if (!web3_compose_signature_bytes(&pending_web3_request, recoverable_sig,
+                                    recoverable_sig[64], signature,
+                                    &signature_len)) {
+    secure_memzero(recoverable_sig, sizeof(recoverable_sig));
+    dialog_show_error("签名结果编码失败", web3_show_request_summary, 0);
+    return false;
+  }
+
+  char *response_ur = NULL;
+  bool ok = web3_build_eth_signature_ur(&pending_web3_request, signature,
+                                        signature_len, &response_ur);
+  secure_memzero(signature, sizeof(signature));
+  secure_memzero(recoverable_sig, sizeof(recoverable_sig));
+  if (!ok || !response_ur) {
+    dialog_show_error("签名结果编码失败", web3_show_request_summary, 0);
+    free(response_ur);
+    return false;
+  }
+
+  web3_show_sign_result_qr(response_ur);
+  return true;
+}
+
+static bool handle_web3_relay_content(const char *content) {
+  if (!looks_like_web3_relay_content(content))
+    return false;
+
+  char wallet[48] = "";
+  char action[64] = "";
+  char chain[64] = "";
+  char path[96] = "";
+  char address[72] = "";
+  char payload[96] = "";
+  long data_type = 0;
+  (void)json_string_value(content, "wallet_name", wallet, sizeof(wallet));
+  (void)json_string_value(content, "action", action, sizeof(action));
+  (void)json_string_value(content, "chain", chain, sizeof(chain));
+  (void)json_string_value(content, "address_path", path, sizeof(path));
+  if (!path[0])
+    (void)json_string_value(content, "path", path, sizeof(path));
+  (void)json_string_value(content, "address", address, sizeof(address));
+  (void)json_string_value(content, "payload", payload, sizeof(payload));
+  (void)json_int_value(content, "request_data_type_id", &data_type);
+
+  const char *kind = "EVM 签名请求";
+  if (starts_ci(content, "tp:web3RelayNative-"))
+    kind = "Web3 原生中转";
+  else if (starts_ci(content, "ethereum:"))
+    kind = "Ethereum 请求";
+  else if (starts_ci(content, "tp:personalSign-") ||
+           contains_ci(content, "personalSign"))
+    kind = "消息签名";
+  else if (starts_ci(content, "tp:signTransaction-") ||
+           contains_ci(content, "signTransaction"))
+    kind = "交易签名";
+  else if (contains_ci(content, "signTypedData") ||
+           contains_ci(content, "signTypeData"))
+    kind = "TypedData 签名";
+
+  char target[96];
+  short_middle(target, sizeof(target), address[0] ? address : path,
+               address[0] ? 8 : 16, address[0] ? 6 : 12);
+  char message[256];
+  snprintf(message, sizeof(message),
+           "钱包：%s\n类型：%s\n链：%s\n%s%s",
+           wallet[0] ? wallet : "Web3",
+           action[0] ? action : kind,
+           chain[0] ? chain : "-",
+           target[0] ? target : "-",
+           (smartcard_web3_mode || unified_scan_mode)
+               ? ""
+               : "\n请用智能卡签名");
+
+  qr_scanner_page_hide();
+  qr_scanner_page_destroy();
+  if (smartcard_web3_mode || unified_scan_mode) {
+    if (!web3_parse_sign_request(content, &pending_web3_request)) {
+      char msg[256];
+      snprintf(msg, sizeof(msg),
+               "无法签名\n%s",
+               pending_web3_request.detail[0] ? pending_web3_request.detail
+                                               : "二维码缺少签名数据");
+      web3_request_clear(&pending_web3_request);
+      dialog_show_error(msg, return_callback, 0);
+      return true;
+    }
+    web3_show_source_choice();
+    return true;
+  }
+
+  web3_info_active = true;
+  dialog_show_info(smartcard_web3_mode ? "智能卡 Web3" : "暂不支持签名",
+                   message, web3_relay_info_done_cb, NULL,
+                   DIALOG_STYLE_FULLSCREEN);
+  return true;
 }
 
 // --- Main scanner callback with two-layer detection ---
@@ -300,7 +3120,7 @@ static void return_from_qr_scanner_cb(void) {
           handle_descriptor_content(desc);
           free(desc);
         } else {
-          dialog_show_error("Failed to parse descriptor", return_callback, 0);
+          dialog_show_error("描述符解析失败", return_callback, 0);
         }
         return;
       } else if (ur_type && strcmp(ur_type, "bytes") == 0) {
@@ -310,11 +3130,29 @@ static void return_from_qr_scanner_cb(void) {
           size_t len = 0;
           const uint8_t *data = bytes_get_data(bytes, &len);
           if (data && len > 0) {
-            qr_content = strndup((const char *)data, len);
+            qr_content = web3_strndup((const char *)data, len);
             qr_content_len = len;
           }
           bytes_free(bytes);
         }
+      } else if (ur_type && strcmp(ur_type, "eth-sign-request") == 0) {
+        if (smartcard_web3_mode || unified_scan_mode) {
+          if (!web3_parse_eth_sign_request_cbor(cbor_data, cbor_len,
+                                                &pending_web3_request)) {
+            qr_scanner_page_hide();
+            qr_scanner_page_destroy();
+            dialog_show_error("Web3 UR 请求解析失败", return_callback, 0);
+            return;
+          }
+          qr_scanner_page_hide();
+          qr_scanner_page_destroy();
+          web3_show_source_choice();
+          return;
+        }
+        qr_scanner_page_hide();
+        qr_scanner_page_destroy();
+        dialog_show_error("Web3 签名请用统一扫码入口", return_callback, 0);
+        return;
       }
     }
   } else if (detected_format == FORMAT_BBQR) {
@@ -339,6 +3177,12 @@ static void return_from_qr_scanner_cb(void) {
     if (message_sign_parse(qr_content, &current_message)) {
       is_message_sign = true;
       parse_success = true;
+    }
+
+    // 1b. Web3 relay envelopes from satochip-signer / mobile relay.
+    if (!parse_success && handle_web3_relay_content(qr_content)) {
+      free(qr_content);
+      return;
     }
 
     // 2. PSBT (base64)
@@ -368,9 +3212,9 @@ static void return_from_qr_scanner_cb(void) {
     // 5. Mnemonic
     if (!parse_success) {
       char *mnemonic =
-          mnemonic_qr_to_mnemonic(qr_content, qr_content_len, NULL);
-      if (mnemonic && bip39_mnemonic_validate(NULL, mnemonic) == WALLY_OK) {
-        free(mnemonic);
+          mnemonic_qr_to_mnemonic_unchecked(qr_content, qr_content_len, NULL);
+      if (mnemonic) {
+        SECURE_FREE_STRING(mnemonic);
         qr_scanner_page_hide();
         qr_scanner_page_destroy();
         handle_mnemonic_content(qr_content, qr_content_len);
@@ -388,22 +3232,151 @@ static void return_from_qr_scanner_cb(void) {
   qr_scanner_page_destroy();
 
   if (parse_success) {
-    if (is_message_sign) {
-      create_message_sign_display();
-    } else {
-      scanned_qr_format = detected_format;
+    scanned_qr_format = detected_format;
 
-      if (psbt_is_multisig(current_psbt) && !wallet_has_descriptor()) {
-        show_multisig_options_menu();
-      } else {
-        if (!create_psbt_info_display()) {
-          dialog_show_error("Invalid PSBT data", return_callback, 0);
-        }
-      }
+    if (current_psbt && unified_scan_mode) {
+      show_btc_source_choice();
+      return;
+    }
+
+    if (!key_is_loaded()) {
+      cleanup_psbt_data();
+      message_sign_free_parsed(&current_message);
+      is_message_sign = false;
+      dialog_show_error("请先导入助记词", return_callback, 1800);
+      return;
+    }
+    pending_btc_source = BTC_SIGN_SOURCE_MNEMONIC;
+    if (mnemonic_slots_count() > 1) {
+      mnemonic_slots_page_create(lv_screen_active(), return_from_sign_slots_cb,
+                                 show_scanned_sign_payload);
+      mnemonic_slots_page_show();
+    } else {
+      show_scanned_sign_payload();
     }
   } else {
-    dialog_show_error("Unrecognized QR format", return_callback, 0);
+    dialog_show_error("无法识别的二维码格式", return_callback, 0);
   }
+}
+
+static void return_from_sign_slots_cb(void) {
+  mnemonic_slots_page_destroy();
+  if (return_callback)
+    return_callback();
+}
+
+static lv_obj_t *btc_prepare_page(void) {
+  qr_scanner_page_hide();
+  qr_scanner_page_destroy();
+  if (!scan_screen)
+    scan_screen = theme_create_page_container(lv_screen_active());
+  lv_obj_move_foreground(scan_screen);
+  lv_obj_clean(scan_screen);
+  theme_apply_screen(scan_screen);
+  lv_obj_clear_flag(scan_screen, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_set_flex_flow(scan_screen, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(scan_screen, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(scan_screen, theme_get_default_padding(), 0);
+  lv_obj_set_style_pad_gap(scan_screen, theme_get_default_padding(), 0);
+  return scan_screen;
+}
+
+static void btc_source_back_cb(lv_event_t *e) {
+  (void)e;
+  pending_btc_source = BTC_SIGN_SOURCE_NONE;
+  cleanup_psbt_data();
+  message_sign_free_parsed(&current_message);
+  is_message_sign = false;
+  if (return_callback)
+    return_callback();
+}
+
+static void btc_source_mnemonic_cb(lv_event_t *e) {
+  (void)e;
+  pending_btc_source = BTC_SIGN_SOURCE_MNEMONIC;
+
+  if (!key_is_loaded()) {
+    dialog_show_error("请先导入助记词", return_callback, 1800);
+    return;
+  }
+
+  if (mnemonic_slots_count() > 1) {
+    mnemonic_slots_page_create(lv_screen_active(), return_from_sign_slots_cb,
+                               show_scanned_sign_payload);
+    mnemonic_slots_page_show();
+  } else {
+    show_scanned_sign_payload();
+  }
+}
+
+static void btc_source_satochip_cb(lv_event_t *e) {
+  (void)e;
+  pending_btc_source = BTC_SIGN_SOURCE_SMARTCARD;
+  show_scanned_sign_payload();
+}
+
+static void show_btc_source_choice(void) {
+  pending_btc_source = BTC_SIGN_SOURCE_NONE;
+  lv_obj_t *root = btc_prepare_page();
+
+  lv_obj_t *title = theme_create_page_title(root, "签名方式");
+  lv_obj_set_width(title, LV_PCT(90));
+  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+
+  lv_obj_t *row = lv_obj_create(root);
+  lv_obj_set_width(row, LV_PCT(100));
+  lv_obj_set_height(row, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(row, 0, 0);
+  lv_obj_set_style_pad_all(row, 0, 0);
+  lv_obj_set_style_pad_gap(row, theme_get_default_padding(), 0);
+
+  lv_obj_t *mnemonic_btn = lv_btn_create(row);
+  lv_obj_set_size(mnemonic_btn, LV_PCT(48), 96);
+  theme_apply_touch_button(mnemonic_btn, true);
+  lv_obj_add_event_cb(mnemonic_btn, btc_source_mnemonic_cb, LV_EVENT_CLICKED,
+                      NULL);
+  lv_obj_t *mnemonic_label = lv_label_create(mnemonic_btn);
+  lv_label_set_text(mnemonic_label, "助记词");
+  theme_apply_button_label(mnemonic_label, true);
+  lv_obj_center(mnemonic_label);
+
+  lv_obj_t *card_btn = lv_btn_create(row);
+  lv_obj_set_size(card_btn, LV_PCT(48), 96);
+  theme_apply_touch_button(card_btn, true);
+  lv_obj_add_event_cb(card_btn, btc_source_satochip_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_t *card_label = lv_label_create(card_btn);
+  lv_label_set_text(card_label, "智能卡");
+  theme_apply_button_label(card_label, true);
+  lv_obj_center(card_label);
+
+  (void)ui_create_back_button(root, btc_source_back_cb);
+}
+
+static void show_scanned_sign_payload(void) {
+  mnemonic_slots_page_destroy();
+
+  if (is_message_sign) {
+    create_message_sign_display();
+    return;
+  }
+
+  if (!current_psbt) {
+    dialog_show_error("交易数据无效", return_callback, 0);
+    return;
+  }
+
+  if (psbt_is_multisig(current_psbt) && !wallet_has_descriptor()) {
+    show_multisig_options_menu();
+    return;
+  }
+
+  if (!create_psbt_info_display())
+    dialog_show_error("交易数据无效", return_callback, 0);
 }
 
 // --- Descriptor handler ---
@@ -419,7 +3392,7 @@ static void scan_descriptor_validation_cb(descriptor_validation_result_t result,
   (void)user_data;
 
   if (result == VALIDATION_SUCCESS) {
-    dialog_show_info("Descriptor Loaded", "Wallet descriptor updated",
+    dialog_show_info("描述符已加载", "钱包描述符已更新",
                      descriptor_loaded_info_cb, NULL, DIALOG_STYLE_FULLSCREEN);
     return;
   }
@@ -452,7 +3425,7 @@ static void handle_address_content(const char *content) {
   // For multisig without descriptor, we can't verify addresses
   if (wallet_get_policy() == WALLET_POLICY_MULTISIG &&
       !wallet_has_descriptor()) {
-    dialog_show_error("Load a descriptor first to verify multisig addresses",
+    dialog_show_error("请先加载描述符，再核对多签地址",
                       return_callback, 0);
     return;
   }
@@ -473,24 +3446,26 @@ static void mnemonic_confirm_cb(bool confirmed, void *user_data) {
   }
 
   wallet_network_t net = wallet_get_network();
+  char *passphrase = NULL;
+  (void)key_get_session_passphrase(&passphrase);
 
-  // Unload current state
-  wallet_unload();
-
-  // Load new mnemonic (no passphrase, will use current network)
-  if (!key_load_from_mnemonic(scanned_mnemonic, NULL,
+  if (!key_load_from_mnemonic(scanned_mnemonic, passphrase,
                               net == WALLET_NETWORK_TESTNET)) {
+    SECURE_FREE_STRING(passphrase);
     SECURE_FREE_STRING(scanned_mnemonic);
-    dialog_show_error("Failed to load mnemonic", return_callback, 0);
+    dialog_show_error("助记词加载失败", return_callback, 0);
     return;
   }
+  SECURE_FREE_STRING(passphrase);
 
+  wallet_cleanup();
   if (!wallet_init(net)) {
     SECURE_FREE_STRING(scanned_mnemonic);
-    dialog_show_error("Failed to initialize wallet", return_callback, 0);
+    dialog_show_error("钱包初始化失败", return_callback, 0);
     return;
   }
 
+  (void)mnemonic_slots_add_current(NULL);
   SECURE_FREE_STRING(scanned_mnemonic);
 
   // Return to home — it will recreate with new key info
@@ -498,23 +3473,44 @@ static void mnemonic_confirm_cb(bool confirmed, void *user_data) {
     return_callback();
 }
 
+static void mnemonic_intermediate_info_cb(void *user_data) {
+  (void)user_data;
+  if (return_callback)
+    return_callback();
+}
+
 static void handle_mnemonic_content(const char *data, size_t len) {
-  char *mnemonic = mnemonic_qr_to_mnemonic(data, len, NULL);
-  if (!mnemonic || bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
+  char *mnemonic = mnemonic_qr_to_mnemonic_unchecked(data, len, NULL);
+  if (!mnemonic) {
     SECURE_FREE_STRING(mnemonic);
-    dialog_show_error("Invalid mnemonic", return_callback, 0);
+    dialog_show_error("助记词无效", return_callback, 0);
+    return;
+  }
+
+  if (bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK) {
+    if (!key_load_from_mnemonic_unchecked(mnemonic)) {
+      SECURE_FREE_STRING(mnemonic);
+      dialog_show_error("临时助记词导入失败", return_callback, 0);
+      return;
+    }
+    wallet_cleanup();
+    SECURE_FREE_STRING(mnemonic);
+    dialog_show_info("已导入临时助记词",
+                     "只能用于助记词变换和还原，不能签名或备份。",
+                     mnemonic_intermediate_info_cb, NULL,
+                     DIALOG_STYLE_FULLSCREEN);
     return;
   }
 
   // Get current fingerprint
-  char current_fp[9] = "????????";
+  char current_fp[9] = "--------";
   key_get_fingerprint_hex(current_fp);
 
   // Compute new mnemonic's fingerprint without touching the loaded key
   wallet_network_t net = wallet_get_network();
   bool is_test = (net == WALLET_NETWORK_TESTNET);
 
-  char new_fp[9] = "????????";
+  char new_fp[9] = "--------";
   {
     unsigned char seed[BIP39_SEED_LEN_512];
     size_t seed_len = 0;
@@ -528,7 +3524,7 @@ static void handle_mnemonic_content(const char *data, size_t len) {
         if (bip32_key_get_fingerprint(tmp_key, fp, BIP32_KEY_FINGERPRINT_LEN) ==
             WALLY_OK) {
           for (int i = 0; i < BIP32_KEY_FINGERPRINT_LEN; i++)
-            sprintf(new_fp + (i * 2), "%02x", fp[i]);
+            snprintf(new_fp + (i * 2), 3, "%02x", fp[i]);
           new_fp[BIP32_KEY_FINGERPRINT_LEN * 2] = '\0';
         }
         bip32_key_free(tmp_key);
@@ -543,9 +3539,9 @@ static void handle_mnemonic_content(const char *data, size_t len) {
   char msg[256];
   snprintf(
       msg, sizeof(msg),
-      "Replace current key?\n\n"
+      "替换当前密钥？\n\n"
       "  %s > #%06X %s#\n\n"
-      "Passphrase and descriptor will be discarded.",
+      "附加口令和描述符会被清除。",
       current_fp,
       (unsigned)((lv_color_to_32(highlight_color(), LV_OPA_COVER).red << 16) |
                  (lv_color_to_32(highlight_color(), LV_OPA_COVER).green << 8) |
@@ -609,36 +3605,40 @@ static bool check_psbt_mismatch(void) {
   int offset = 0;
   offset += snprintf(
       message + offset, sizeof(message) - offset,
-      "PSBT requires different settings for proper change detection:\n\n");
+      "这笔交易需要切换设置，才能正确识别找零：\n\n");
 
   if (network_mismatch) {
     offset += snprintf(message + offset, sizeof(message) - offset,
-                       "  Network:  %s -> %s\n",
-                       wallet_is_testnet ? "Testnet" : "Mainnet",
-                       is_testnet ? "Testnet" : "Mainnet");
+                       "  网络：%s -> %s\n",
+                       wallet_is_testnet ? "测试网" : "主网",
+                       is_testnet ? "测试网" : "主网");
   }
 
   if (account_mismatch) {
     offset += snprintf(message + offset, sizeof(message) - offset,
-                       "  Account:  %u -> %d\n", wallet_account, psbt_account);
+                       "  账户：%u -> %d\n", wallet_account, psbt_account);
   }
 
   snprintf(message + offset, sizeof(message) - offset,
-           "\nGo to Settings " LV_SYMBOL_SETTINGS
-           " to update\nconfiguration before signing.");
+           "\n请先进入设置更新配置，之后再签名。");
 
-  dialog_show_info("Configuration Mismatch", message, mismatch_dialog_cb, NULL,
+  dialog_show_info("配置不匹配", message, mismatch_dialog_cb, NULL,
                    DIALOG_STYLE_FULLSCREEN);
 
   return true;
 }
 
 static bool create_psbt_info_display(void) {
-  if (!scan_screen || !current_psbt || !wallet_is_initialized()) {
+  if (!scan_screen || !current_psbt) {
     return false;
   }
 
-  if (check_psbt_mismatch()) {
+  if (pending_btc_source != BTC_SIGN_SOURCE_SMARTCARD &&
+      !wallet_is_initialized()) {
+    return false;
+  }
+
+  if (pending_btc_source != BTC_SIGN_SOURCE_SMARTCARD && check_psbt_mismatch()) {
     return true;
   }
 
@@ -776,7 +3776,7 @@ static bool create_psbt_info_display(void) {
 
     if (input_overflow > 0) {
       char overflow_text[32];
-      snprintf(overflow_text, sizeof(overflow_text), "+%zu more",
+      snprintf(overflow_text, sizeof(overflow_text), "还有 %zu 个",
                input_overflow);
       lv_obj_t *label = theme_create_label(overflow_row, overflow_text, false);
       lv_obj_set_style_text_color(label, secondary_color(), 0);
@@ -789,7 +3789,7 @@ static bool create_psbt_info_display(void) {
 
     if (output_overflow > 0) {
       char overflow_text[32];
-      snprintf(overflow_text, sizeof(overflow_text), "+%zu more",
+      snprintf(overflow_text, sizeof(overflow_text), "还有 %zu 个",
                output_overflow);
       lv_obj_t *label = theme_create_label(overflow_row, overflow_text, false);
       lv_obj_set_style_text_color(label, secondary_color(), 0);
@@ -801,7 +3801,7 @@ static bool create_psbt_info_display(void) {
   free(output_colors);
 
   char prefix_text[64];
-  snprintf(prefix_text, sizeof(prefix_text), "Inputs(%zu): ", num_inputs);
+  snprintf(prefix_text, sizeof(prefix_text), "输入(%zu)：", num_inputs);
   lv_obj_t *inputs_row = create_btc_value_row(psbt_info_container, prefix_text,
                                               total_input_value, main_color());
   lv_obj_set_width(inputs_row, LV_PCT(100));
@@ -817,7 +3817,7 @@ static bool create_psbt_info_display(void) {
     if (classified_outputs[i].type == OUTPUT_TYPE_SELF_TRANSFER) {
       if (!has_self_transfers) {
         lv_obj_t *title =
-            theme_create_label(psbt_info_container, "Self-Transfer: ", false);
+            theme_create_label(psbt_info_container, "自转账：", false);
         theme_apply_label(title, true);
         lv_obj_set_style_text_color(title, cyan_color(), 0);
         lv_obj_set_width(title, LV_PCT(100));
@@ -826,7 +3826,7 @@ static bool create_psbt_info_display(void) {
 
       char text[64];
       snprintf(text, sizeof(text),
-               "Receive #%u: ", classified_outputs[i].address_index);
+               "收款 #%u：", classified_outputs[i].address_index);
       lv_obj_t *row = create_btc_value_row(
           psbt_info_container, text, classified_outputs[i].value, main_color());
       lv_obj_set_width(row, LV_PCT(100));
@@ -847,7 +3847,7 @@ static bool create_psbt_info_display(void) {
     if (classified_outputs[i].type == OUTPUT_TYPE_CHANGE) {
       if (!has_change) {
         lv_obj_t *title =
-            theme_create_label(psbt_info_container, "Change: ", false);
+            theme_create_label(psbt_info_container, "找零：", false);
         theme_apply_label(title, true);
         lv_obj_set_style_text_color(title, yes_color(), 0);
         lv_obj_set_style_margin_top(title, 15, 0);
@@ -857,7 +3857,7 @@ static bool create_psbt_info_display(void) {
 
       char text[64];
       snprintf(text, sizeof(text),
-               "Change #%u: ", classified_outputs[i].address_index);
+               "找零 #%u：", classified_outputs[i].address_index);
       lv_obj_t *row = create_btc_value_row(
           psbt_info_container, text, classified_outputs[i].value, main_color());
       lv_obj_set_width(row, LV_PCT(100));
@@ -878,7 +3878,7 @@ static bool create_psbt_info_display(void) {
     if (classified_outputs[i].type == OUTPUT_TYPE_SPEND) {
       if (!has_spends) {
         lv_obj_t *title =
-            theme_create_label(psbt_info_container, "Spending: ", false);
+            theme_create_label(psbt_info_container, "支出：", false);
         theme_apply_label(title, true);
         lv_obj_set_style_text_color(title, highlight_color(), 0);
         lv_obj_set_style_margin_top(title, 15, 0);
@@ -887,7 +3887,7 @@ static bool create_psbt_info_display(void) {
       }
 
       char text[64];
-      snprintf(text, sizeof(text), "Output %zu: ", classified_outputs[i].index);
+      snprintf(text, sizeof(text), "输出 %zu：", classified_outputs[i].index);
       lv_obj_t *row = create_btc_value_row(
           psbt_info_container, text, classified_outputs[i].value, main_color());
       lv_obj_set_width(row, LV_PCT(100));
@@ -928,7 +3928,7 @@ static bool create_psbt_info_display(void) {
     lv_obj_set_style_border_width(separator2, 0, 0);
 
     lv_obj_t *fee_row =
-        create_btc_value_row(psbt_info_container, "Fee: ", fee, error_color());
+        create_btc_value_row(psbt_info_container, "手续费：", fee, error_color());
     lv_obj_set_width(fee_row, LV_PCT(100));
   }
 
@@ -949,7 +3949,7 @@ static bool create_psbt_info_display(void) {
   lv_obj_clear_flag(back_button, LV_OBJ_FLAG_EVENT_BUBBLE);
 
   lv_obj_t *back_label = lv_label_create(back_button);
-  lv_label_set_text(back_label, "Back");
+  lv_label_set_text(back_label, "返回");
   lv_obj_center(back_label);
   theme_apply_button_label(back_label, false);
 
@@ -960,7 +3960,7 @@ static bool create_psbt_info_display(void) {
   lv_obj_clear_flag(sign_button, LV_OBJ_FLAG_EVENT_BUBBLE);
 
   lv_obj_t *sign_label = lv_label_create(sign_button);
-  lv_label_set_text(sign_label, "Sign");
+  lv_label_set_text(sign_label, "签名");
   lv_obj_center(sign_label);
   theme_apply_button_label(sign_label, false);
 
@@ -976,21 +3976,10 @@ static void dismiss_sign_progress(void) {
   }
 }
 
-static void deferred_sign_cb(lv_timer_t *timer) {
-  (void)timer;
-
+static bool show_signed_psbt_qr_after_sign(void) {
   if (!current_psbt) {
-    dismiss_sign_progress();
-    dialog_show_error("No PSBT loaded", NULL, 2000);
-    return;
-  }
-
-  size_t signatures_added = psbt_sign(current_psbt, is_testnet);
-
-  if (signatures_added == 0) {
-    dismiss_sign_progress();
-    dialog_show_error("Failed to sign PSBT", NULL, 2000);
-    return;
+    dialog_show_error("没有已加载的交易", NULL, 2000);
+    return false;
   }
 
   if (signed_psbt_base64) {
@@ -1010,8 +3999,8 @@ static void deferred_sign_cb(lv_timer_t *timer) {
   dismiss_sign_progress();
 
   if (ret != WALLY_OK) {
-    dialog_show_error("Failed to encode PSBT", NULL, 2000);
-    return;
+    dialog_show_error("交易编码失败", NULL, 2000);
+    return false;
   }
 
   saved_return_callback = return_callback;
@@ -1020,31 +4009,226 @@ static void deferred_sign_cb(lv_timer_t *timer) {
       (scanned_qr_format == -1) ? FORMAT_NONE : scanned_qr_format;
 
   if (!qr_viewer_page_create_with_format(lv_screen_active(), export_format,
-                                         signed_psbt_base64, "Signed PSBT",
+                                         signed_psbt_base64, "已签名交易",
                                          return_from_qr_viewer_cb)) {
-    dialog_show_error("Failed to create QR viewer", return_callback, 2000);
-    return;
+    dialog_show_error("二维码显示页创建失败", return_callback, 2000);
+    return false;
   }
 
   scan_page_hide();
   scan_page_destroy();
 
   qr_viewer_page_show();
+  return true;
+}
+
+static void deferred_sign_cb(lv_timer_t *timer) {
+  (void)timer;
+
+  if (!current_psbt) {
+    dismiss_sign_progress();
+    dialog_show_error("没有已加载的交易", NULL, 2000);
+    return;
+  }
+
+  size_t signatures_added = psbt_sign(current_psbt, is_testnet);
+
+  if (signatures_added == 0) {
+    dismiss_sign_progress();
+    dialog_show_error("交易签名失败", NULL, 2000);
+    return;
+  }
+
+  show_signed_psbt_qr_after_sign();
+}
+
+static void start_psbt_sign_after_pin(void) {
+  if (!current_psbt) {
+    dialog_show_error("没有已加载的交易", NULL, 2000);
+    return;
+  }
+
+  // 大交易签名可能需要几秒，先显示进度弹窗再开始处理。
+  // defer the work to a one-shot timer so LVGL gets to render it first.
+  sign_progress_dialog =
+      dialog_show_progress("签名", "正在处理...", DIALOG_STYLE_OVERLAY);
+  lv_timer_t *t = lv_timer_create(deferred_sign_cb, 50, NULL);
+  lv_timer_set_repeat_count(t, 1);
+}
+
+static void btc_satochip_pin_input_cleanup(void) {
+  if (btc_satochip_pin_input_active) {
+    ui_text_input_destroy(&btc_satochip_pin_input);
+    memset(&btc_satochip_pin_input, 0, sizeof(btc_satochip_pin_input));
+    btc_satochip_pin_input_active = false;
+  }
+}
+
+static void btc_satochip_sign_task(void *arg) {
+  (void)arg;
+  const bool delete_with_caps = btc_satochip_sign_task_with_caps;
+  btc_satochip_sign_task_err = ESP_ERR_INVALID_STATE;
+  btc_satochip_signatures_added = 0;
+  btc_satochip_sign_task_detail[0] = '\0';
+
+  btc_satochip_signatures_added = psbt_sign_with_satochip(
+      current_psbt, btc_satochip_sign_task_pin, is_testnet,
+      btc_satochip_sign_task_detail, sizeof(btc_satochip_sign_task_detail));
+  btc_satochip_sign_task_err =
+      btc_satochip_signatures_added > 0 ? ESP_OK : ESP_FAIL;
+
+  secure_memzero(btc_satochip_sign_task_pin,
+                 sizeof(btc_satochip_sign_task_pin));
+  __atomic_store_n(&btc_satochip_sign_task_done, true, __ATOMIC_RELEASE);
+  if (delete_with_caps) {
+    vTaskDeleteWithCaps(NULL);
+    return;
+  }
+  vTaskDelete(NULL);
+}
+
+static void btc_satochip_sign_finish_ui(void) {
+  if (btc_satochip_sign_progress_dialog) {
+    lv_obj_del(btc_satochip_sign_progress_dialog);
+    btc_satochip_sign_progress_dialog = NULL;
+  }
+
+  if (btc_satochip_sign_task_err != ESP_OK ||
+      btc_satochip_signatures_added == 0) {
+    char msg[384];
+    snprintf(msg, sizeof(msg), "智能卡签名失败\n%s",
+             btc_satochip_sign_task_detail[0]
+                 ? btc_satochip_sign_task_detail
+                 : "没有可签名输入。");
+    dialog_show_error(msg, show_scanned_sign_payload, 0);
+    return;
+  }
+
+  show_signed_psbt_qr_after_sign();
+}
+
+static void btc_satochip_sign_poll_cb(lv_timer_t *timer) {
+  (void)timer;
+  if (!__atomic_load_n(&btc_satochip_sign_task_done, __ATOMIC_ACQUIRE))
+    return;
+
+  if (btc_satochip_sign_poll_timer) {
+    lv_timer_del(btc_satochip_sign_poll_timer);
+    btc_satochip_sign_poll_timer = NULL;
+  }
+  btc_satochip_sign_task_handle = NULL;
+  btc_satochip_sign_task_with_caps = false;
+  btc_satochip_sign_finish_ui();
+}
+
+static void start_psbt_satochip_sign(const char *pin_text) {
+  if (!pin_text || !pin_text[0]) {
+    dialog_show_error("请输入智能卡 PIN", show_scanned_sign_payload, 1600);
+    return;
+  }
+  if (!current_psbt) {
+    dialog_show_error("没有已加载的交易", return_callback, 2000);
+    return;
+  }
+
+  snprintf(btc_satochip_sign_task_pin, sizeof(btc_satochip_sign_task_pin),
+           "%s", pin_text);
+  btc_satochip_sign_task_detail[0] = '\0';
+  btc_satochip_signatures_added = 0;
+  btc_satochip_sign_task_err = ESP_ERR_INVALID_STATE;
+  __atomic_store_n(&btc_satochip_sign_task_done, false, __ATOMIC_RELEASE);
+  btc_satochip_sign_task_with_caps = false;
+
+  btc_satochip_sign_progress_dialog =
+      dialog_show_progress("智能卡签名", "签名中", DIALOG_STYLE_OVERLAY);
+  lv_refr_now(NULL);
+
+  BaseType_t ok = xTaskCreatePinnedToCore(
+      btc_satochip_sign_task, "btc_card_sign",
+      BTC_SATOCHIP_SIGN_TASK_STACK_SIZE, NULL, 4,
+      &btc_satochip_sign_task_handle, 1);
+  if (ok != pdPASS) {
+    btc_satochip_sign_task_with_caps = true;
+    ok = xTaskCreatePinnedToCoreWithCaps(
+        btc_satochip_sign_task, "btc_card_sign",
+        BTC_SATOCHIP_SIGN_TASK_STACK_SIZE, NULL, 4,
+        &btc_satochip_sign_task_handle, 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  }
+  if (ok != pdPASS) {
+    secure_memzero(btc_satochip_sign_task_pin,
+                   sizeof(btc_satochip_sign_task_pin));
+    btc_satochip_sign_task_handle = NULL;
+    btc_satochip_sign_task_with_caps = false;
+    if (btc_satochip_sign_progress_dialog) {
+      lv_obj_del(btc_satochip_sign_progress_dialog);
+      btc_satochip_sign_progress_dialog = NULL;
+    }
+    dialog_show_error("智能卡签名任务启动失败", show_scanned_sign_payload, 0);
+    return;
+  }
+
+  btc_satochip_sign_poll_timer =
+      lv_timer_create(btc_satochip_sign_poll_cb, 100, NULL);
+}
+
+static void btc_satochip_pin_ready_cb(lv_event_t *e) {
+  (void)e;
+  if (!btc_satochip_pin_input.textarea)
+    return;
+  const char *pin_text =
+      lv_textarea_get_text(btc_satochip_pin_input.textarea);
+  char pin_copy[80];
+  snprintf(pin_copy, sizeof(pin_copy), "%s", pin_text ? pin_text : "");
+  btc_satochip_pin_input_cleanup();
+  start_psbt_satochip_sign(pin_copy);
+  secure_memzero(pin_copy, sizeof(pin_copy));
+}
+
+static void btc_satochip_pin_back_cb(lv_event_t *e) {
+  (void)e;
+  btc_satochip_pin_input_cleanup();
+  show_scanned_sign_payload();
+}
+
+static void show_btc_satochip_pin_input(void) {
+  lv_obj_t *root = btc_prepare_page();
+  lv_obj_t *title = theme_create_page_title(root, "智能卡 PIN");
+  lv_obj_set_width(title, LV_PCT(90));
+  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+
+  btc_satochip_pin_input_cleanup();
+  ui_text_input_create(&btc_satochip_pin_input, root, "智能卡 PIN", true,
+                       btc_satochip_pin_ready_cb);
+  btc_satochip_pin_input_active = true;
+  if (btc_satochip_pin_input.keyboard)
+    lv_obj_add_event_cb(btc_satochip_pin_input.keyboard,
+                        btc_satochip_pin_back_cb, LV_EVENT_CANCEL, NULL);
+  if (btc_satochip_pin_input.textarea)
+    lv_obj_add_event_cb(btc_satochip_pin_input.textarea,
+                        btc_satochip_pin_back_cb, LV_EVENT_CANCEL, NULL);
+  (void)ui_create_back_button(root, btc_satochip_pin_back_cb);
+}
+
+static void psbt_final_confirm_cb(bool confirmed, void *user_data) {
+  (void)user_data;
+  if (!confirmed)
+    return;
+  start_psbt_sign_after_pin();
+}
+
+static void request_psbt_final_confirm_after_pin(void) {
+  dialog_show_danger_confirm(
+      "最后确认：\n请再次核对收款地址、金额、找零和手续费。\n确认签名？",
+      psbt_final_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
 
 static void sign_button_cb(lv_event_t *e) {
   (void)e;
-  if (!current_psbt) {
-    dialog_show_error("No PSBT loaded", NULL, 2000);
+  if (pending_btc_source == BTC_SIGN_SOURCE_SMARTCARD) {
+    show_btc_satochip_pin_input();
     return;
   }
-
-  // Signing big PSBTs can take a few seconds — show a progress dialog and
-  // defer the work to a one-shot timer so LVGL gets to render it first.
-  sign_progress_dialog =
-      dialog_show_progress("Sign", "Processing...", DIALOG_STYLE_OVERLAY);
-  lv_timer_t *t = lv_timer_create(deferred_sign_cb, 50, NULL);
-  lv_timer_set_repeat_count(t, 1);
+  sensitive_pin_require(request_psbt_final_confirm_after_pin, NULL);
 }
 
 static void return_from_qr_viewer_cb(void) {
@@ -1109,7 +4293,7 @@ static void descriptor_validation_cb(descriptor_validation_result_t result,
       multisig_menu = NULL;
     }
     if (!create_psbt_info_display()) {
-      dialog_show_error("Invalid PSBT data", return_callback, 0);
+      dialog_show_error("交易数据无效", return_callback, 0);
     }
     return;
   }
@@ -1136,7 +4320,7 @@ static void success_from_descriptor_storage(void) {
     multisig_menu = NULL;
   }
   if (!create_psbt_info_display()) {
-    dialog_show_error("Invalid PSBT data", return_callback, 0);
+    dialog_show_error("交易数据无效", return_callback, 0);
   }
 }
 
@@ -1178,15 +4362,14 @@ static void load_descriptor_menu_cb(void) {
       load_desc_from_sd_cb, load_desc_source_back_cb);
 }
 
-static void sign_without_verification_cb(void) {
+static void unsafe_multisig_signing_disabled_cb(void) {
   if (multisig_menu) {
     ui_menu_destroy(multisig_menu);
     multisig_menu = NULL;
   }
-  skip_verification = true;
-  if (!create_psbt_info_display()) {
-    dialog_show_error("Invalid PSBT data", return_callback, 0);
-  }
+  skip_verification = false;
+  dialog_show_error("已禁用不核对签名\n\n多签交易必须先加载描述符，才能核对找零和输出。",
+                    return_callback, 0);
 }
 
 static void show_multisig_options_menu(void) {
@@ -1194,16 +4377,16 @@ static void show_multisig_options_menu(void) {
     return;
   }
 
-  multisig_menu = ui_menu_create(scan_screen, "Multisig PSBT Detected",
+  multisig_menu = ui_menu_create(scan_screen, "检测到多签交易",
                                  multisig_menu_back_cb);
   if (!multisig_menu) {
-    dialog_show_error("Failed to create menu", return_callback, 0);
+    dialog_show_error("菜单创建失败", return_callback, 0);
     return;
   }
 
-  ui_menu_add_entry(multisig_menu, "Load Descriptor", load_descriptor_menu_cb);
-  ui_menu_add_entry(multisig_menu, "Sign Without Verification",
-                    sign_without_verification_cb);
+  ui_menu_add_entry(multisig_menu, "加载描述符", load_descriptor_menu_cb);
+  ui_menu_add_entry(multisig_menu, "安全说明：必须先加载描述符",
+                    unsafe_multisig_signing_disabled_cb);
   ui_menu_show(multisig_menu);
 }
 
@@ -1218,7 +4401,7 @@ static void create_message_sign_display(void) {
   char *address = NULL;
   if (!message_sign_get_address(current_message.derivation_path, testnet,
                                 &address)) {
-    dialog_show_error("Failed to derive address", return_callback, 0);
+    dialog_show_error("地址派生失败", return_callback, 0);
     return;
   }
 
@@ -1232,10 +4415,10 @@ static void create_message_sign_display(void) {
   theme_apply_screen(psbt_info_container);
   lv_obj_add_flag(psbt_info_container, LV_OBJ_FLAG_SCROLLABLE);
 
-  theme_create_page_title(psbt_info_container, "Sign Message");
+  theme_create_page_title(psbt_info_container, "消息签名");
 
   lv_obj_t *path_title =
-      theme_create_label(psbt_info_container, "Path:", false);
+      theme_create_label(psbt_info_container, "路径：", false);
   theme_apply_label(path_title, true);
   lv_obj_set_style_text_color(path_title, secondary_color(), 0);
 
@@ -1244,7 +4427,7 @@ static void create_message_sign_display(void) {
   lv_obj_set_width(path_label, LV_PCT(100));
 
   lv_obj_t *addr_title =
-      theme_create_label(psbt_info_container, "Address:", false);
+      theme_create_label(psbt_info_container, "地址：", false);
   theme_apply_label(addr_title, true);
   lv_obj_set_style_text_color(addr_title, secondary_color(), 0);
 
@@ -1262,7 +4445,7 @@ static void create_message_sign_display(void) {
   lv_obj_set_style_border_width(separator, 0, 0);
 
   lv_obj_t *msg_title =
-      theme_create_label(psbt_info_container, "Message:", false);
+      theme_create_label(psbt_info_container, "消息：", false);
   theme_apply_label(msg_title, true);
   lv_obj_set_style_text_color(msg_title, secondary_color(), 0);
 
@@ -1288,7 +4471,7 @@ static void create_message_sign_display(void) {
   lv_obj_clear_flag(back_button, LV_OBJ_FLAG_EVENT_BUBBLE);
 
   lv_obj_t *back_label = lv_label_create(back_button);
-  lv_label_set_text(back_label, "Back");
+  lv_label_set_text(back_label, "返回");
   lv_obj_center(back_label);
   theme_apply_button_label(back_label, false);
 
@@ -1300,24 +4483,29 @@ static void create_message_sign_display(void) {
   lv_obj_clear_flag(sign_button, LV_OBJ_FLAG_EVENT_BUBBLE);
 
   lv_obj_t *sign_label = lv_label_create(sign_button);
-  lv_label_set_text(sign_label, "Sign");
+  lv_label_set_text(sign_label, "签名");
   lv_obj_center(sign_label);
   theme_apply_button_label(sign_label, false);
 }
 
-static void message_sign_button_cb(lv_event_t *e) {
+static void start_message_sign_after_pin(void) {
   char *sig_b64 = NULL;
   if (!message_sign_sign(current_message.derivation_path,
                          current_message.message, &sig_b64)) {
-    dialog_show_error("Failed to sign message", NULL, 2000);
+    dialog_show_error("消息签名失败", NULL, 2000);
     return;
   }
 
   saved_return_callback = return_callback;
 
-  qr_viewer_page_create(lv_screen_active(), sig_b64, "Message Signature",
-                        return_from_qr_viewer_cb);
+  bool qr_ready = qr_viewer_page_create(lv_screen_active(), sig_b64,
+                                        "消息签名结果",
+                                        return_from_qr_viewer_cb);
   wally_free_string(sig_b64);
+  if (!qr_ready) {
+    dialog_show_error("签名二维码创建失败", NULL, 2000);
+    return;
+  }
 
   scan_page_hide();
   scan_page_destroy();
@@ -1325,13 +4513,66 @@ static void message_sign_button_cb(lv_event_t *e) {
   qr_viewer_page_show();
 }
 
+static void message_final_confirm_cb(bool confirmed, void *user_data) {
+  (void)user_data;
+  if (!confirmed)
+    return;
+  start_message_sign_after_pin();
+}
+
+static void request_message_final_confirm_after_pin(void) {
+  dialog_show_danger_confirm(
+      "最后确认：\n请再次核对消息内容、地址和派生路径。\n确认签名？",
+      message_final_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
+}
+
+static void message_sign_button_cb(lv_event_t *e) {
+  (void)e;
+  sensitive_pin_require(request_message_final_confirm_after_pin, NULL);
+}
+
 void scan_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   if (!parent || !key_is_loaded()) {
     return;
   }
 
+  smartcard_web3_mode = false;
+  unified_scan_mode = false;
+  pending_web3_from_ur = false;
   return_callback = return_cb;
+  (void)mnemonic_slots_add_current(NULL);
 
+  scan_screen = theme_create_page_container(parent);
+  qr_scanner_page_create(NULL, return_from_qr_scanner_cb);
+  qr_scanner_page_show();
+}
+
+void scan_page_create_unified(lv_obj_t *parent, void (*return_cb)(void)) {
+  if (!parent) {
+    return;
+  }
+
+  smartcard_web3_mode = false;
+  unified_scan_mode = true;
+  pending_web3_from_ur = false;
+  return_callback = return_cb;
+  if (key_is_loaded())
+    (void)mnemonic_slots_add_current(NULL);
+
+  scan_screen = theme_create_page_container(parent);
+  qr_scanner_page_create(NULL, return_from_qr_scanner_cb);
+  qr_scanner_page_show();
+}
+
+void scan_page_create_smartcard_web3(lv_obj_t *parent, void (*return_cb)(void)) {
+  if (!parent) {
+    return;
+  }
+
+  smartcard_web3_mode = true;
+  unified_scan_mode = false;
+  pending_web3_from_ur = false;
+  return_callback = return_cb;
   scan_screen = theme_create_page_container(parent);
   qr_scanner_page_create(NULL, return_from_qr_scanner_cb);
   qr_scanner_page_show();
@@ -1350,7 +4591,42 @@ void scan_page_hide(void) {
 }
 
 void scan_page_destroy(void) {
+  if (web3_info_active) {
+    return_callback = NULL;
+    return;
+  }
+
+  if (web3_sign_task_handle &&
+      !__atomic_load_n(&web3_sign_task_done, __ATOMIC_ACQUIRE)) {
+    ESP_LOGW(TAG, "Scan page destroy deferred while Web3 sign task is running");
+    return;
+  }
+  if (btc_satochip_sign_task_handle &&
+      !__atomic_load_n(&btc_satochip_sign_task_done, __ATOMIC_ACQUIRE)) {
+    ESP_LOGW(TAG,
+             "Scan page destroy deferred while BTC smartcard sign task is running");
+    return;
+  }
+  if (web3_sign_poll_timer) {
+    lv_timer_del(web3_sign_poll_timer);
+    web3_sign_poll_timer = NULL;
+  }
+  if (btc_satochip_sign_poll_timer) {
+    lv_timer_del(btc_satochip_sign_poll_timer);
+    btc_satochip_sign_poll_timer = NULL;
+  }
+  web3_sign_task_handle = NULL;
+  web3_sign_task_with_caps = false;
+  btc_satochip_sign_task_handle = NULL;
+  btc_satochip_sign_task_with_caps = false;
+
   dismiss_sign_progress();
+  if (btc_satochip_sign_progress_dialog) {
+    lv_obj_del(btc_satochip_sign_progress_dialog);
+    btc_satochip_sign_progress_dialog = NULL;
+  }
+  btc_satochip_pin_input_cleanup();
+  web3_pin_input_cleanup();
   qr_scanner_page_destroy();
   load_descriptor_storage_page_destroy();
   descriptor_loader_destroy_source_menu();
@@ -1378,4 +4654,9 @@ void scan_page_destroy(void) {
   }
 
   return_callback = NULL;
+  web3_info_active = false;
+  smartcard_web3_mode = false;
+  unified_scan_mode = false;
+  pending_web3_from_ur = false;
+  pending_btc_source = BTC_SIGN_SOURCE_NONE;
 }

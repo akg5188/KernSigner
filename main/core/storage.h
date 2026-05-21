@@ -1,12 +1,12 @@
 /*
  * Persistent storage for mnemonics and descriptors
  *
- * Stores KEF-encrypted or plaintext data on SPIFFS (flash) or SD card.
+ * Stores KEF-encrypted descriptors on SPIFFS (flash) or SD card.
+ * Mnemonics are stateless and are only saved to SD card, never local flash.
  * Flash: raw binary (no encoding overhead on constrained SPIFFS).
  * SD card: base64-encoded for KEF, raw text for plaintext.
  *
  * Mnemonic paths:
- *   Flash:  /spiffs/m_<sanitized_id>.kef
  *   SD:     /sdcard/kern/mnemonics/<sanitized_id>.kef
  *
  * Descriptor paths:
@@ -45,9 +45,9 @@ typedef enum {
 esp_err_t storage_init(void);
 
 /**
- * Save a KEF envelope. Flash: raw binary. SD: base64-encoded.
+ * Save a KEF mnemonic envelope. Only SD card is allowed in stateless mode.
  *
- * @param loc           Flash or SD card
+ * @param loc           SD card
  * @param id            Raw KEF ID (sanitized for the filename)
  * @param kef_envelope  Binary KEF envelope
  * @param len           Length of KEF envelope

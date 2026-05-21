@@ -97,6 +97,11 @@ bool psbt_get_output_derivation(const struct wally_psbt *psbt,
                                 size_t output_index, bool is_testnet,
                                 bool *is_change, uint32_t *address_index);
 
+// Commercial signing gate: every input must be owned, script-verified and on
+// the selected Bitcoin network before psbt_sign() is allowed to sign.
+bool psbt_inputs_verified_for_signing(const struct wally_psbt *psbt,
+                                      bool is_testnet);
+
 // Sign PSBT inputs with loaded key
 // Returns number of signatures added (0 if none)
 size_t psbt_sign(struct wally_psbt *psbt, bool is_testnet);

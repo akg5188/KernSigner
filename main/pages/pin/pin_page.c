@@ -117,6 +117,25 @@ static void build_split_state(void);
 static void build_delay_state(void);
 static void pin_mismatch_dismissed_cb(void);
 static void wrong_pin_dismissed_cb(void);
+static void deferred_pin_save(lv_timer_t *timer);
+
+static bool pin_show_anti_phishing_words(void) {
+  // Product mode keeps PIN entry to one uninterrupted input. The underlying
+  // HMAC/eFuse support stays in core code, but the UI no longer pauses for
+  // anti-phishing words.
+  return false;
+}
+
+static int pin_unlock_textarea_y(void) {
+  int default_y = theme_get_screen_height() * 17 / 100;
+  int chrome_bottom =
+      theme_get_small_padding() + theme_get_corner_button_height() +
+      theme_get_small_padding();
+#ifdef CONFIG_KERN_BOARD_WAVE_35
+  default_y = 80;
+#endif
+  return default_y > chrome_bottom ? default_y : chrome_bottom;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -231,7 +250,7 @@ static void dismiss_processing(void) {
 
 static void show_processing(lv_timer_cb_t callback) {
   progress_dialog =
-      dialog_show_progress("PIN", "Processing...", DIALOG_STYLE_OVERLAY);
+      dialog_show_progress("PIN", "正在处理...", DIALOG_STYLE_OVERLAY);
   lv_timer_t *t = lv_timer_create(callback, 50, NULL);
   lv_timer_set_repeat_count(t, 1);
 }
@@ -270,7 +289,8 @@ static void deferred_verify_cb(lv_timer_t *timer) {
     break;
   case PIN_VERIFY_WIPED: {
     clear_buffers();
-    dialog_show_error("Device wiped. All data erased.", NULL, 0);
+    dialog_show_error("PIN 码连续错误 3 次，已清除本次会话并重启。",
+                      NULL, 0);
     lv_timer_t *rt = lv_timer_create(restart_cb, 3000, NULL);
     lv_timer_set_repeat_count(rt, 1);
     break;
@@ -279,7 +299,7 @@ static void deferred_verify_cb(lv_timer_t *timer) {
     clear_buffers();
     // Defer the rebuild until the dialog dismisses; rebuilding now would
     // add the new keyboard above the error modal and hide the message.
-    dialog_show_error("Wrong PIN", wrong_pin_dismissed_cb, 1500);
+    dialog_show_error("PIN 码错误", wrong_pin_dismissed_cb, 1500);
     break;
   }
 }
@@ -316,14 +336,17 @@ static void input_ready_cb(lv_event_t *e) {
 
   case STATE_SETUP_FULL_PIN: {
     if (len < PIN_MIN_LENGTH) {
-      dialog_show_error("PIN must be at least 6 characters", NULL, 1500);
+      dialog_show_error("PIN 码至少需要 6 位", NULL, 1500);
       return;
     }
     memcpy(setup_pin, text, len);
     setup_pin[len] = '\0';
     setup_pin_len = (int)len;
     secure_clear_textarea(text_input.textarea);
-    transition_to(STATE_SETUP_CONFIRM_PIN);
+    split_pos = setup_pin_len / 2;
+    if (split_pos < 1)
+      split_pos = 1;
+    show_processing(deferred_pin_save);
     break;
   }
 
@@ -334,7 +357,7 @@ static void input_ready_cb(lv_event_t *e) {
       secure_clear_textarea(text_input.textarea);
       // Defer the rebuild until the dialog dismisses; rebuilding now would
       // add the new keyboard above the error modal and hide the message.
-      dialog_show_error("PINs don't match", pin_mismatch_dismissed_cb, 1500);
+      dialog_show_error("两次 PIN 码不一致", pin_mismatch_dismissed_cb, 1500);
       return;
     }
     secure_clear_textarea(text_input.textarea);
@@ -358,10 +381,18 @@ static void back_btn_cb(lv_event_t *e);
 
 // Back button (setup/change only) + title
 static void build_chrome(const char *title_text) {
-  if (current_mode != PIN_PAGE_UNLOCK)
+  bool has_back = current_mode != PIN_PAGE_UNLOCK || on_cancel;
+  if (has_back)
     ui_create_back_button(page_screen, back_btn_cb);
   title_label = theme_create_page_title(page_screen, title_text);
+  if (has_back) {
+    lv_obj_set_width(title_label, LV_PCT(60));
+    lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0,
+                 theme_get_default_padding());
+  }
 }
+
+static void keyboard_cancel_cb(lv_event_t *e) { back_btn_cb(e); }
 
 static void build_entry_state(const char *title_text) {
   clear_state();
@@ -370,6 +401,12 @@ static void build_entry_state(const char *title_text) {
   // Text input: textarea + eye toggle + full keyboard
   ui_text_input_create(&text_input, page_screen, "", true, input_ready_cb);
   text_input_active = true;
+  if (text_input.keyboard)
+    lv_obj_add_event_cb(text_input.keyboard, keyboard_cancel_cb,
+                        LV_EVENT_CANCEL, NULL);
+  if (text_input.textarea)
+    lv_obj_add_event_cb(text_input.textarea, keyboard_cancel_cb,
+                        LV_EVENT_CANCEL, NULL);
 }
 
 // ---------------------------------------------------------------------------
@@ -494,7 +531,7 @@ static void pin_keystroke_cb(lv_event_t *e) {
         lv_obj_add_state(text_input.textarea, LV_STATE_DISABLED);
 #ifdef CONFIG_KERN_BOARD_WAVE_35
         if (!continue_btn) {
-          continue_btn = theme_create_button(page_screen, "Continue", true);
+          continue_btn = theme_create_button(page_screen, "继续", true);
           lv_obj_set_size(continue_btn, LV_PCT(60), theme_get_button_height());
           lv_obj_align(continue_btn, LV_ALIGN_BOTTOM_MID, 0, -20);
           lv_obj_add_event_cb(continue_btn, continue_btn_cb, LV_EVENT_CLICKED,
@@ -521,58 +558,63 @@ static void pin_keystroke_cb(lv_event_t *e) {
 
 static void build_unlock_entry_state(void) {
   clear_state();
-  build_chrome("Enter PIN");
+  build_chrome("输入 PIN 码");
 
   // Text input: textarea + eye toggle + full keyboard
   ui_text_input_create(&text_input, page_screen, "", true, input_ready_cb);
   text_input_active = true;
+  if (text_input.keyboard)
+    lv_obj_add_event_cb(text_input.keyboard, keyboard_cancel_cb,
+                        LV_EVENT_CANCEL, NULL);
+  if (text_input.textarea)
+    lv_obj_add_event_cb(text_input.textarea, keyboard_cancel_cb,
+                        LV_EVENT_CANCEL, NULL);
 
-  // Reposition textarea from default y=140 to y=60
+  // Keep the input below the title/back chrome.
   lv_obj_align(text_input.textarea, LV_ALIGN_TOP_LEFT, LV_HOR_RES * 5 / 100,
-               60);
+               pin_unlock_textarea_y());
   // Re-align eye button to match
   if (text_input.eye_btn)
     lv_obj_align_to(text_input.eye_btn, text_input.textarea,
                     LV_ALIGN_OUT_RIGHT_MID, 5, 0);
 
-  // Hidden flex row at y=115: identicon + words side-by-side
-  words_container = lv_obj_create(page_screen);
-  lv_obj_remove_style_all(words_container);
-  lv_obj_set_flex_flow(words_container, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(words_container, LV_FLEX_ALIGN_CENTER,
-                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_gap(words_container, 12, 0);
-  lv_obj_set_size(words_container, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-  lv_obj_align(words_container, LV_ALIGN_TOP_MID, 0, 125);
-  lv_obj_add_flag(words_container, LV_OBJ_FLAG_HIDDEN);
+  if (pin_show_anti_phishing_words() && pin_has_anti_phishing()) {
+    // Hidden flex row at y=115: identicon + words side-by-side
+    words_container = lv_obj_create(page_screen);
+    lv_obj_remove_style_all(words_container);
+    lv_obj_set_flex_flow(words_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(words_container, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(words_container, 12, 0);
+    lv_obj_set_size(words_container, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_align(words_container, LV_ALIGN_TOP_MID, 0, 125);
+    lv_obj_add_flag(words_container, LV_OBJ_FLAG_HIDDEN);
 
-  // Identicon canvas (120x120 RGB565)
-  identicon_draw_buf = lv_draw_buf_create(
-      IDENTICON_SIZE, IDENTICON_SIZE, LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO);
-  if (identicon_draw_buf) {
-    identicon_canvas = lv_canvas_create(words_container);
-    lv_canvas_set_draw_buf(identicon_canvas, identicon_draw_buf);
-    lv_obj_set_size(identicon_canvas, IDENTICON_SIZE, IDENTICON_SIZE);
-  }
+    // Identicon canvas (120x120 RGB565)
+    identicon_draw_buf = lv_draw_buf_create(
+        IDENTICON_SIZE, IDENTICON_SIZE, LV_COLOR_FORMAT_RGB565, LV_STRIDE_AUTO);
+    if (identicon_draw_buf) {
+      identicon_canvas = lv_canvas_create(words_container);
+      lv_canvas_set_draw_buf(identicon_canvas, identicon_draw_buf);
+      lv_obj_set_size(identicon_canvas, IDENTICON_SIZE, IDENTICON_SIZE);
+    }
 
-  // Words label (inside container)
-  words_label = lv_label_create(words_container);
-  lv_label_set_text(words_label, "");
-  lv_obj_set_style_text_font(words_label, theme_font_medium(), 0);
-  lv_obj_set_style_text_color(words_label, highlight_color(), 0);
+    // Words label (inside container)
+    words_label = lv_label_create(words_container);
+    lv_label_set_text(words_label, "");
+    lv_obj_set_style_text_font(words_label, theme_font_medium(), 0);
+    lv_obj_set_style_text_color(words_label, highlight_color(), 0);
 
-  // Hidden warning label below identicon row (125 + 120 + 5 = 250)
-  words_warning = lv_label_create(page_screen);
-  lv_label_set_text(words_warning, "If image or words don't match, stop!");
-  lv_obj_set_style_text_font(words_warning, theme_font_small(), 0);
-  lv_obj_set_style_text_color(words_warning, error_color(), 0);
-  lv_obj_set_style_text_align(words_warning, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_width(words_warning, LV_PCT(100));
-  lv_obj_align(words_warning, LV_ALIGN_TOP_MID, 0, 260);
-  lv_obj_add_flag(words_warning, LV_OBJ_FLAG_HIDDEN);
+    // Hidden warning label below identicon row (125 + 120 + 5 = 250)
+    words_warning = lv_label_create(page_screen);
+    lv_label_set_text(words_warning, "图案或词语不一致时，请立即停止！");
+    lv_obj_set_style_text_font(words_warning, theme_font_small(), 0);
+    lv_obj_set_style_text_color(words_warning, error_color(), 0);
+    lv_obj_set_style_text_align(words_warning, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(words_warning, LV_PCT(100));
+    lv_obj_align(words_warning, LV_ALIGN_TOP_MID, 0, 260);
+    lv_obj_add_flag(words_warning, LV_OBJ_FLAG_HIDDEN);
 
-  // Attach keystroke callback if anti-phishing is available
-  if (pin_has_anti_phishing()) {
     split_pos = pin_get_split_position();
     lv_obj_add_event_cb(text_input.keyboard, pin_keystroke_cb,
                         LV_EVENT_VALUE_CHANGED, NULL);
@@ -620,8 +662,7 @@ static void split_eye_cb(lv_event_t *e) {
   (void)e;
   split_revealed = !split_revealed;
   if (split_eye_label)
-    lv_label_set_text(split_eye_label, split_revealed ? LV_SYMBOL_EYE_CLOSE
-                                                      : LV_SYMBOL_EYE_OPEN);
+    lv_label_set_text(split_eye_label, split_revealed ? "隐藏" : "显示");
   update_split_display();
 }
 
@@ -647,7 +688,7 @@ static void deferred_pin_save(lv_timer_t *timer) {
   clear_buffers();
   dismiss_processing();
   if (err != ESP_OK) {
-    dialog_show_error("Failed to save PIN. Please try again.", NULL, 2000);
+    dialog_show_error("PIN 码保存失败，请重试。", NULL, 2000);
     transition_to(STATE_SETUP_FULL_PIN);
     return;
   }
@@ -668,16 +709,14 @@ static void split_confirm_cb(lv_event_t *e) {
 
 static void build_split_state(void) {
   clear_state();
-  build_chrome("Choose split position");
+  build_chrome("选择 PIN 码分割位置");
   create_content_area();
 
   // Description
   lv_obj_t *desc = lv_label_create(content_area);
-  lv_label_set_text(desc, "Choose where to split your PIN.\n"
-                          "After entering the first part, the device "
-                          "will show an image and two words to verify "
-                          "it hasn't been tampered with.\n"
-                          "(prefix|suffix)");
+  lv_label_set_text(desc, "选择 PIN 码分割位置。\n"
+                          "此设置用于 PIN 输入保护。\n"
+                          "格式：前半段 | 后半段");
   lv_obj_set_style_text_color(desc, secondary_color(), 0);
   lv_obj_set_style_text_align(desc, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_width(desc, LV_PCT(100));
@@ -703,7 +742,7 @@ static void build_split_state(void) {
   lv_obj_add_event_cb(split_eye_btn, split_eye_cb, LV_EVENT_CLICKED, NULL);
 
   split_eye_label = lv_label_create(split_eye_btn);
-  lv_label_set_text(split_eye_label, LV_SYMBOL_EYE_OPEN);
+  lv_label_set_text(split_eye_label, "显示");
   lv_obj_set_style_text_color(split_eye_label, secondary_color(), 0);
   lv_obj_set_style_text_font(split_eye_label, theme_font_small(), 0);
   lv_obj_center(split_eye_label);
@@ -714,18 +753,18 @@ static void build_split_state(void) {
   lv_obj_set_flex_align(btn_row, LV_FLEX_ALIGN_SPACE_EVENLY,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-  left_btn = theme_create_button(btn_row, LV_SYMBOL_LEFT, false);
+  left_btn = theme_create_button(btn_row, "左", false);
   lv_obj_set_size(left_btn, theme_get_button_width(),
                   theme_get_button_height());
   lv_obj_add_event_cb(left_btn, split_left_cb, LV_EVENT_CLICKED, NULL);
 
-  right_btn = theme_create_button(btn_row, LV_SYMBOL_RIGHT, false);
+  right_btn = theme_create_button(btn_row, "右", false);
   lv_obj_set_size(right_btn, theme_get_button_width(),
                   theme_get_button_height());
   lv_obj_add_event_cb(right_btn, split_right_cb, LV_EVENT_CLICKED, NULL);
 
   // Confirm button
-  lv_obj_t *confirm = theme_create_button(content_area, "Confirm", true);
+  lv_obj_t *confirm = theme_create_button(content_area, "确认", true);
   lv_obj_set_size(confirm, LV_PCT(60), theme_get_button_height());
   lv_obj_add_event_cb(confirm, split_confirm_cb, LV_EVENT_CLICKED, NULL);
 
@@ -740,15 +779,13 @@ static void efuse_confirm_result(bool confirmed, void *user_data) {
   (void)user_data;
   if (confirmed) {
     lv_obj_t *progress = dialog_show_progress(
-        "Provisioning", "Burning eFuse key...", DIALOG_STYLE_OVERLAY);
+        "正在写入", "正在写入硬件密钥...", DIALOG_STYLE_OVERLAY);
     esp_err_t err = pin_efuse_provision();
     if (progress)
       lv_obj_delete(progress);
 
     if (err != ESP_OK) {
-      dialog_show_error("eFuse provisioning failed. "
-                        "Anti-phishing will be unavailable.",
-                        NULL, 3000);
+      dialog_show_error("硬件密钥写入失败，请重试。", NULL, 3000);
     }
   }
 
@@ -772,7 +809,7 @@ static void setup_words_confirm_result(bool confirmed, void *user_data) {
 
 static void setup_words_continue_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("Have you recorded these words?",
+  dialog_show_confirm("已经记录这两个词了吗？",
                       setup_words_confirm_result, NULL, DIALOG_STYLE_OVERLAY);
 }
 
@@ -793,14 +830,12 @@ static void build_setup_words_deferred(lv_timer_t *timer) {
   }
 
   dismiss_processing();
-  build_chrome("Record anti-phishing words");
+  build_chrome("PIN 已设置");
   create_content_area();
 
   // Description
   lv_obj_t *desc = lv_label_create(content_area);
-  lv_label_set_text(desc, "This icon and words will appear after you "
-                          "enter your prefix during unlock. They prove "
-                          "this is your device.");
+  lv_label_set_text(desc, "PIN 已设置。请妥善保管，遗忘后无法恢复。");
   lv_obj_set_style_text_color(desc, secondary_color(), 0);
   lv_obj_set_style_text_align(desc, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_width(desc, LV_PCT(100));
@@ -843,8 +878,8 @@ static void build_setup_words_deferred(lv_timer_t *timer) {
   lv_obj_set_style_text_font(w2, theme_font_medium(), 0);
   lv_obj_set_style_text_color(w2, highlight_color(), 0);
 
-  // Continue button — let user read words before confirming
-  lv_obj_t *btn = theme_create_button(content_area, "Continue", true);
+  // Continue button.
+  lv_obj_t *btn = theme_create_button(content_area, "继续", true);
   lv_obj_set_size(btn, LV_PCT(60), theme_get_button_height());
   lv_obj_add_event_cb(btn, setup_words_continue_cb, LV_EVENT_CLICKED, NULL);
 }
@@ -869,7 +904,7 @@ static void delay_timer_cb(lv_timer_t *timer) {
   delay_remaining_sec--;
   if (delay_label) {
     char buf[48];
-    snprintf(buf, sizeof(buf), "Try again in %lus",
+    snprintf(buf, sizeof(buf), "%lu 秒后可重试",
              (unsigned long)delay_remaining_sec);
     lv_label_set_text(delay_label, buf);
   }
@@ -881,7 +916,7 @@ static void build_delay_state(void) {
   uint32_t delay_ms = pin_get_delay_ms();
   delay_remaining_sec = (delay_ms + 999) / 1000;
 
-  title_label = theme_create_page_title(page_screen, "Wrong PIN");
+  title_label = theme_create_page_title(page_screen, "PIN 码错误");
   lv_obj_set_style_text_color(title_label, error_color(), 0);
 
   create_content_area();
@@ -891,7 +926,7 @@ static void build_delay_state(void) {
   uint8_t fail = pin_get_fail_count();
   uint8_t max = pin_get_max_failures();
   char attempts_buf[48];
-  snprintf(attempts_buf, sizeof(attempts_buf), "%u of %u attempts used", fail,
+  snprintf(attempts_buf, sizeof(attempts_buf), "已用 %u / %u 次错误机会", fail,
            max);
   lv_label_set_text(attempts, attempts_buf);
   lv_obj_set_style_text_color(attempts, secondary_color(), 0);
@@ -901,7 +936,7 @@ static void build_delay_state(void) {
   // Countdown label
   delay_label = lv_label_create(content_area);
   char buf[48];
-  snprintf(buf, sizeof(buf), "Try again in %lus",
+  snprintf(buf, sizeof(buf), "%lu 秒后可重试",
            (unsigned long)delay_remaining_sec);
   lv_label_set_text(delay_label, buf);
   lv_obj_set_style_text_font(delay_label, theme_font_medium(), 0);
@@ -924,21 +959,19 @@ static void transition_to(pin_flow_state_t state) {
     build_unlock_entry_state();
     break;
   case STATE_SETUP_FULL_PIN:
-    build_entry_state("Choose your PIN");
+    build_entry_state("设置 PIN 码");
     break;
   case STATE_SETUP_CONFIRM_PIN:
-    build_entry_state("Confirm your PIN");
+    build_entry_state("确认 PIN 码");
     break;
   case STATE_SETUP_SPLIT:
     build_split_state();
     break;
   case STATE_SETUP_EFUSE:
     dialog_show_confirm(
-        "Enable anti-phishing protection?\n\n"
-        "This will permanently burn a cryptographic key into the "
-        "device hardware (eFuse).\n\n"
-        "This is IRREVERSIBLE but enables anti-phishing words "
-        "to detect device tampering.",
+        "启用硬件密钥？\n\n"
+        "该操作会写入设备密钥，用于 PIN 保护。\n\n"
+        "写入后不可撤销。",
         efuse_confirm_result, NULL, DIALOG_STYLE_FULLSCREEN);
     break;
   case STATE_SETUP_SHOW_WORDS:
@@ -956,7 +989,7 @@ static void transition_to(pin_flow_state_t state) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  if (current_mode == PIN_PAGE_UNLOCK)
+  if (current_mode == PIN_PAGE_UNLOCK && !on_cancel)
     return;
 
   clear_buffers();

@@ -38,6 +38,17 @@
 ## 必看文档
 
 - `docs/FLASH_PRECHECK.md`：刷机前检查。
+- `docs/零基础第一次上手教程.zh-CN.md`：完全新手第一次从开机到测试签名的操作教程。
+- `docs/USER_QUICK_START.zh-CN.md`：第一次使用 Kern 的完整新手流程。
+- `docs/全功能操作总手册.zh-CN.md`：当前所有主要功能的操作入口总图。
+- `docs/BUILD_FLASH_DEBUG_GUIDE.zh-CN.md`：构建、刷机、调试和“改了没编进去”排查。
+- `docs/安卓构建环境准备.zh-CN.md`：安卓中转 App 的 JDK、SDK、debug/release APK 构建步骤。
+- `docs/TROUBLESHOOTING_GENERAL.zh-CN.md`：屏幕、触摸、相机、扫码、构建、刷机等通用排障。
+- `docs/BACKUP_AND_RECOVERY_GUIDE.zh-CN.md`：助记词备份和恢复演练。
+- `docs/连接钱包教程.zh-CN.md`：Web3 商业钱包、BTC 观察钱包和扫码签名新手教程。
+- `docs/SECURITY_PIN_GUIDE.zh-CN.md`：开发板 PIN、智能卡 PIN、PUK、错误次数和新手操作说明。
+- `docs/MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md`：几种助记词创建方式和 BIP39 网站验证。
+- `docs/DOCUMENTATION_COVERAGE.md`：文档覆盖地图，改功能时看它决定要同步哪份文档。
 - `docs/RELEASE_POINTERS_AND_HISTORY.md`：发布包指针、旧包和本轮未出固件说明。
 - `docs/COMMERCIAL_RELEASE_GATE.md`：商业生产版门禁。
 - `docs/REAL_DEVICE_ACCEPTANCE_CHECKLIST.md`：整机真机验收。

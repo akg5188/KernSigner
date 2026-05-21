@@ -50,8 +50,10 @@ static esp_err_t ensure_sensor_sccb(void) {
 
 #define MAX_BUFFER_COUNT 6
 #define MIN_BUFFER_COUNT 2
-// 8KB needed: motor driver init (DW9714) deepens SCCB/I2C call stack
-#define VIDEO_TASK_STACK_SIZE (8 * 1024)
+// QR decode and sensor control can briefly deepen the video callback stack.
+// 32KB matches Kern's dedicated QR decode task size and prevents stack guard
+// panics when k_quirc scans preview frames.
+#define VIDEO_TASK_STACK_SIZE (32 * 1024)
 #define VIDEO_TASK_PRIORITY 3
 
 typedef enum {
@@ -70,6 +72,7 @@ typedef struct {
   app_video_frame_operation_cb_t frame_cb;
   TaskHandle_t task_handle;
   EventGroupHandle_t event_group;
+  bool stopping;
 } app_video_t;
 
 static const esp_video_init_csi_config_t s_csi_config = {
@@ -82,7 +85,7 @@ static const esp_video_init_csi_config_t s_csi_config = {
     .pwdn_pin = -1,
 };
 
-#if BSP_CAM_HAS_MOTOR
+#if BSP_CAM_HAS_MOTOR && CONFIG_ESP_VIDEO_ENABLE_CAMERA_MOTOR_CONTROLLER
 static const esp_video_init_cam_motor_config_t s_cam_motor_config = {
     .sccb_config = {.init_sccb = true,
                     .i2c_config = {.port = 0,
@@ -97,7 +100,7 @@ static const esp_video_init_cam_motor_config_t s_cam_motor_config = {
 
 static const esp_video_init_config_t s_cam_config = {
     .csi = &s_csi_config,
-#if BSP_CAM_HAS_MOTOR
+#if BSP_CAM_HAS_MOTOR && CONFIG_ESP_VIDEO_ENABLE_CAMERA_MOTOR_CONTROLLER
     .cam_motor = &s_cam_motor_config,
 #endif
 };
@@ -108,6 +111,7 @@ static bool s_initialized = false;
 static esp_err_t stream_start(int fd);
 static esp_err_t stream_stop(int fd);
 static void stream_task(void *arg);
+static void reset_video_runtime_state(void);
 
 esp_err_t app_video_main(i2c_master_bus_handle_t i2c_bus_handle) {
   if (s_initialized) {
@@ -130,7 +134,7 @@ esp_err_t app_video_main(i2c_master_bus_handle_t i2c_bus_handle) {
         .csi = &csi_config,
     };
 
-#if BSP_CAM_HAS_MOTOR
+#if BSP_CAM_HAS_MOTOR && CONFIG_ESP_VIDEO_ENABLE_CAMERA_MOTOR_CONTROLLER
     static esp_video_init_cam_motor_config_t cam_motor_config;
     cam_motor_config = s_cam_motor_config;
     cam_motor_config.sccb_config.init_sccb = false;
@@ -152,7 +156,7 @@ int app_video_open(char *dev, video_fmt_t fmt) {
   struct v4l2_format default_format = {.type = V4L2_BUF_TYPE_VIDEO_CAPTURE};
   struct v4l2_capability cap;
 
-  int fd = open(dev, O_RDWR);
+  int fd = open(dev, O_RDWR | O_NONBLOCK);
   if (fd < 0) {
     ESP_LOGE(TAG, "Open failed");
     return -1;
@@ -210,10 +214,15 @@ int app_video_open(char *dev, video_fmt_t fmt) {
     ESP_LOGW(TAG, "HFLIP failed");
 #endif
 
+  app_video.video_fd = fd;
+  app_video.frame_cb = NULL;
+  app_video.stopping = false;
+
   return fd;
 
 fail:
   close(fd);
+  reset_video_runtime_state();
   return -1;
 }
 
@@ -285,6 +294,7 @@ fail:
     }
   }
   close(fd);
+  reset_video_runtime_state();
   return ESP_FAIL;
 }
 
@@ -323,6 +333,8 @@ static esp_err_t receive_frame(int fd) {
   app_video.v4l2_buf.memory = app_video.camera_mem_mode;
 
   if (ioctl(fd, VIDIOC_DQBUF, &app_video.v4l2_buf)) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+      return ESP_ERR_TIMEOUT;
     ESP_LOGE(TAG, "DQBUF failed");
     return ESP_FAIL;
   }
@@ -330,11 +342,19 @@ static esp_err_t receive_frame(int fd) {
 }
 
 static void process_frame(void) {
+  if (app_video.stopping || !app_video.frame_cb)
+    return;
+
   uint8_t idx = app_video.v4l2_buf.index;
   if (idx >= MAX_BUFFER_COUNT) {
     ESP_LOGE(TAG, "Buffer index %u out of range", idx);
     return;
   }
+  if (!app_video.camera_buffer[idx]) {
+    ESP_LOGW(TAG, "Dropping frame from empty buffer %u", idx);
+    return;
+  }
+
   app_video.v4l2_buf.m.userptr = (unsigned long)app_video.camera_buffer[idx];
   app_video.v4l2_buf.length = app_video.camera_buf_size;
 
@@ -372,13 +392,25 @@ static esp_err_t stream_stop(int fd) {
 
 static void stream_task(void *arg) {
   int fd = app_video.video_fd;
-  ESP_ERROR_CHECK(stream_start(fd));
+  if (stream_start(fd) != ESP_OK) {
+    if (app_video.event_group)
+      xEventGroupSetBits(app_video.event_group, VIDEO_TASK_DELETE_DONE);
+    app_video.stopping = false;
+    app_video.task_handle = NULL;
+    vTaskDelete(NULL);
+    return;
+  }
 
   while (1) {
     if (xEventGroupGetBits(app_video.event_group) & VIDEO_TASK_DELETE)
       break;
 
-    if (receive_frame(fd) != ESP_OK)
+    esp_err_t frame_err = receive_frame(fd);
+    if (frame_err == ESP_ERR_TIMEOUT) {
+      vTaskDelay(pdMS_TO_TICKS(2));
+      continue;
+    }
+    if (frame_err != ESP_OK)
       break;
 
     if (app_video.v4l2_buf.flags & V4L2_BUF_FLAG_DONE)
@@ -389,34 +421,66 @@ static void stream_task(void *arg) {
   }
 
   stream_stop(fd);
+  app_video.stopping = false;
+  app_video.task_handle = NULL;
   vTaskDelete(NULL);
 }
 
 esp_err_t app_video_stream_task_start(int fd, int core_id) {
   if (!app_video.event_group)
     app_video.event_group = xEventGroupCreate();
-  xEventGroupClearBits(app_video.event_group, VIDEO_TASK_DELETE_DONE);
+  if (!app_video.event_group) {
+    ESP_LOGE(TAG, "Failed to create video event group");
+    return ESP_FAIL;
+  }
+  xEventGroupClearBits(app_video.event_group,
+                       VIDEO_TASK_DELETE | VIDEO_TASK_DELETE_DONE);
+
+  if (app_video.task_handle) {
+    ESP_LOGW(TAG, "Video stream task already running");
+    return ESP_ERR_INVALID_STATE;
+  }
 
   app_video.video_fd = fd;
+  app_video.stopping = false;
 
   if (xTaskCreatePinnedToCore(stream_task, "video_stream",
                               VIDEO_TASK_STACK_SIZE, NULL, VIDEO_TASK_PRIORITY,
                               &app_video.task_handle, core_id) != pdPASS) {
     ESP_LOGE(TAG, "Task create failed");
+    app_video.video_fd = -1;
+    app_video.stopping = false;
     return ESP_FAIL;
   }
   return ESP_OK;
 }
 
 esp_err_t app_video_stream_task_stop(int fd) {
+  app_video.stopping = true;
+  app_video.frame_cb = NULL;
   if (!app_video.event_group)
     return ESP_OK;
   xEventGroupSetBits(app_video.event_group, VIDEO_TASK_DELETE);
+  if (!app_video.task_handle)
+    xEventGroupSetBits(app_video.event_group, VIDEO_TASK_DELETE_DONE);
+  if (fd >= 0) {
+    int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    ioctl(fd, VIDIOC_STREAMOFF, &type);
+  }
   return ESP_OK;
+}
+
+static void reset_video_runtime_state(void) {
+  memset(&app_video, 0, sizeof(app_video));
+  app_video.video_fd = -1;
 }
 
 esp_err_t
 app_video_register_frame_operation_cb(app_video_frame_operation_cb_t cb) {
+  if (app_video.stopping && cb) {
+    ESP_LOGW(TAG, "Refusing frame callback while video is stopping");
+    return ESP_ERR_INVALID_STATE;
+  }
   app_video.frame_cb = cb;
   return ESP_OK;
 }
@@ -425,14 +489,21 @@ esp_err_t app_video_close(int fd) {
   esp_err_t ret = ESP_OK;
 
   app_video_stream_task_stop(fd);
-  if (fd >= 0) {
-    int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    ioctl(fd, VIDIOC_STREAMOFF, &type);
-  }
 
   if (app_video.event_group) {
-    xEventGroupWaitBits(app_video.event_group, VIDEO_TASK_DELETE_DONE, pdFALSE,
-                        pdFALSE, pdMS_TO_TICKS(1000));
+    EventBits_t bits = xEventGroupWaitBits(
+        app_video.event_group, VIDEO_TASK_DELETE_DONE, pdFALSE, pdFALSE,
+        pdMS_TO_TICKS(2000));
+    if (!(bits & VIDEO_TASK_DELETE_DONE)) {
+      ESP_LOGE(TAG, "Timed out waiting for video stream task to stop");
+      ret = ESP_ERR_TIMEOUT;
+      if (app_video.task_handle) {
+        ESP_LOGW(TAG, "Force deleting stuck video stream task");
+        vTaskDelete(app_video.task_handle);
+        app_video.task_handle = NULL;
+      }
+      xEventGroupSetBits(app_video.event_group, VIDEO_TASK_DELETE_DONE);
+    }
   }
 
   if (fd >= 0) {
@@ -466,8 +537,7 @@ esp_err_t app_video_close(int fd) {
     app_video.event_group = NULL;
   }
 
-  memset(&app_video, 0, sizeof(app_video));
-  app_video.video_fd = -1;
+  reset_video_runtime_state();
 
   return ret;
 }

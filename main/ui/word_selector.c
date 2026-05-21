@@ -60,7 +60,7 @@ void ui_word_count_selector_create(lv_obj_t *parent, ui_menu_callback_t back_cb,
 
   selector->on_select = on_select;
   selector->on_back = back_cb;
-  selector->menu = ui_menu_create(parent, "Mnemonic Length",
+  selector->menu = ui_menu_create(parent, "助记词长度",
                                   back_cb ? back_wrapper_cb : NULL);
 
   if (!selector->menu) {
@@ -68,8 +68,8 @@ void ui_word_count_selector_create(lv_obj_t *parent, ui_menu_callback_t back_cb,
     return;
   }
 
-  ui_menu_add_entry(selector->menu, "12 Words", word_count_12_cb);
-  ui_menu_add_entry(selector->menu, "24 Words", word_count_24_cb);
+  ui_menu_add_entry(selector->menu, "12 个单词", word_count_12_cb);
+  ui_menu_add_entry(selector->menu, "24 个单词", word_count_24_cb);
 
   active_selector = selector;
   ui_menu_show(selector->menu);

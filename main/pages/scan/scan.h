@@ -9,6 +9,9 @@
  * @param return_cb Callback function to call when returning to home
  */
 void scan_page_create(lv_obj_t *parent, void (*return_cb)(void));
+void scan_page_create_unified(lv_obj_t *parent, void (*return_cb)(void));
+void scan_page_create_smartcard_web3(lv_obj_t *parent,
+                                      void (*return_cb)(void));
 
 /**
  * Show the scan page

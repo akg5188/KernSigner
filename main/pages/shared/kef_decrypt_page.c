@@ -54,7 +54,7 @@ static void show_input(void) {
 static void show_loading(void) {
   ui_text_input_hide(&text_input);
   progress_dialog =
-      dialog_show_progress("KEF", "Decrypting...", DIALOG_STYLE_OVERLAY);
+      dialog_show_progress("加密文件", "正在解密...", DIALOG_STYLE_OVERLAY);
 }
 
 /* Runs on CPU 1 — does NOT touch LVGL */
@@ -108,7 +108,7 @@ static void poll_timer_cb(lv_timer_t *timer) {
     lv_textarea_set_text(text_input.textarea, "");
 
   if (decrypt_result == KEF_ERR_AUTH) {
-    dialog_show_error("Wrong key", NULL, 0);
+    dialog_show_error("密钥错误", NULL, 0);
   } else {
     dialog_show_error(kef_error_str(decrypt_result), NULL, 0);
   }
@@ -138,7 +138,7 @@ static void keyboard_ready_cb(lv_event_t *e) {
     SECURE_FREE_BUFFER(key_copy, key_copy_len);
     key_copy_len = 0;
     show_input();
-    dialog_show_error("Task creation failed", NULL, 0);
+    dialog_show_error("任务创建失败", NULL, 0);
     return;
   }
 
@@ -171,8 +171,8 @@ void kef_decrypt_page_create(lv_obj_t *parent, void (*return_cb)(void),
   size_t id_len = 0;
   uint8_t version;
   uint32_t iterations;
-  const char *prefix = "Enter Key for: ";
-  char title[64] = "Enter Key";
+  const char *prefix = "输入密钥：";
+  char title[64] = "输入密钥";
   if (kef_parse_header(envelope, envelope_len, &id, &id_len, &version,
                        &iterations) == KEF_OK &&
       id_len > 0) {
@@ -198,7 +198,7 @@ void kef_decrypt_page_create(lv_obj_t *parent, void (*return_cb)(void),
   ui_create_back_button(kef_screen, back_btn_cb);
 
   /* Text input (textarea + eye toggle + keyboard) */
-  ui_text_input_create(&text_input, kef_screen, "key", true, keyboard_ready_cb);
+  ui_text_input_create(&text_input, kef_screen, "密钥", true, keyboard_ready_cb);
 
   progress_dialog = NULL;
 }

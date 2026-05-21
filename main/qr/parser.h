@@ -12,6 +12,8 @@
 #define FORMAT_PMOFN 1
 #define FORMAT_UR 2
 #define FORMAT_BBQR 3
+#define FORMAT_RELAY 4
+#define FORMAT_TP_MULTI 5
 
 /**
  * @brief Prefix length constants for different QR formats

@@ -9,8 +9,10 @@
 #include "parser.h"
 #include <bsp/esp-bsp.h>
 #include <driver/ppa.h>
+#include <esp_heap_caps.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
+#include <freertos/idf_additions.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -48,7 +50,7 @@
 #define CAMERA_SCREEN_WIDTH CAMERA_SCREEN_SIZE
 #define CAMERA_SCREEN_HEIGHT CAMERA_SCREEN_SIZE
 #define QR_FRAME_QUEUE_SIZE 1
-#define QR_DECODE_TASK_STACK_SIZE 32768
+#define QR_DECODE_TASK_STACK_SIZE 12288
 #define QR_DECODE_TASK_PRIORITY 5
 #define PROGRESS_BAR_HEIGHT 20
 #define PROGRESS_FRAME_PADD 2
@@ -101,6 +103,7 @@ static volatile bool buffer_swap_needed = false;
 
 static k_quirc_t *qr_decoder = NULL;
 static TaskHandle_t qr_decode_task_handle = NULL;
+static bool qr_decode_task_with_caps = false;
 static QueueHandle_t qr_frame_queue = NULL;
 static SemaphoreHandle_t qr_task_done_sem = NULL;
 static QRPartParser *qr_parser = NULL;
@@ -126,6 +129,7 @@ static ppa_client_handle_t cam_ppa_client = NULL;
 
 static volatile int active_frame_operations = 0;
 static lv_timer_t *completion_timer = NULL;
+static bool video_stream_stopped_for_destroy = false;
 
 #ifdef QR_PERF_DEBUG
 typedef struct {
@@ -208,8 +212,8 @@ static void log_perf_metrics(void) {
            camera_fps, decode_fps, successes_per_sec, avg_decode_ms,
            avg_grayscale_ms, avg_quirc_ms);
 
-  if (fps_label && bsp_display_lock(0)) {
-    lv_label_set_text_fmt(fps_label, "CAM:%.0f DEC:%.0f", camera_fps,
+  if (fps_label && bsp_display_lock(20)) {
+    lv_label_set_text_fmt(fps_label, "相机:%.0f 识别:%.0f", camera_fps,
                           decode_fps);
     bsp_display_unlock();
   }
@@ -437,7 +441,7 @@ static void create_settings_overlay(void) {
 
   // Exposure label + slider
   lv_obj_t *ae_title = lv_label_create(panel);
-  lv_label_set_text(ae_title, "Exposure");
+  lv_label_set_text(ae_title, "曝光");
   lv_obj_set_style_text_font(ae_title, theme_font_small(), 0);
   lv_obj_set_style_text_color(ae_title, main_color(), 0);
 
@@ -451,7 +455,7 @@ static void create_settings_overlay(void) {
   // right=far)
   if (has_focus_motor) {
     lv_obj_t *focus_title = lv_label_create(panel);
-    lv_label_set_text(focus_title, "Focus");
+    lv_label_set_text(focus_title, "焦点");
     lv_obj_set_style_text_font(focus_title, theme_font_small(), 0);
     lv_obj_set_style_text_color(focus_title, main_color(), 0);
 
@@ -466,7 +470,7 @@ static void create_settings_overlay(void) {
   }
 
   // Close button
-  lv_obj_t *close_btn = theme_create_button(panel, "Close", true);
+  lv_obj_t *close_btn = theme_create_button(panel, "关闭", true);
   lv_obj_set_width(close_btn, LV_PCT(60));
   lv_obj_set_style_bg_opa(close_btn, LV_OPA_COVER, 0);
   lv_obj_set_style_margin_top(close_btn, 16, 0);
@@ -621,6 +625,12 @@ static void qr_decode_task(void *pvParameters) {
                 create_progress_indicators(qr_parser->total);
               if (part_index >= 0 && qr_parser->total > 1)
                 update_progress_indicator(part_index);
+            } else if (qr_parser->format == FORMAT_RELAY ||
+                       qr_parser->format == FORMAT_TP_MULTI) {
+              if (qr_parser->total > 1 && !progress_frame)
+                create_progress_indicators(qr_parser->total);
+              if (part_index >= 0 && qr_parser->total > 1)
+                update_progress_indicator(part_index);
             }
 
             if (qr_parser_is_complete(qr_parser)) {
@@ -698,8 +708,22 @@ static bool qr_decoder_init(uint32_t width, uint32_t height) {
   BaseType_t task_result = xTaskCreatePinnedToCore(
       qr_decode_task, "qr_decode", QR_DECODE_TASK_STACK_SIZE, NULL,
       QR_DECODE_TASK_PRIORITY, &qr_decode_task_handle, 1);
+  qr_decode_task_with_caps = false;
   if (task_result != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create QR decode task");
+    ESP_LOGW(TAG,
+             "QR decode task internal stack failed; internal=%u spiram=%u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    task_result = xTaskCreatePinnedToCoreWithCaps(
+        qr_decode_task, "qr_decode", QR_DECODE_TASK_STACK_SIZE, NULL,
+        QR_DECODE_TASK_PRIORITY, &qr_decode_task_handle, 1,
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    qr_decode_task_with_caps = task_result == pdPASS;
+  }
+  if (task_result != pdPASS) {
+    ESP_LOGE(TAG, "Failed to create QR decode task; internal=%u spiram=%u",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     goto error;
   }
 
@@ -716,8 +740,12 @@ error:
     qr_parser = NULL;
   }
   if (qr_decode_task_handle) {
-    vTaskDelete(qr_decode_task_handle);
+    if (qr_decode_task_with_caps)
+      vTaskDeleteWithCaps(qr_decode_task_handle);
+    else
+      vTaskDelete(qr_decode_task_handle);
     qr_decode_task_handle = NULL;
+    qr_decode_task_with_caps = false;
   }
   if (qr_task_done_sem) {
     vSemaphoreDelete(qr_task_done_sem);
@@ -740,8 +768,12 @@ static void qr_decoder_cleanup(void) {
   if (qr_decode_task_handle && qr_task_done_sem) {
     if (xSemaphoreTake(qr_task_done_sem, pdMS_TO_TICKS(500)) != pdTRUE)
       ESP_LOGW(TAG, "Timeout waiting for QR decode task");
-    vTaskDelete(qr_decode_task_handle);
+    if (qr_decode_task_with_caps)
+      vTaskDeleteWithCaps(qr_decode_task_handle);
+    else
+      vTaskDelete(qr_decode_task_handle);
     qr_decode_task_handle = NULL;
+    qr_decode_task_with_caps = false;
   }
 
   if (qr_task_done_sem) {
@@ -867,14 +899,13 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
   buffer_swap_needed = true;
 
   if (buffer_swap_needed && !closing && !destruction_in_progress &&
-      bsp_display_lock(0)) {
+      bsp_display_lock(10)) {
     // Re-check after taking lock — destroy may have run between the check
     // above and acquiring the lock, nulling camera_img
     if (!closing && !destruction_in_progress && camera_img) {
       current_display_buffer = back_buffer;
       img_refresh_dsc.data = display_src;
       lv_img_set_src(camera_img, &img_refresh_dsc);
-      lv_refr_now(NULL);
     }
     buffer_swap_needed = false;
     bsp_display_unlock();
@@ -897,6 +928,35 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
 
 static void camera_init(void) {
   if (video_system_initialized) {
+    closing = false;
+    destruction_in_progress = false;
+    if (camera_event_group) {
+      xEventGroupClearBits(camera_event_group, CAMERA_EVENT_DELETE);
+      xEventGroupSetBits(camera_event_group, CAMERA_EVENT_TASK_RUN);
+    }
+    if (!qr_decode_task_handle || !qr_parser || !qr_frame_queue) {
+      if (!qr_decoder_init(CAMERA_SCREEN_WIDTH, CAMERA_SCREEN_HEIGHT)) {
+        ESP_LOGE(TAG, "Failed to initialize QR decoder on active camera");
+      }
+    }
+    if (!cam_ppa_client) {
+      ppa_client_config_t ppa_cfg = {.oper_type = PPA_OPERATION_SRM};
+      if (ppa_register_client(&ppa_cfg, &cam_ppa_client) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register PPA client for camera scaler");
+        cam_ppa_client = NULL;
+      }
+    }
+    if (camera_ctlr_handle >= 0 && video_stream_stopped_for_destroy) {
+      esp_err_t start_err = app_video_stream_task_start(camera_ctlr_handle, 0);
+      if (start_err == ESP_OK || start_err == ESP_ERR_INVALID_STATE) {
+        video_stream_stopped_for_destroy = false;
+        (void)app_video_register_frame_operation_cb(
+            camera_video_frame_operation);
+      } else {
+        ESP_LOGW(TAG, "Failed to resume camera stream: %s",
+                 esp_err_to_name(start_err));
+      }
+    }
     return;
   }
 
@@ -934,8 +994,12 @@ static void camera_init(void) {
   has_focus_motor = false;
 #endif
 
-  ESP_ERROR_CHECK(
-      app_video_register_frame_operation_cb(camera_video_frame_operation));
+  err = app_video_register_frame_operation_cb(camera_video_frame_operation);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to register camera frame callback: %s",
+             esp_err_to_name(err));
+    return;
+  }
 
   img_refresh_dsc = (lv_img_dsc_t){
       .header = {.cf = LV_COLOR_FORMAT_RGB565,
@@ -953,7 +1017,12 @@ static void camera_init(void) {
   current_display_buffer = display_buffer_a;
   img_refresh_dsc.data = current_display_buffer;
 
-  ESP_ERROR_CHECK(app_video_set_bufs(camera_ctlr_handle, CAM_BUF_NUM, NULL));
+  err = app_video_set_bufs(camera_ctlr_handle, CAM_BUF_NUM, NULL);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to configure camera buffers: %s",
+             esp_err_to_name(err));
+    return;
+  }
 
   esp_err_t start_err = app_video_stream_task_start(camera_ctlr_handle, 0);
   if (start_err != ESP_OK) {
@@ -961,6 +1030,7 @@ static void camera_init(void) {
              esp_err_to_name(start_err));
     return;
   }
+  video_stream_stopped_for_destroy = false;
 
   // Apply camera settings after stream starts (V4L2 controls register with the
   // sensor device only once streaming).
@@ -971,6 +1041,18 @@ static void camera_init(void) {
 
   if (!qr_decoder_init(CAMERA_SCREEN_WIDTH, CAMERA_SCREEN_HEIGHT)) {
     ESP_LOGE(TAG, "Failed to initialize QR decoder");
+    (void)app_video_register_frame_operation_cb(NULL);
+    (void)app_video_stream_task_stop(camera_ctlr_handle);
+    int wait_count = 0;
+    while (__atomic_load_n(&active_frame_operations, __ATOMIC_SEQ_CST) > 0 &&
+           wait_count < 30) {
+      vTaskDelay(pdMS_TO_TICKS(10));
+      wait_count++;
+    }
+    (void)app_video_close(camera_ctlr_handle);
+    camera_ctlr_handle = -1;
+    video_stream_stopped_for_destroy = false;
+    return;
   }
 
   // PPA does centered crop + downscale on every frame.
@@ -984,8 +1066,30 @@ static void camera_init(void) {
 static bool camera_run(void) {
   if (camera_ctlr_handle < 0 || !video_system_initialized) {
     camera_init();
+  } else if (!qr_decode_task_handle || !qr_parser || !qr_frame_queue ||
+             !cam_ppa_client) {
+    camera_init();
+  } else {
+    closing = false;
+    destruction_in_progress = false;
+    if (camera_event_group) {
+      xEventGroupClearBits(camera_event_group, CAMERA_EVENT_DELETE);
+      xEventGroupSetBits(camera_event_group, CAMERA_EVENT_TASK_RUN);
+    }
+    if (video_stream_stopped_for_destroy) {
+      esp_err_t start_err = app_video_stream_task_start(camera_ctlr_handle, 0);
+      if (start_err == ESP_OK || start_err == ESP_ERR_INVALID_STATE) {
+        video_stream_stopped_for_destroy = false;
+        (void)app_video_register_frame_operation_cb(
+            camera_video_frame_operation);
+      } else {
+        ESP_LOGW(TAG, "Failed to resume camera stream: %s",
+                 esp_err_to_name(start_err));
+      }
+    }
   }
-  return true;
+  return camera_ctlr_handle >= 0 && video_system_initialized &&
+         qr_decode_task_handle && qr_parser && qr_frame_queue;
 }
 
 void qr_scanner_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
@@ -1026,11 +1130,6 @@ void qr_scanner_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_bg_color(camera_img, bg_color(), 0);
   lv_obj_set_style_bg_opa(camera_img, LV_OPA_COVER, 0);
 
-  lv_obj_t *title_label =
-      theme_create_label(qr_scanner_screen, "QR Scanner", false);
-  theme_apply_label(title_label, true);
-  lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 8);
-
   lv_obj_t *settings_btn =
       ui_create_settings_button(qr_scanner_screen, settings_btn_cb);
   lv_obj_set_style_bg_opa(settings_btn, LV_OPA_COVER, 0);
@@ -1038,7 +1137,7 @@ void qr_scanner_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
 #ifdef QR_PERF_DEBUG
   fps_label = lv_label_create(qr_scanner_screen);
-  lv_label_set_text(fps_label, "CAM:-- DEC:--");
+  lv_label_set_text(fps_label, "相机:-- 识别:--");
   lv_obj_set_style_text_color(fps_label, lv_color_hex(0x00FF00), 0);
   lv_obj_set_style_text_font(fps_label, &lv_font_montserrat_14, 0);
   lv_obj_align(fps_label, LV_ALIGN_TOP_LEFT, 10, 8);
@@ -1061,7 +1160,7 @@ void qr_scanner_page_show(void) {
 }
 
 void qr_scanner_page_hide(void) {
-  if (is_fully_initialized && !closing && qr_scanner_screen) {
+  if (qr_scanner_screen) {
     lv_obj_add_flag(qr_scanner_screen, LV_OBJ_FLAG_HIDDEN);
   }
 }
@@ -1070,6 +1169,8 @@ void qr_scanner_page_destroy(void) {
   destruction_in_progress = true;
   closing = true;
   is_fully_initialized = false;
+  if (qr_scanner_screen)
+    lv_obj_add_flag(qr_scanner_screen, LV_OBJ_FLAG_HIDDEN);
   destroy_settings_overlay();
   has_focus_motor = false;
 
@@ -1082,6 +1183,12 @@ void qr_scanner_page_destroy(void) {
   if (camera_event_group) {
     xEventGroupClearBits(camera_event_group, CAMERA_EVENT_TASK_RUN);
     xEventGroupSetBits(camera_event_group, CAMERA_EVENT_DELETE);
+  }
+
+  if (camera_ctlr_handle >= 0) {
+    (void)app_video_register_frame_operation_cb(NULL);
+    (void)app_video_stream_task_stop(camera_ctlr_handle);
+    video_stream_stopped_for_destroy = true;
   }
 
   int wait_count = 0;
@@ -1098,10 +1205,12 @@ void qr_scanner_page_destroy(void) {
              remaining_ops);
 
   if (camera_ctlr_handle >= 0) {
-    app_video_stream_task_stop(camera_ctlr_handle);
-    vTaskDelay(pdMS_TO_TICKS(50));
-    app_video_close(camera_ctlr_handle);
+    esp_err_t close_ret = app_video_close(camera_ctlr_handle);
+    if (close_ret == ESP_ERR_TIMEOUT) {
+      ESP_LOGE(TAG, "Video close timeout; forced scanner cleanup");
+    }
     camera_ctlr_handle = -1;
+    video_stream_stopped_for_destroy = false;
   }
 
   qr_decoder_cleanup();
@@ -1153,16 +1262,17 @@ char *qr_scanner_get_completed_content(void) {
 }
 
 char *qr_scanner_get_completed_content_with_len(size_t *content_len) {
+  if (content_len) {
+    *content_len = 0;
+  }
+
   if (qr_parser && qr_parser_is_complete(qr_parser)) {
-    size_t result_len;
+    size_t result_len = 0;
     char *complete_result = qr_parser_result(qr_parser, &result_len);
-    if (content_len) {
+    if (complete_result && content_len) {
       *content_len = result_len;
     }
     return complete_result; // Caller must free this
-  }
-  if (content_len) {
-    *content_len = 0;
   }
   return NULL;
 }

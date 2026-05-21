@@ -2,7 +2,10 @@
 
 #include "mnemonic_words.h"
 #include "../../../core/key.h"
+#include "../../../ui/dialog.h"
+#include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
+#include "../../../utils/bip39_filter.h"
 #include <lvgl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,73 +19,121 @@ static void back_cb(lv_event_t *e) {
     return_callback();
 }
 
+static void append_word_line(char *buf, size_t buf_len, int *offset,
+                             size_t position, const char *word) {
+  if (!buf || !offset || *offset >= (int)buf_len)
+    return;
+
+  int word_index = bip39_filter_get_word_index(word);
+  char index_text[5];
+  if (word_index >= 0)
+    snprintf(index_text, sizeof(index_text), "%04d", word_index);
+  else
+    snprintf(index_text, sizeof(index_text), "未知");
+
+  int remaining = (int)buf_len - *offset;
+  int written = snprintf(buf + *offset, remaining, "%s%2zu. %s  %s",
+                         *offset > 0 ? "\n" : "", position + 1, index_text,
+                         word ? word : "");
+  if (written > 0) {
+    if (written >= remaining)
+      *offset = (int)buf_len - 1;
+    else
+      *offset += written;
+  }
+}
+
 void mnemonic_words_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   if (!parent || !key_is_loaded())
     return;
 
   return_callback = return_cb;
 
+  if (!key_mnemonic_is_valid()) {
+    dialog_show_error("临时助记词不能显示明文词或序号", return_cb, 0);
+    return;
+  }
+
   char **words = NULL;
   size_t word_count = 0;
   if (!key_get_mnemonic_words(&words, &word_count))
     return;
+  bool wordlist_ready = bip39_filter_init();
 
   mnemonic_screen = theme_create_page_container(parent);
-  lv_obj_add_flag(mnemonic_screen, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_event_cb(mnemonic_screen, back_cb, LV_EVENT_CLICKED, NULL);
+  theme_create_page_title(mnemonic_screen, "序号");
+  (void)ui_create_back_button(mnemonic_screen, back_cb);
 
-  theme_create_page_title(mnemonic_screen, "BIP39 Words");
+  char fingerprint_text[32];
+  char fingerprint_hex[9] = "--------";
+  key_get_fingerprint_hex(fingerprint_hex);
+  snprintf(fingerprint_text, sizeof(fingerprint_text), "指纹 %s", fingerprint_hex);
 
   lv_obj_t *content = lv_obj_create(mnemonic_screen);
-  lv_obj_set_size(content, LV_PCT(100), LV_SIZE_CONTENT);
-  lv_obj_set_style_pad_all(content, 0, 0);
+  lv_obj_set_size(content, LV_PCT(94), LV_PCT(80));
+  lv_obj_set_style_pad_all(content, theme_get_small_padding(), 0);
+  lv_obj_set_style_pad_gap(content, theme_get_small_padding(), 0);
   lv_obj_set_style_border_width(content, 0, 0);
   lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
   lv_obj_set_flex_grow(content, 1);
-  lv_obj_add_flag(content, LV_OBJ_FLAG_EVENT_BUBBLE);
-  lv_obj_align(content, LV_ALIGN_CENTER, 0, 0);
-  lv_obj_set_flex_flow(content, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(content, LV_FLEX_ALIGN_SPACE_EVENLY,
+  lv_obj_align(content, LV_ALIGN_BOTTOM_MID, 0, -theme_get_small_padding());
+  lv_obj_set_flex_flow(content, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(content, LV_FLEX_ALIGN_START,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-  char word_list[512];
+  lv_obj_t *fingerprint = theme_create_label(content, fingerprint_text, false);
+  lv_obj_set_style_text_font(fingerprint, theme_font_small(), 0);
+  lv_obj_set_style_text_color(fingerprint, highlight_color(), 0);
+  lv_obj_set_style_text_align(fingerprint, LV_TEXT_ALIGN_CENTER, 0);
+
+  if (!wordlist_ready) {
+    lv_obj_t *warn = theme_create_label(content, "词表未加载", false);
+    lv_obj_set_style_text_font(warn, theme_font_small(), 0);
+    lv_obj_set_style_text_color(warn, error_color(), 0);
+    lv_obj_set_style_text_align(warn, LV_TEXT_ALIGN_CENTER, 0);
+  }
+
+  lv_obj_t *words_row = lv_obj_create(content);
+  lv_obj_set_width(words_row, LV_PCT(100));
+  lv_obj_set_flex_grow(words_row, 1);
+  lv_obj_set_style_pad_all(words_row, 0, 0);
+  lv_obj_set_style_border_width(words_row, 0, 0);
+  lv_obj_set_style_bg_opa(words_row, LV_OPA_TRANSP, 0);
+  lv_obj_set_flex_flow(words_row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(words_row, LV_FLEX_ALIGN_SPACE_EVENLY,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+  char word_list[1024];
   int offset = 0;
 
-  if (word_count == 12) {
-    for (size_t i = 0; i < word_count; i++) {
-      offset += snprintf(word_list + offset, sizeof(word_list) - offset,
-                         "%s%zu. %s", i > 0 ? "\n" : "", i + 1, words[i]);
-    }
-    lv_obj_t *label = theme_create_label(content, word_list, false);
-    lv_obj_set_style_text_font(label, theme_font_medium(), 0);
-    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
+  const lv_font_t *word_font =
+      (word_count > 12 || theme_get_screen_width() <= 520)
+          ? theme_font_small()
+          : theme_font_medium();
 
-  } else if (word_count == 24) {
-    for (size_t i = 0; i < 12; i++) {
-      offset += snprintf(word_list + offset, sizeof(word_list) - offset,
-                         "%s%zu. %s", i > 0 ? "\n" : "", i + 1, words[i]);
-    }
-    lv_obj_t *left = theme_create_label(content, word_list, false);
-    lv_obj_set_style_text_font(left, theme_font_medium(), 0);
+  if (word_count <= 12) {
+    for (size_t i = 0; i < word_count; i++)
+      append_word_line(word_list, sizeof(word_list), &offset, i, words[i]);
+    lv_obj_t *label = theme_create_label(words_row, word_list, false);
+    lv_obj_set_style_text_font(label, word_font, 0);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
+  } else {
+    size_t split_index = (word_count + 1) / 2;
+    for (size_t i = 0; i < split_index; i++)
+      append_word_line(word_list, sizeof(word_list), &offset, i, words[i]);
+    lv_obj_t *left = theme_create_label(words_row, word_list, false);
+    lv_obj_set_style_text_font(left, word_font, 0);
     lv_obj_set_style_text_align(left, LV_TEXT_ALIGN_LEFT, 0);
 
     offset = 0;
-    for (size_t i = 12; i < 24; i++) {
-      offset += snprintf(word_list + offset, sizeof(word_list) - offset,
-                         "%s%zu. %s", i > 12 ? "\n" : "", i + 1, words[i]);
-    }
-    lv_obj_t *right = theme_create_label(content, word_list, false);
-    lv_obj_set_style_text_font(right, theme_font_medium(), 0);
+    for (size_t i = split_index; i < word_count; i++)
+      append_word_line(word_list, sizeof(word_list), &offset, i, words[i]);
+    lv_obj_t *right = theme_create_label(words_row, word_list, false);
+    lv_obj_set_style_text_font(right, word_font, 0);
     lv_obj_set_style_text_align(right, LV_TEXT_ALIGN_LEFT, 0);
   }
 
-  for (size_t i = 0; i < word_count; i++)
-    free(words[i]);
-  free(words);
-
-  lv_obj_t *hint = theme_create_label(mnemonic_screen, "Tap to return", false);
-  lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -theme_get_default_padding());
+  key_free_mnemonic_words(words, word_count);
 }
 
 void mnemonic_words_page_show(void) {

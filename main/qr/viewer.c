@@ -12,6 +12,9 @@
 #include <wally_core.h>
 
 #define MAX_QR_CHARS_PER_FRAME 400
+#define PRINT_QR_CHARS_PER_FRAME 180
+#define PRINT_QR_MIN_CHARS_PER_FRAME 80
+#define PRINT_QR_MAX_CHARS_PER_FRAME 260
 #define ANIMATION_INTERVAL_MS 250
 #define PROGRESS_BAR_HEIGHT 20
 #define PROGRESS_FRAME_PADD 2
@@ -29,11 +32,13 @@ typedef struct {
 static lv_obj_t *qr_viewer_screen = NULL;
 static lv_obj_t *qr_code_obj = NULL;
 static lv_obj_t *progress_frame = NULL;
+static lv_obj_t *page_label = NULL;
 static lv_obj_t **progress_rectangles = NULL;
 static int progress_rectangles_count = 0;
 
 static void (*return_callback)(void) = NULL;
 static char *qr_content_copy = NULL;
+static const char *qr_viewer_title = NULL;
 static lv_timer_t *message_timer = NULL;
 static lv_timer_t *animation_timer = NULL;
 
@@ -111,9 +116,12 @@ static void cleanup_progress_indicators(void) {
   progress_frame = NULL;
 }
 
-static void split_content_into_parts(const char *content) {
+static void split_content_into_parts_with_limit(const char *content,
+                                                size_t max_chars) {
   size_t content_len = strlen(content);
-  size_t max_chars = MAX_QR_CHARS_PER_FRAME;
+  if (max_chars == 0) {
+    max_chars = MAX_QR_CHARS_PER_FRAME;
+  }
 
   if (content_len <= max_chars) {
     qr_parts_count = 1;
@@ -169,6 +177,10 @@ static void split_content_into_parts(const char *content) {
   }
 }
 
+static void split_content_into_parts(const char *content) {
+  split_content_into_parts_with_limit(content, MAX_QR_CHARS_PER_FRAME);
+}
+
 static void cleanup_qr_parts(void) {
   if (qr_parts) {
     for (int i = 0; i < qr_parts_count; i++) {
@@ -190,6 +202,52 @@ static void animation_timer_cb(lv_timer_t *timer) {
   current_part_index = (current_part_index + 1) % qr_parts_count;
   qr_update_optimal(qr_code_obj, qr_parts[current_part_index].data, NULL);
   update_progress_indicator(current_part_index);
+}
+
+static void print_update_page(void) {
+  if (!qr_code_obj || !qr_parts || qr_parts_count <= 0) {
+    return;
+  }
+
+  if (current_part_index < 0) {
+    current_part_index = 0;
+  } else if (current_part_index >= qr_parts_count) {
+    current_part_index = qr_parts_count - 1;
+  }
+
+  qr_update_optimal(qr_code_obj, qr_parts[current_part_index].data, NULL);
+
+  if (page_label) {
+    char text[96];
+    if (qr_parts_count > 1) {
+      snprintf(text, sizeof(text), "%s 第 %d/%d 页",
+               qr_viewer_title ? qr_viewer_title : "备份",
+               current_part_index + 1, qr_parts_count);
+    } else {
+      snprintf(text, sizeof(text), "%s 低密度全屏",
+               qr_viewer_title ? qr_viewer_title : "备份");
+    }
+    lv_label_set_text(page_label, text);
+  }
+}
+
+static void print_next_cb(lv_event_t *e) {
+  (void)e;
+  if (qr_parts_count <= 1) {
+    return;
+  }
+  current_part_index = (current_part_index + 1) % qr_parts_count;
+  print_update_page();
+}
+
+static void print_prev_cb(lv_event_t *e) {
+  (void)e;
+  if (qr_parts_count <= 1) {
+    return;
+  }
+  current_part_index =
+      (current_part_index + qr_parts_count - 1) % qr_parts_count;
+  print_update_page();
 }
 
 static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
@@ -236,7 +294,7 @@ static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
     lv_obj_center(msgbox);
 
     char message[128];
-    snprintf(message, sizeof(message), "%s\nTap to return", title);
+    snprintf(message, sizeof(message), "%s\n点击返回", title);
     lv_obj_t *msg_label = theme_create_label(msgbox, message, false);
     lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(msg_label, lv_color_hex(0xFFFFFF), 0);
@@ -249,29 +307,168 @@ static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   return true;
 }
 
-void qr_viewer_page_create(lv_obj_t *parent, const char *qr_content,
-                           const char *title, void (*return_cb)(void)) {
-  if (!parent || !qr_content) {
-    return;
+static bool setup_print_qr_viewer_ui(lv_obj_t *parent, const char *title) {
+  qr_viewer_screen = lv_obj_create(parent);
+  lv_obj_set_size(qr_viewer_screen, LV_PCT(100), LV_PCT(100));
+  lv_obj_set_style_bg_color(qr_viewer_screen, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_style_bg_opa(qr_viewer_screen, LV_OPA_COVER, 0);
+  lv_obj_set_style_pad_all(qr_viewer_screen, 4, 0);
+  lv_obj_clear_flag(qr_viewer_screen, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_event_cb(qr_viewer_screen, print_next_cb, LV_EVENT_CLICKED, NULL);
+
+  lv_obj_update_layout(qr_viewer_screen);
+  int32_t w = lv_obj_get_content_width(qr_viewer_screen);
+  int32_t h = lv_obj_get_content_height(qr_viewer_screen);
+  int32_t bar_h = 46;
+  int32_t qr_size = (w < (h - bar_h)) ? w : (h - bar_h);
+  if (qr_size < 120) {
+    qr_size = (w < h) ? w : h;
   }
 
+  qr_code_obj = lv_qrcode_create(qr_viewer_screen);
+  if (!qr_code_obj) {
+    return false;
+  }
+  lv_qrcode_set_size(qr_code_obj, qr_size);
+  lv_obj_align(qr_code_obj, LV_ALIGN_TOP_MID, 0, 2);
+
+  lv_obj_t *bar = lv_obj_create(qr_viewer_screen);
+  lv_obj_set_size(bar, LV_PCT(100), bar_h);
+  lv_obj_align(bar, LV_ALIGN_BOTTOM_MID, 0, 0);
+  lv_obj_set_style_bg_color(bar, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_opa(bar, LV_OPA_70, 0);
+  lv_obj_set_style_border_width(bar, 0, 0);
+  lv_obj_set_style_radius(bar, 0, 0);
+  lv_obj_set_style_pad_all(bar, 4, 0);
+  lv_obj_set_style_pad_gap(bar, 6, 0);
+  lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_clear_flag(bar, LV_OBJ_FLAG_EVENT_BUBBLE);
+  lv_obj_set_flex_flow(bar, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(bar, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+  lv_obj_t *back_btn = lv_btn_create(bar);
+  lv_obj_set_size(back_btn, 74, 36);
+  theme_apply_touch_button(back_btn, false);
+  lv_obj_add_event_cb(back_btn, back_button_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_clear_flag(back_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
+  lv_obj_t *back_label = lv_label_create(back_btn);
+  lv_label_set_text(back_label, "返回");
+  lv_obj_center(back_label);
+  theme_apply_button_label(back_label, false);
+
+  page_label = theme_create_label(bar, "", false);
+  lv_obj_set_style_text_color(page_label, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_style_text_font(page_label, theme_font_small(), 0);
+  lv_obj_set_style_text_align(page_label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_flex_grow(page_label, 1);
+  if (title && title[0] != '\0') {
+    lv_obj_set_style_pad_left(page_label, 4, 0);
+    lv_obj_set_style_pad_right(page_label, 4, 0);
+  }
+
+  lv_obj_t *prev_btn = lv_btn_create(bar);
+  lv_obj_set_size(prev_btn, 62, 36);
+  theme_apply_touch_button(prev_btn, false);
+  lv_obj_add_event_cb(prev_btn, print_prev_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_clear_flag(prev_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
+  lv_obj_t *prev_label = lv_label_create(prev_btn);
+  lv_label_set_text(prev_label, "上页");
+  lv_obj_center(prev_label);
+  theme_apply_button_label(prev_label, false);
+
+  lv_obj_t *next_btn = lv_btn_create(bar);
+  lv_obj_set_size(next_btn, 62, 36);
+  theme_apply_touch_button(next_btn, false);
+  lv_obj_add_event_cb(next_btn, print_next_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_clear_flag(next_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
+  lv_obj_t *next_label = lv_label_create(next_btn);
+  lv_label_set_text(next_label, "下页");
+  lv_obj_center(next_label);
+  theme_apply_button_label(next_label, false);
+
+  print_update_page();
+  return true;
+}
+
+bool qr_viewer_page_create(lv_obj_t *parent, const char *qr_content,
+                           const char *title, void (*return_cb)(void)) {
+  if (!parent || !qr_content) {
+    return false;
+  }
+  if (qr_viewer_screen || qr_content_copy || qr_parts)
+    qr_viewer_page_destroy();
+
   return_callback = return_cb;
+  qr_viewer_title = title;
   message_timer = NULL;
   animation_timer = NULL;
 
   qr_content_copy = strdup(qr_content);
   if (!qr_content_copy) {
-    return;
+    return false;
   }
 
   split_content_into_parts(qr_content_copy);
   if (!qr_parts || qr_parts_count == 0) {
     free(qr_content_copy);
     qr_content_copy = NULL;
-    return;
+    return false;
   }
 
-  setup_qr_viewer_ui(parent, title);
+  if (!setup_qr_viewer_ui(parent, title)) {
+    cleanup_qr_parts();
+    free(qr_content_copy);
+    qr_content_copy = NULL;
+    return false;
+  }
+  return true;
+}
+
+bool qr_viewer_page_create_print(lv_obj_t *parent, const char *qr_content,
+                                 const char *title, void (*return_cb)(void),
+                                 size_t max_chars_per_frame) {
+  if (!parent || !qr_content) {
+    return false;
+  }
+  if (qr_viewer_screen || qr_content_copy || qr_parts)
+    qr_viewer_page_destroy();
+
+  return_callback = return_cb;
+  qr_viewer_title = title;
+  message_timer = NULL;
+  animation_timer = NULL;
+  page_label = NULL;
+
+  qr_content_copy = strdup(qr_content);
+  if (!qr_content_copy) {
+    return false;
+  }
+
+  size_t max_chars = max_chars_per_frame;
+  if (max_chars == 0) {
+    max_chars = PRINT_QR_CHARS_PER_FRAME;
+  } else if (max_chars < PRINT_QR_MIN_CHARS_PER_FRAME) {
+    max_chars = PRINT_QR_MIN_CHARS_PER_FRAME;
+  } else if (max_chars > PRINT_QR_MAX_CHARS_PER_FRAME) {
+    max_chars = PRINT_QR_MAX_CHARS_PER_FRAME;
+  }
+
+  split_content_into_parts_with_limit(qr_content_copy, max_chars);
+  if (!qr_parts || qr_parts_count == 0) {
+    free(qr_content_copy);
+    qr_content_copy = NULL;
+    return false;
+  }
+
+  if (!setup_print_qr_viewer_ui(parent, title)) {
+    cleanup_qr_parts();
+    free(qr_content_copy);
+    qr_content_copy = NULL;
+    return false;
+  }
+
+  return true;
 }
 
 void qr_viewer_page_show(void) {
@@ -311,6 +508,8 @@ void qr_viewer_page_destroy(void) {
   }
 
   qr_code_obj = NULL;
+  page_label = NULL;
+  qr_viewer_title = NULL;
   return_callback = NULL;
 }
 
@@ -320,10 +519,11 @@ bool qr_viewer_page_create_with_format(lv_obj_t *parent, int qr_format,
   if (!parent || !content) {
     return false;
   }
+  if (qr_viewer_screen || qr_content_copy || qr_parts)
+    qr_viewer_page_destroy();
 
   if (qr_format != FORMAT_UR && qr_format != FORMAT_BBQR) {
-    qr_viewer_page_create(parent, content, title, return_cb);
-    return true;
+    return qr_viewer_page_create(parent, content, title, return_cb);
   }
 
   // Decode base64 content to binary PSBT
