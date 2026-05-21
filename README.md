@@ -88,6 +88,20 @@ ESP32-P4 OTG 口
 
 不要把“电脑能识别读卡器”理解成“开发板直插也能给读卡器供电”。电脑 USB 口和 ESP32-P4 OTG Host 口的供电条件不是一回事。详细排障看 [智能卡供电和 OTG 排障](docs/TROUBLESHOOTING_SMARTCARD_POWER_OTG.md)。
 
+## 3D Printed Case / 3D 打印外壳
+
+本仓库已收录 Waveshare ESP32-P4 4.3 寸带摄像头版本的 AI/OpenSCAD 外壳草模和实打照片：
+
+- 外壳目录：[hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera)
+- 主壳 STL：[screen_protective_case.stl](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/screen_protective_case.stl)
+- 参数化源码：[esp32_p4_4_3_camera_case.scad](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/esp32_p4_4_3_camera_case.scad)
+
+注意：这版外壳已经打印过一次，实物开孔位置不准，照片中的孔位是后期用火烧/热熔方式手工补开的。请不要直接批量打印当前 STL，先按实物重新量孔位再改模型。
+
+| 实打外壳 | 补孔记录 |
+| --- | --- |
+| <img src="hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/photos/printed_case_wrong_holes_01.jpg" width="280" alt="3D 打印外壳开孔错误"> | <img src="hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/photos/printed_case_wrong_holes_02.jpg" width="280" alt="3D 打印外壳补孔记录"> |
+
 ## Repository Layout
 
 ```text
@@ -103,6 +117,7 @@ scripts/            Format, test, CI, and release helpers
 tools/              Delivery, production-check, and asset-baking helpers
 docs/               Acceptance plans, security gates, and delivery records
 wallet/             Android relay wallet app for high-density QR handoff
+hardware/           3D printed case files, OpenSCAD source, and fit notes
 ```
 
 ## Download Firmware / 直接下载固件
