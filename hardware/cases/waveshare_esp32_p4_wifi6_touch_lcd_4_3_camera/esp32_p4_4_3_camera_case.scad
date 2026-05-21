@@ -69,27 +69,13 @@ drop_in_w = glass_pocket_w;
 drop_in_h = glass_pocket_h;
 drop_in_r = 2.40;
 
-// Fixing: recommended method is four longer screws through the case back into
-// the board's existing corner mounting holes. This avoids relying on a hard
-// snap-fit around the glass.
+// Fixing: four simple measured screw holes through the back cover. The centers
+// are measured from the printed case edges, not from the official PCB drawing.
 use_mount_screws = true;
-mount_screw_clearance_d = 2.80; // M2.5 clearance; use 2.4 for M2.
-mount_screw_slot_x = 5.20;
-mount_screw_slot_y = 8.00;
-mount_screw_head_d = 5.80;
-mount_screw_head_slot_x = 8.20;
-mount_screw_head_slot_y = 10.60;
-mount_screw_head_h = 1.25;
-mount_inner_relief_d = 6.40;
-
-// Hand-measured from the real unit: mounting-hole centers to the outer glass
-// edge. These override the vertical hole positions inferred from the PCB size.
-mount_top_from_glass_top = 15.00;
-mount_bottom_from_glass_bottom = 10.00;
-mount_l_x = 5.25;
-mount_r_x = pcb_w - 5.60;
-mount_t_y = 5.00;
-mount_b_y = pcb_h - 5.00;
+mount_screw_clearance_d = 2.50;
+mount_side_from_outer_edge = 12.00;
+mount_usb_edge_from_bottom = 12.00;
+mount_plain_edge_from_top = 16.00;
 
 // Camera module location measured from the printed back cover.
 // Back view: the button edge is +Y. The camera is near the left short edge.
@@ -171,15 +157,11 @@ module rounded_prism(size, r) {
         rounded_rect([size[0], size[1]], r);
 }
 
-module slot_2d(size, r) {
-    rounded_rect(size, r);
-}
-
 module mount_positions() {
-    mount_left_x = from_pcb_left(mount_l_x);
-    mount_right_x = from_pcb_left(mount_r_x);
-    mount_top_y = glass_h / 2 - mount_top_from_glass_top;
-    mount_bottom_y = -glass_h / 2 + mount_bottom_from_glass_bottom;
+    mount_left_x = -outer_w / 2 + mount_side_from_outer_edge;
+    mount_right_x = outer_w / 2 - mount_side_from_outer_edge;
+    mount_top_y = outer_h / 2 - mount_plain_edge_from_top;
+    mount_bottom_y = -outer_h / 2 + mount_usb_edge_from_bottom;
 
     for (x = [mount_left_x, mount_right_x])
         for (y = [mount_top_y, mount_bottom_y])
@@ -227,13 +209,7 @@ module camera_hole() {
 module mount_screw_cuts() {
     mount_positions() {
         translate([0, 0, -eps])
-            linear_extrude(height = back_thickness + inside_depth + front_rim_h + 2 * eps)
-                slot_2d([mount_screw_slot_x, mount_screw_slot_y], mount_screw_clearance_d / 2);
-        translate([0, 0, -eps])
-            linear_extrude(height = mount_screw_head_h + eps)
-                slot_2d([mount_screw_head_slot_x, mount_screw_head_slot_y], mount_screw_head_d / 2);
-        translate([0, 0, back_thickness - eps])
-            cylinder(d = mount_inner_relief_d, h = 1.40 + eps);
+            cylinder(d = mount_screw_clearance_d, h = back_thickness + inside_depth + front_rim_h + 2 * eps);
     }
 }
 
@@ -304,11 +280,10 @@ module fit_check_plate() {
         translate([0, 0, -eps])
             rounded_prism([glass_w - 1.50, glass_h - 1.50, 1.20 + 2 * eps], 2.0);
 
-        // Mounting slots.
+        // Mounting holes.
         mount_positions()
             translate([0, 0, -eps])
-                linear_extrude(height = 1.20 + 2 * eps)
-                    slot_2d([mount_screw_slot_x, mount_screw_slot_y], mount_screw_clearance_d / 2);
+                cylinder(d = mount_screw_clearance_d, h = 1.20 + 2 * eps);
 
         // Camera hole marker.
         translate([camera_x(), camera_y(), -eps])
