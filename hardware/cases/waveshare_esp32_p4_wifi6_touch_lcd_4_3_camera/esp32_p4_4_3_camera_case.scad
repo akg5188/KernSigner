@@ -91,13 +91,14 @@ mount_r_x = pcb_w - 5.60;
 mount_t_y = 5.00;
 mount_b_y = pcb_h - 5.00;
 
-// Camera module location estimated from the supplied camera-version photo.
-// The official size drawing shows the connector area, but not the fitted lens.
-camera_center_x_from_pcb_left = 97.40;
-camera_center_y_from_pcb_top = 30.60;
+// Camera module location measured from the printed back cover.
+// Back view: the button edge is +Y. The camera is near the left short edge.
+camera_center_x_from_left_edge = 15.00;
+camera_center_y_from_button_edge = 37.00;
+camera_center_y_from_plain_edge_reference = 36.00;
 // Mini OV5647/Raspberry-Pi-style camera opening: small visible round hole,
 // with a hidden square recess inside for the lens body.
-camera_lens_hole_d = 8.40;
+camera_lens_hole_d = 7.00;
 camera_lens_relief_d = 10.80;
 camera_pocket_w = 15.00;
 camera_pocket_h = 15.00;
@@ -151,8 +152,8 @@ function pcb_center_x() = from_pcb_left(pcb_w / 2);
 function pcb_center_y() = pcb_top() - pcb_h / 2;
 function from_pcb_left(x) = case_x_from_rear_x(rear_from_pcb_left(x));
 function from_pcb_top(y) = pcb_top() - y;
-function camera_x() = from_pcb_left(camera_center_x_from_pcb_left);
-function camera_y() = from_pcb_top(camera_center_y_from_pcb_top);
+function camera_x() = -outer_w / 2 + camera_center_x_from_left_edge;
+function camera_y() = outer_h / 2 - camera_center_y_from_button_edge;
 
 module rounded_rect(size, r) {
     w = size[0];

@@ -26,16 +26,17 @@
 
 后续如果继续改壳，优先处理：
 
-- 重新按实物量 USB-C、TF 卡、按钮、螺丝孔和摄像头孔位。
+- 继续按实物逐项复核剩余孔位，尤其是螺丝孔、摄像头孔和 USB-C 插线余量。
 - 不要直接批量打印当前 STL。
 - 改完 OpenSCAD 参数后，先切薄片验证孔位，再出完整外壳。
-- 当前 `screen_protective_case.stl` 是只修正了正面屏幕圈的试打版，其他开孔仍需后续逐项修正。
+- 当前 `screen_protective_case.stl` 是多轮修正版，已包含屏幕圈、USB-C、SD/按键封孔和摄像头孔修正，但仍建议先小批量试打。
 
 ## 修改记录
 
 - `2026-05-21`：只修正正面屏幕/玻璃保护圈。根据实打反馈，屏幕四周约大 `0.5mm`，已把 `glass_clearance` 从 `0.38` 改为 `0.12`，开口总宽/总高各收小约 `0.52mm`。USB、TF、按钮、摄像头、螺丝孔暂时不改，后续按实物逐项修。
 - `2026-05-21`：修正两个 USB-C 侧边开孔。中间隔条改为 `3.00mm`；左右两个最外侧各填充 `4.00mm`，避免开孔过大；靠屏幕/正面一侧整体填充 `1.50mm`，降低两个 C 口开孔高度。其他开孔暂时不改。
 - `2026-05-21`：封掉 TF/SD 卡大开口。侧面 POWER/BOOT/RESET 不再开大孔，只保留 `1.00mm` 针孔，方便极端情况下用针触发；日常刷机和使用主要依赖 USB 自动下载、触摸屏、摄像头和 USB-C 智能卡链路。
+- `2026-05-21`：按实测修正摄像头孔。摄像头中心距后盖左侧短边 `15.00mm`，距按键侧长边 `37.00mm`，距无按键侧约 `36.00mm`；外侧圆孔直径改为 `7.00mm`。
 
 ## 为什么不用纯卡扣
 
@@ -72,13 +73,14 @@ Waveshare 官方页面/文档图给出的主要尺寸：
 
 ## 需要优先复核的参数
 
-摄像头孔位按你发的背面图估算；外侧圆孔已经按常见迷你
-OV5647/Raspberry Pi 摄像头镜头口收小，里面仍保留方形凹槽：
+摄像头孔位按实测后盖定位；外侧圆孔已经按常见迷你
+OV5647/Raspberry Pi 摄像头镜头口收小到 `7.00mm`，里面仍保留方形凹槽：
 
 ```scad
-camera_center_x_from_pcb_left = 97.40;
-camera_center_y_from_pcb_top = 30.60;
-camera_lens_hole_d = 8.40;
+camera_center_x_from_left_edge = 15.00;
+camera_center_y_from_button_edge = 37.00;
+camera_center_y_from_plain_edge_reference = 36.00;
+camera_lens_hole_d = 7.00;
 camera_lens_relief_d = 10.80;
 camera_pocket_w = 15.00;
 camera_pocket_h = 15.00;
