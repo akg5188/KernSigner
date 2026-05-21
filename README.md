@@ -26,9 +26,9 @@ Common 480x800 UI screenshots are included for GitHub preview and beginner docum
 
 More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gallery/README.md)
 
-| 首页 | 连接钱包 | 扫码签名 | 智能卡 |
+| 首页 | 连接钱包 | 助记词 | 智能卡 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/gallery/v20260521_124238_001_home_top.png" width="160" alt="首页"> | <img src="docs/screens/gallery/v20260521_124238_002_pi_connect_wallet_top.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/v20260521_124238_128_signing_top.png" width="160" alt="扫码签名"> | <img src="docs/screens/gallery/v20260521_124238_030_smartcard_tools_top.png" width="160" alt="智能卡"> |
+| <img src="docs/screens/gallery/v20260521_124238_001_home_top.png" width="160" alt="首页"> | <img src="docs/screens/gallery/v20260521_124238_002_pi_connect_wallet_top.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/v20260521_124238_029_pi_mnemonic_tools_top.png" width="160" alt="助记词"> | <img src="docs/screens/gallery/v20260521_124238_030_smartcard_tools_top.png" width="160" alt="智能卡"> |
 
 | Satochip | SeedKeeper | 创建助记词 | 备份 |
 | --- | --- | --- | --- |

@@ -6,11 +6,13 @@
 
 本目录旧截图文件已经删除，当前截图统一使用 `v20260521_124238_...png` 文件名，避免 GitHub 图片缓存继续显示旧图。
 
+扫码签名入口在真机上会直接打开相机，因此这里不再展示旧的“先选 OKX/Bitget/BTC”签名菜单截图。
+
 ## 快速预览
 
-| 离线签名器 | 连接钱包 | 扫码签名 | 智能卡 |
+| 离线签名器 | 连接钱包 | 助记词 | 智能卡 |
 | --- | --- | --- | --- |
-| <img src="v20260521_124238_001_home_top.png" width="160" alt="离线签名器"> | <img src="v20260521_124238_002_pi_connect_wallet_top.png" width="160" alt="连接钱包"> | <img src="v20260521_124238_128_signing_top.png" width="160" alt="扫码签名"> | <img src="v20260521_124238_030_smartcard_tools_top.png" width="160" alt="智能卡"> |
+| <img src="v20260521_124238_001_home_top.png" width="160" alt="离线签名器"> | <img src="v20260521_124238_002_pi_connect_wallet_top.png" width="160" alt="连接钱包"> | <img src="v20260521_124238_029_pi_mnemonic_tools_top.png" width="160" alt="助记词"> | <img src="v20260521_124238_030_smartcard_tools_top.png" width="160" alt="智能卡"> |
 
 | Satochip | SeedKeeper | 创建 | 备份 |
 | --- | --- | --- | --- |
@@ -24,8 +26,8 @@
 
 - 截图来源：`docs/screens/delivery_20260521_124238`
 - 完整清单：`v20260521_124238_manifest.tsv`
-- 首屏截图：170 张
-- 底部截图：170 张
+- 首屏截图：150 张
+- 底部截图：150 张
 
 | # | 页面 | 标题 | 首屏 | 底部 |
 | --- | --- | --- | --- | --- |
@@ -154,30 +156,10 @@
 | 125 | `addr_change` | 找零地址 | [v20260521_124238_125_addr_change_top.png](v20260521_124238_125_addr_change_top.png) | [v20260521_124238_125_addr_change_bottom.png](v20260521_124238_125_addr_change_bottom.png) |
 | 126 | `addr_scan_check` | 扫码核对地址 | [v20260521_124238_126_addr_scan_check_top.png](v20260521_124238_126_addr_scan_check_top.png) | [v20260521_124238_126_addr_scan_check_bottom.png](v20260521_124238_126_addr_scan_check_bottom.png) |
 | 127 | `addr_qr_view` | 地址二维码 | [v20260521_124238_127_addr_qr_view_top.png](v20260521_124238_127_addr_qr_view_top.png) | [v20260521_124238_127_addr_qr_view_bottom.png](v20260521_124238_127_addr_qr_view_bottom.png) |
-| 128 | `signing` | 扫码签名 | [v20260521_124238_128_signing_top.png](v20260521_124238_128_signing_top.png) | [v20260521_124238_128_signing_bottom.png](v20260521_124238_128_signing_bottom.png) |
-| 129 | `sign_okx` | OKX | [v20260521_124238_129_sign_okx_top.png](v20260521_124238_129_sign_okx_top.png) | [v20260521_124238_129_sign_okx_bottom.png](v20260521_124238_129_sign_okx_bottom.png) |
-| 130 | `sign_bitget` | Bitget | [v20260521_124238_130_sign_bitget_top.png](v20260521_124238_130_sign_bitget_top.png) | [v20260521_124238_130_sign_bitget_bottom.png](v20260521_124238_130_sign_bitget_bottom.png) |
-| 131 | `sign_metamask` | MetaMask | [v20260521_124238_131_sign_metamask_top.png](v20260521_124238_131_sign_metamask_top.png) | [v20260521_124238_131_sign_metamask_bottom.png](v20260521_124238_131_sign_metamask_bottom.png) |
-| 132 | `sign_rabby` | Rabby | [v20260521_124238_132_sign_rabby_top.png](v20260521_124238_132_sign_rabby_top.png) | [v20260521_124238_132_sign_rabby_bottom.png](v20260521_124238_132_sign_rabby_bottom.png) |
-| 133 | `sign_tokenpocket` | TokenPocket | [v20260521_124238_133_sign_tokenpocket_top.png](v20260521_124238_133_sign_tokenpocket_top.png) | [v20260521_124238_133_sign_tokenpocket_bottom.png](v20260521_124238_133_sign_tokenpocket_bottom.png) |
-| 134 | `sign_btc` | BTC | [v20260521_124238_134_sign_btc_top.png](v20260521_124238_134_sign_btc_top.png) | [v20260521_124238_134_sign_btc_bottom.png](v20260521_124238_134_sign_btc_bottom.png) |
-| 135 | `sign_okx_mnemonic` | 助记词 | [v20260521_124238_135_sign_okx_mnemonic_top.png](v20260521_124238_135_sign_okx_mnemonic_top.png) | [v20260521_124238_135_sign_okx_mnemonic_bottom.png](v20260521_124238_135_sign_okx_mnemonic_bottom.png) |
-| 136 | `sign_okx_satochip` | 智能卡 | [v20260521_124238_136_sign_okx_satochip_top.png](v20260521_124238_136_sign_okx_satochip_top.png) | [v20260521_124238_136_sign_okx_satochip_bottom.png](v20260521_124238_136_sign_okx_satochip_bottom.png) |
-| 137 | `sign_bitget_mnemonic` | 助记词 | [v20260521_124238_137_sign_bitget_mnemonic_top.png](v20260521_124238_137_sign_bitget_mnemonic_top.png) | [v20260521_124238_137_sign_bitget_mnemonic_bottom.png](v20260521_124238_137_sign_bitget_mnemonic_bottom.png) |
-| 138 | `sign_bitget_satochip` | 智能卡 | [v20260521_124238_138_sign_bitget_satochip_top.png](v20260521_124238_138_sign_bitget_satochip_top.png) | [v20260521_124238_138_sign_bitget_satochip_bottom.png](v20260521_124238_138_sign_bitget_satochip_bottom.png) |
-| 139 | `sign_metamask_mnemonic` | 助记词 | [v20260521_124238_139_sign_metamask_mnemonic_top.png](v20260521_124238_139_sign_metamask_mnemonic_top.png) | [v20260521_124238_139_sign_metamask_mnemonic_bottom.png](v20260521_124238_139_sign_metamask_mnemonic_bottom.png) |
-| 140 | `sign_metamask_satochip` | 智能卡 | [v20260521_124238_140_sign_metamask_satochip_top.png](v20260521_124238_140_sign_metamask_satochip_top.png) | [v20260521_124238_140_sign_metamask_satochip_bottom.png](v20260521_124238_140_sign_metamask_satochip_bottom.png) |
-| 141 | `sign_rabby_mnemonic` | 助记词 | [v20260521_124238_141_sign_rabby_mnemonic_top.png](v20260521_124238_141_sign_rabby_mnemonic_top.png) | [v20260521_124238_141_sign_rabby_mnemonic_bottom.png](v20260521_124238_141_sign_rabby_mnemonic_bottom.png) |
-| 142 | `sign_rabby_satochip` | 智能卡 | [v20260521_124238_142_sign_rabby_satochip_top.png](v20260521_124238_142_sign_rabby_satochip_top.png) | [v20260521_124238_142_sign_rabby_satochip_bottom.png](v20260521_124238_142_sign_rabby_satochip_bottom.png) |
-| 143 | `sign_tokenpocket_mnemonic` | 助记词 | [v20260521_124238_143_sign_tokenpocket_mnemonic_top.png](v20260521_124238_143_sign_tokenpocket_mnemonic_top.png) | [v20260521_124238_143_sign_tokenpocket_mnemonic_bottom.png](v20260521_124238_143_sign_tokenpocket_mnemonic_bottom.png) |
-| 144 | `sign_tokenpocket_satochip` | 智能卡 | [v20260521_124238_144_sign_tokenpocket_satochip_top.png](v20260521_124238_144_sign_tokenpocket_satochip_top.png) | [v20260521_124238_144_sign_tokenpocket_satochip_bottom.png](v20260521_124238_144_sign_tokenpocket_satochip_bottom.png) |
-| 145 | `sign_btc_mnemonic` | 助记词 | [v20260521_124238_145_sign_btc_mnemonic_top.png](v20260521_124238_145_sign_btc_mnemonic_top.png) | [v20260521_124238_145_sign_btc_mnemonic_bottom.png](v20260521_124238_145_sign_btc_mnemonic_bottom.png) |
-| 146 | `sign_btc_satochip` | 智能卡 | [v20260521_124238_146_sign_btc_satochip_top.png](v20260521_124238_146_sign_btc_satochip_top.png) | [v20260521_124238_146_sign_btc_satochip_bottom.png](v20260521_124238_146_sign_btc_satochip_bottom.png) |
 | 147 | `smartcard_card_info` | 卡片信息 | [v20260521_124238_147_smartcard_card_info_top.png](v20260521_124238_147_smartcard_card_info_top.png) | [v20260521_124238_147_smartcard_card_info_bottom.png](v20260521_124238_147_smartcard_card_info_bottom.png) |
 | 148 | `satochip_path_address` | 派生地址 | [v20260521_124238_148_satochip_path_address_top.png](v20260521_124238_148_satochip_path_address_top.png) | [v20260521_124238_148_satochip_path_address_bottom.png](v20260521_124238_148_satochip_path_address_bottom.png) |
 | 149 | `satochip_btc_zpub` | zpub | [v20260521_124238_149_satochip_btc_zpub_top.png](v20260521_124238_149_satochip_btc_zpub_top.png) | [v20260521_124238_149_satochip_btc_zpub_bottom.png](v20260521_124238_149_satochip_btc_zpub_bottom.png) |
 | 150 | `satochip_btc_xpub` | xpub | [v20260521_124238_150_satochip_btc_xpub_top.png](v20260521_124238_150_satochip_btc_xpub_top.png) | [v20260521_124238_150_satochip_btc_xpub_bottom.png](v20260521_124238_150_satochip_btc_xpub_bottom.png) |
-| 151 | `sign_psbt_qr` | 扫码签名 | [v20260521_124238_151_sign_psbt_qr_top.png](v20260521_124238_151_sign_psbt_qr_top.png) | [v20260521_124238_151_sign_psbt_qr_bottom.png](v20260521_124238_151_sign_psbt_qr_bottom.png) |
 | 152 | `tools_create_qr` | 生成二维码 | [v20260521_124238_152_tools_create_qr_top.png](v20260521_124238_152_tools_create_qr_top.png) | [v20260521_124238_152_tools_create_qr_bottom.png](v20260521_124238_152_tools_create_qr_bottom.png) |
 | 153 | `tools_qr_capture` | 扫描二维码 | [v20260521_124238_153_tools_qr_capture_top.png](v20260521_124238_153_tools_qr_capture_top.png) | [v20260521_124238_153_tools_qr_capture_bottom.png](v20260521_124238_153_tools_qr_capture_bottom.png) |
 | 154 | `tools_file_manager` | 文件管理 | [v20260521_124238_154_tools_file_manager_top.png](v20260521_124238_154_tools_file_manager_top.png) | [v20260521_124238_154_tools_file_manager_bottom.png](v20260521_124238_154_tools_file_manager_bottom.png) |
