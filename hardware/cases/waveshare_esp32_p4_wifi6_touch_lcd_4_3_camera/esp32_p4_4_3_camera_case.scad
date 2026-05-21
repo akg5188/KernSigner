@@ -6,12 +6,11 @@
   matches the board when the screen is facing the user.
 
   Kept openings:
-  - 2 x USB-C on the left
-  - 1 x microSD/TF card slot on the top
-  - 3 x buttons on the top
+  - 2 x USB-C on the side
   - 1 x camera lens on the back
+  - 4 x mounting screws
 
-  No GPIO, microphone, or extra rear ventilation openings.
+  No GPIO, microphone, button, TF/SD, or extra rear ventilation openings.
 
   Official dimensions used:
   - Front glass: 114.40 x 66.80 mm
@@ -20,7 +19,7 @@
 */
 
 $fn = 56;
-part = "case"; // case, fit_check, reference
+part = "case"; // case, fit_check, preview, reference
 
 // Main board and display dimensions
 glass_w = 114.40;
@@ -47,7 +46,7 @@ mirror_official_rear_x = true;
 case_margin = 3.20;
 outer_w = glass_w + 2 * case_margin;
 outer_h = glass_h + 2 * case_margin;
-outer_r = 3.00;
+outer_r = 6.00;
 wall = 2.10;
 back_thickness = 2.20;
 inside_depth = 10.20;
@@ -73,6 +72,10 @@ drop_in_r = 2.40;
 // are measured from the printed case edges, not from the official PCB drawing.
 use_mount_screws = true;
 mount_screw_clearance_d = 2.50;
+mount_screw_counterbore_d = 7.20;
+mount_screw_counterbore_depth = 1.50;
+mount_screw_bevel_d = 9.20;
+mount_screw_bevel_depth = 0.85;
 mount_side_from_outer_edge = 12.00;
 mount_usb_edge_from_bottom = 12.00;
 mount_plain_edge_from_top = 16.00;
@@ -85,11 +88,28 @@ camera_center_y_from_plain_edge_reference = 36.00;
 // Mini OV5647/Raspberry-Pi-style camera opening: small visible round hole,
 // with a hidden square recess inside for the lens body.
 camera_lens_hole_d = 7.00;
+camera_lens_bevel_d = 10.20;
+camera_lens_bevel_depth = 1.00;
 camera_lens_relief_d = 10.80;
 camera_pocket_w = 15.00;
 camera_pocket_h = 15.00;
 camera_pocket_depth = 1.60;
 camera_guard_h = 0.00;
+
+// Real-fit feedback: the screen/glass is larger than the PCB, so a full-size
+// lower shell hides the recessed USB-C plugs. Keep the screen-side rim large,
+// but make the whole lower/back shell smaller with a sloped transition.
+lower_shell_usb_inset = 4.50;
+lower_shell_opposite_inset = 4.50;
+lower_shell_long_edge_inset = 3.00;
+lower_shell_taper_h = 11.20;
+lower_shell_taper_steps = 18;
+lower_shell_profile_roundness = 0.04;
+lower_shell_corner_r = 6.00;
+lower_shell_bottom_round_h = 0.50;
+lower_shell_bottom_edge_inset = 0.30;
+pcb_cavity_clearance = 0.60;
+lower_shell_min_wall = 1.60;
 
 // Only necessary side openings.
 edge_cut_depth = wall + case_margin + 4.0;
@@ -115,7 +135,8 @@ usb_cutout_neg_y_max = -usb_center_separator_w / 2;
 usb_cutout_z_min = port_z_center - usb_cutout_h / 2;
 usb_cutout_z_max = port_z_center + usb_cutout_h / 2 - usb_screen_side_fill;
 
-// Official rear-view top-edge positions.
+// Official rear-view top-edge positions. The side buttons are intentionally
+// sealed in the printable case; these positions are kept only for reference.
 tf_slot_x_from_pcb_left = 52.00;
 tf_slot_w = 22.50;
 tf_slot_h = 5.40;
@@ -140,6 +161,45 @@ function from_pcb_left(x) = case_x_from_rear_x(rear_from_pcb_left(x));
 function from_pcb_top(y) = pcb_top() - y;
 function camera_x() = -outer_w / 2 + camera_center_x_from_left_edge;
 function camera_y() = outer_h / 2 - camera_center_y_from_button_edge;
+function usb_edge_sign() = mirror_official_rear_x ? 1 : -1;
+function clamp(v, lo, hi) = min(max(v, lo), hi);
+function lerp(a, b, t) = a + (b - a) * t;
+function smoothstep(t) = t * t * (3 - 2 * t);
+function taper_profile(t) =
+    lerp(t, smoothstep(t), lower_shell_profile_roundness);
+function lower_shell_inset_pos_x() =
+    usb_edge_sign() > 0 ? lower_shell_usb_inset : lower_shell_opposite_inset;
+function lower_shell_inset_neg_x() =
+    usb_edge_sign() > 0 ? lower_shell_opposite_inset : lower_shell_usb_inset;
+function lower_shell_w() =
+    outer_w - lower_shell_inset_pos_x() - lower_shell_inset_neg_x();
+function lower_shell_h() =
+    outer_h - 2 * lower_shell_long_edge_inset;
+function pcb_cavity_w() = pcb_w + 2 * pcb_cavity_clearance;
+function pcb_cavity_h() = pcb_h + 2 * pcb_cavity_clearance;
+function pcb_cavity_x_min() = pcb_center_x() - pcb_cavity_w() / 2;
+function pcb_cavity_x_max() = pcb_center_x() + pcb_cavity_w() / 2;
+function pcb_cavity_y_min() = pcb_center_y() - pcb_cavity_h() / 2;
+function pcb_cavity_y_max() = pcb_center_y() + pcb_cavity_h() / 2;
+function lower_shell_requested_x() =
+    (lower_shell_inset_neg_x() - lower_shell_inset_pos_x()) / 2;
+function lower_shell_requested_y() = 0;
+function lower_shell_x() =
+    clamp(
+        lower_shell_requested_x(),
+        pcb_cavity_x_max() + lower_shell_min_wall - lower_shell_w() / 2,
+        pcb_cavity_x_min() - lower_shell_min_wall + lower_shell_w() / 2
+    );
+function lower_shell_y() =
+    clamp(
+        lower_shell_requested_y(),
+        pcb_cavity_y_max() + lower_shell_min_wall - lower_shell_h() / 2,
+        pcb_cavity_y_min() - lower_shell_min_wall + lower_shell_h() / 2
+    );
+function lower_shell_taper_start_z() =
+    total_depth - lower_shell_taper_h;
+function cavity_transition_start_z() =
+    max(back_thickness, lower_shell_taper_start_z());
 
 module rounded_rect(size, r) {
     w = size[0];
@@ -191,6 +251,12 @@ module top_pin_hole(x) {
 
 module camera_hole() {
     translate([camera_x(), camera_y(), -eps])
+        cylinder(
+            d1 = camera_lens_bevel_d,
+            d2 = camera_lens_hole_d,
+            h = camera_lens_bevel_depth + eps
+        );
+    translate([camera_x(), camera_y(), -eps])
         cylinder(d = camera_lens_hole_d, h = back_thickness + 2 * eps);
 
     // Inner square recess for the camera module/lens body. The outside remains
@@ -209,35 +275,123 @@ module camera_hole() {
 module mount_screw_cuts() {
     mount_positions() {
         translate([0, 0, -eps])
+            cylinder(
+                d1 = mount_screw_bevel_d,
+                d2 = mount_screw_counterbore_d,
+                h = mount_screw_bevel_depth + eps
+            );
+        translate([0, 0, -eps])
+            cylinder(d = mount_screw_counterbore_d, h = mount_screw_counterbore_depth + eps);
+        translate([0, 0, -eps])
             cylinder(d = mount_screw_clearance_d, h = back_thickness + inside_depth + front_rim_h + 2 * eps);
     }
 }
 
+module thin_rounded_plate(w, h, r) {
+    linear_extrude(height = eps)
+        rounded_rect([w, h], r);
+}
+
+module lower_shell_body() {
+    hull() {
+        translate([lower_shell_x(), lower_shell_y(), 0])
+            thin_rounded_plate(
+                lower_shell_w() - 2 * lower_shell_bottom_edge_inset,
+                lower_shell_h() - 2 * lower_shell_bottom_edge_inset,
+                lower_shell_corner_r
+            );
+        translate([lower_shell_x(), lower_shell_y(), lower_shell_bottom_round_h])
+            thin_rounded_plate(lower_shell_w(), lower_shell_h(), lower_shell_corner_r);
+    }
+
+    translate([lower_shell_x(), lower_shell_y(), lower_shell_bottom_round_h])
+        rounded_prism([
+            lower_shell_w(),
+            lower_shell_h(),
+            lower_shell_taper_start_z() - lower_shell_bottom_round_h + eps
+        ], lower_shell_corner_r);
+}
+
+module smooth_outer_transition() {
+    for (i = [0 : lower_shell_taper_steps - 1]) {
+        t0 = i / lower_shell_taper_steps;
+        t1 = (i + 1) / lower_shell_taper_steps;
+        s0 = taper_profile(t0);
+        s1 = taper_profile(t1);
+
+        hull() {
+            translate([
+                lerp(lower_shell_x(), 0, s0),
+                lerp(lower_shell_y(), 0, s0),
+                lower_shell_taper_start_z() + lower_shell_taper_h * t0
+            ])
+                thin_rounded_plate(
+                    lerp(lower_shell_w(), outer_w, s0),
+                    lerp(lower_shell_h(), outer_h, s0),
+                    lerp(lower_shell_corner_r, outer_r, s0)
+                );
+            translate([
+                lerp(lower_shell_x(), 0, s1),
+                lerp(lower_shell_y(), 0, s1),
+                lower_shell_taper_start_z() + lower_shell_taper_h * t1
+            ])
+                thin_rounded_plate(
+                    lerp(lower_shell_w(), outer_w, s1),
+                    lerp(lower_shell_h(), outer_h, s1),
+                    lerp(lower_shell_corner_r, outer_r, s1)
+                );
+        }
+    }
+}
+
+module outer_body() {
+    union() {
+        // Smaller lower shell: this is the PCB-side body that exposes the
+        // recessed USB-C plugs while still leaving a printable side wall.
+        lower_shell_body();
+
+        // Smooth multi-step transition from the smaller lower shell to the
+        // full-size screen-side rim. This avoids the previous square-looking
+        // straight chamfer.
+        smooth_outer_transition();
+
+        translate([0, 0, total_depth])
+            rounded_prism([outer_w, outer_h, front_rim_h], outer_r);
+    }
+}
+
+module drop_in_cavity() {
+    // PCB-side cavity. It is smaller than the glass pocket so the shortened
+    // lower shell still has side walls.
+    translate([pcb_center_x(), pcb_center_y(), back_thickness])
+        rounded_prism([
+            pcb_cavity_w(),
+            pcb_cavity_h(),
+            cavity_transition_start_z() - back_thickness + eps
+        ], drop_in_r);
+
+    // Internal transition where the larger screen/glass area sits above the
+    // smaller PCB. This avoids the old full-size cavity cutting through the
+    // shortened lower shell.
+    hull() {
+        translate([pcb_center_x(), pcb_center_y(), cavity_transition_start_z()])
+            thin_rounded_plate(pcb_cavity_w(), pcb_cavity_h(), drop_in_r);
+        translate([0, 0, total_depth])
+            thin_rounded_plate(drop_in_w, drop_in_h, drop_in_r);
+    }
+
+    translate([0, 0, total_depth])
+        rounded_prism([drop_in_w, drop_in_h, front_rim_h + eps], drop_in_r);
+}
+
 module protective_case() {
     difference() {
-        union() {
-            difference() {
-                // Main tray body, back at z=0 and front rim at z=total_depth.
-                rounded_prism([outer_w, outer_h, total_depth + front_rim_h], outer_r);
-
-                // Drop-in cavity. It leaves the back plate and side walls intact.
-                translate([0, 0, back_thickness])
-                    rounded_prism([drop_in_w, drop_in_h, inside_depth + front_rim_h + eps], drop_in_r);
-
-                // The raised outer wall is the screen protection: the glass
-                // pocket is lower than this rim, so face-down impact hits the
-                // printed edge first.
-            }
-
-        }
+        outer_body();
+        drop_in_cavity();
 
         // Only the requested edge openings.
         side_usb_cutout(usb_cutout_pos_y_min, usb_cutout_pos_y_max);
         side_usb_cutout(usb_cutout_neg_y_min, usb_cutout_neg_y_max);
-        top_pin_hole(from_pcb_left(reset_x_from_pcb_left));
-        top_pin_hole(from_pcb_left(boot_x_from_pcb_left));
-        top_pin_hole(from_pcb_left(power_x_from_pcb_left));
-
         // Camera opening on the back.
         camera_hole();
 
@@ -295,14 +449,8 @@ module fit_check_plate() {
         translate([side_cut_x0(), usb_cutout_neg_y_min, -eps])
             cube([edge_cut_depth + 2 * eps, usb_cutout_neg_y_max - usb_cutout_neg_y_min, 1.20 + 2 * eps]);
 
-        for (x = [
-            from_pcb_left(tf_slot_x_from_pcb_left),
-            from_pcb_left(reset_x_from_pcb_left),
-            from_pcb_left(boot_x_from_pcb_left),
-            from_pcb_left(power_x_from_pcb_left)
-        ])
-            translate([x - 3.00, top_cut_y0(), -eps])
-                cube([6.00, edge_cut_depth + 2 * eps, 1.20 + 2 * eps]);
+        translate([from_pcb_left(tf_slot_x_from_pcb_left) - 3.00, top_cut_y0(), -eps])
+            cube([6.00, edge_cut_depth + 2 * eps, 1.20 + 2 * eps]);
     }
 }
 
@@ -312,12 +460,19 @@ module printable_case() {
     protective_case();
 }
 
+module printable_preview() {
+    color([1.00, 0.34, 0.04, 1.00])
+        protective_case();
+}
+
 module printable_reference() {
     reference();
 }
 
 if (part == "reference") {
     printable_reference();
+} else if (part == "preview") {
+    printable_preview();
 } else if (part == "fit_check") {
     fit_check_plate();
 } else {

@@ -90,17 +90,17 @@ ESP32-P4 OTG 口
 
 ## 3D Printed Case / 3D 打印外壳
 
-本仓库已收录 Waveshare ESP32-P4 4.3 寸带摄像头版本的 AI/OpenSCAD 外壳草模和实打照片：
+本仓库已收录 Waveshare ESP32-P4 4.3 寸带摄像头版本的 AI/OpenSCAD 外壳草模。**这只是未验证草模：由 AI 辅助设计，当前还没有实际打印回来装配验证，不确定尺寸、孔位、USB-C 插线余量、摄像头孔、螺丝孔和手感是否合适。**
 
 - 外壳目录：[hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera)
 - 主壳 STL：[screen_protective_case.stl](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/screen_protective_case.stl)
 - 参数化源码：[esp32_p4_4_3_camera_case.scad](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/esp32_p4_4_3_camera_case.scad)
 
-注意：这版外壳已经打印过一次，实物开孔位置不准，照片中的孔位是后期用火烧/热熔方式手工补开的。请不要直接批量打印当前 STL，先按实物重新量孔位再改模型。
+当前 GitHub 只保留这一版新外壳文件，旧版开孔错误的外壳照片和展示已删除。请不要直接批量打印，建议先用低成本材料只试打一个，确认屏幕、USB-C、摄像头、螺丝孔都合适后，再考虑继续打印。
 
-| 实打外壳 | 补孔记录 |
-| --- | --- |
-| <img src="hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/photos/printed_case_wrong_holes_01.jpg" width="280" alt="3D 打印外壳开孔错误"> | <img src="hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/photos/printed_case_wrong_holes_02.jpg" width="280" alt="3D 打印外壳补孔记录"> |
+注意：这版外壳为了简化外观，已经把 **TF/SD 卡槽** 和侧边 **POWER / BOOT / RESET 三个按键孔** 全部封住；日常使用主要依赖触摸屏、USB-C、摄像头和固件自身功能。需要频繁使用实体按键或 SD 卡的人，不要直接打印这一版。
+
+<img src="hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/case_preview.png" width="620" alt="AI-designed unverified ESP32-P4 4.3 case preview">
 
 ## Repository Layout
 
