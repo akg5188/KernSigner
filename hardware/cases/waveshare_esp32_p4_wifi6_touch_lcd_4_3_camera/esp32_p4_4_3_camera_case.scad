@@ -57,7 +57,9 @@ total_depth = back_thickness + inside_depth;
 // than the glass so touch use remains comfortable.
 front_rim_h = 1.20;
 front_rim_w = 2.20;
-glass_clearance = 0.38;
+// First print showed the front screen/glass opening about 0.5 mm too loose.
+// Tighten only this front rim pocket; side ports and rear holes stay unchanged.
+glass_clearance = 0.12;
 glass_pocket_w = glass_w + 2 * glass_clearance;
 glass_pocket_h = glass_h + 2 * glass_clearance;
 
