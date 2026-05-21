@@ -44,6 +44,26 @@ More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gal
 - Hardware tooling: display/touch setup, camera preview, storage browser, brightness control, device status, and real-device delivery checks.
 - Desktop simulator: runs the LVGL UI in an SDL2 window for UI review and automated screenshots.
 
+## Supported Coins And Wallets / 支持币种和钱包
+
+当前支持范围按“测试资金验收版”口径说明，不能理解为生产真钱包审计通过。
+
+| 类型 | 当前支持 | 说明 |
+| --- | --- | --- |
+| Bitcoin / BTC | 已接主流程 | 支持常见 BTC 地址、扩展公钥、观察钱包、PSBT/消息签名入口；包含 legacy、nested SegWit、native SegWit、Taproot 和 testnet 变体。 |
+| EVM / ETH 兼容链 | 已接测试主线 | 默认路径 `m/44'/60'/0'/0/0`，支持 EVM 地址显示、观察账户连接和常见 Web3 签名测试；复杂合约、TypedData/EIP-712 和完整交易可读解析仍未作为生产能力开放。 |
+| Satochip 智能卡 | 已接可测主线 | 支持外接供电读卡器下的状态读取、EVM 地址/连接码、Web3 测试签名、BTC 观察公钥读取。 |
+| SeedKeeper 智能卡 | 检测/只读验收 | 可做识别和部分只读检测；写卡、改 PIN、重置、SeedKeeper 管理等高风险功能未开放为交付能力。 |
+
+已写入或预留的 Web3/观察钱包入口：
+
+- OKX Wallet：EVM 连接码和常见测试转账签名已跑通。
+- Bitget Wallet：EVM 连接码和常见测试转账签名已跑通。
+- MetaMask：有连接入口，仍需更多实扫回归。
+- Rabby：有连接入口，仍需更多实扫回归。
+- TokenPocket：有连接入口，特殊二维码格式仍需专项样本回归。
+- BlueWallet：BTC `xpub` / `zpub` 观察钱包路径可测，智能卡账户只读观察码可测。
+
 ## Safety Status
 
 Use this repository with test seeds and test funds only unless you have independently completed the production release gate.
@@ -102,10 +122,10 @@ ESP32-P4 OTG 口
 本仓库已收录 Waveshare ESP32-P4 4.3 寸带摄像头版本的 AI/OpenSCAD 外壳草模。**这只是未验证草模：由 AI 辅助设计，当前还没有实际打印回来装配验证，不确定尺寸、孔位、USB-C 插线余量、摄像头孔、螺丝孔和手感是否合适。**
 
 - 外壳目录：[hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera)
-- 主壳 STL：[screen_protective_case.stl](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/screen_protective_case.stl)
+- 新打印文件：[screen_protective_case.stl](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/screen_protective_case.stl)
 - 参数化源码：[esp32_p4_4_3_camera_case.scad](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/esp32_p4_4_3_camera_case.scad)
 
-当前 GitHub 只保留这一版新外壳文件，旧版开孔错误的外壳照片和展示已删除。请不要直接批量打印，建议先用低成本材料只试打一个，确认屏幕、USB-C、摄像头、螺丝孔都合适后，再考虑继续打印。
+当前 GitHub 只保留这一版新的打印 STL，旧版开孔错误的外壳照片、旧展示和重复 STL 已删除。请不要直接批量打印，建议先用低成本材料只试打一个，确认屏幕、USB-C、摄像头、螺丝孔都合适后，再考虑继续打印。
 
 注意：这版外壳为了简化外观，已经把 **TF/SD 卡槽** 和侧边 **POWER / BOOT / RESET 三个按键孔** 全部封住；日常使用主要依赖触摸屏、USB-C、摄像头和固件自身功能。需要频繁使用实体按键或 SD 卡的人，不要直接打印这一版。
 

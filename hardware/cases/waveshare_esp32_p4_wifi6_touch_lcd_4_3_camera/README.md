@@ -28,7 +28,7 @@
 - 先低成本材料试打一个，确认屏幕、USB-C、摄像头、螺丝孔和整体手感。
 - 特别确认 SD 卡槽和 POWER / BOOT / RESET 三个侧边按键是否可以接受被封住。
 - 如果孔位不合适，优先改 OpenSCAD 参数，再重新导出 STL。
-- 当前 GitHub 只保留这版新外壳，旧版开孔错误的外壳照片和展示已删除。
+- 当前 GitHub 只保留这版新外壳打印文件 `screen_protective_case.stl`，旧版开孔错误的外壳照片、旧展示和重复 STL 已删除。
 
 ## 修改记录
 
@@ -133,6 +133,14 @@ make all
 ```
 
 `make all` 只会导出主壳 `screen_protective_case.stl`。`make reference` 可生成带参考板位置的预览 STL，但不是打印件。
+
+GitHub 上用于打印的文件只有：
+
+```text
+screen_protective_case.stl
+```
+
+其他旧外壳打印文件不再保留，避免误打印旧版本。
 
 ## 打印建议
 
