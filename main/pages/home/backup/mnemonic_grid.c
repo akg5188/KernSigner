@@ -28,8 +28,8 @@ static lv_obj_t *create_cell(lv_obj_t *parent, int w, int h) {
   lv_obj_t *cell = lv_obj_create(parent);
   lv_obj_set_size(cell, w, h);
   lv_obj_set_style_bg_opa(cell, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(cell, 1, 0);
-  lv_obj_set_style_border_color(cell, lv_color_hex(0x1F2937), 0);
+  lv_obj_set_style_border_width(cell, 2, 0);
+  lv_obj_set_style_border_color(cell, highlight_color(), 0);
   lv_obj_set_style_radius(cell, 0, 0);
   lv_obj_set_style_pad_all(cell, 0, 0);
   lv_obj_clear_flag(cell, LV_OBJ_FLAG_SCROLLABLE);
@@ -38,20 +38,16 @@ static lv_obj_t *create_cell(lv_obj_t *parent, int w, int h) {
 
 static void add_dot_cell(lv_obj_t *row, bool filled, int size) {
   lv_obj_t *cell = create_cell(row, size, size);
-  lv_obj_set_style_bg_color(cell, filled ? lv_color_hex(0x00D084)
-                                         : lv_color_hex(0x020617),
-                            0);
-  lv_obj_set_style_border_color(cell, filled ? lv_color_hex(0xF59E0B)
-                                            : lv_color_hex(0x1E3A8A),
-                                0);
-  lv_obj_set_style_border_width(cell, filled ? 2 : 1, 0);
+  lv_obj_set_style_bg_color(cell, filled ? highlight_color() : bg_color(), 0);
+  lv_obj_set_style_border_color(cell, highlight_color(), 0);
+  lv_obj_set_style_border_width(cell, 2, 0);
 }
 
 static lv_obj_t *add_text_cell(lv_obj_t *row, const char *text, int w, int h,
                                lv_color_t color) {
   lv_obj_t *cell = create_cell(row, w, h);
-  lv_obj_set_style_bg_color(cell, lv_color_hex(0x000000), 0);
-  lv_obj_set_style_border_color(cell, lv_color_hex(0x111827), 0);
+  lv_obj_set_style_bg_color(cell, bg_color(), 0);
+  lv_obj_set_style_border_color(cell, highlight_color(), 0);
   lv_obj_t *label = lv_label_create(cell);
   lv_label_set_text(label, text ? text : "");
   lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
@@ -124,7 +120,7 @@ void mnemonic_grid_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
     return;
 
   grid_screen = theme_create_page_container(parent);
-  lv_obj_set_style_bg_color(grid_screen, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_color(grid_screen, bg_color(), 0);
   lv_obj_set_style_bg_opa(grid_screen, LV_OPA_COVER, 0);
   theme_create_page_title(grid_screen, "点阵板");
   (void)ui_create_back_button(grid_screen, back_btn_cb);
@@ -133,7 +129,7 @@ void mnemonic_grid_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_width(list, LV_PCT(100));
   lv_obj_set_height(list, LV_PCT(88));
   lv_obj_align(list, LV_ALIGN_BOTTOM_MID, 0, 0);
-  lv_obj_set_style_bg_color(list, lv_color_hex(0x000000), 0);
+  lv_obj_set_style_bg_color(list, bg_color(), 0);
   lv_obj_set_style_bg_opa(list, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(list, 0, 0);
   lv_obj_set_style_radius(list, 0, 0);

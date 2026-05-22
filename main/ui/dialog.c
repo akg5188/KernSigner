@@ -92,7 +92,7 @@ static lv_obj_t *create_dialog_container(dialog_style_t style,
     lv_obj_remove_style_all(blocker);
     lv_obj_set_size(blocker, LV_PCT(100), LV_PCT(100));
     lv_obj_set_style_bg_color(blocker, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(blocker, LV_OPA_50, 0);
+    lv_obj_set_style_bg_opa(blocker, LV_OPA_COVER, 0);
     lv_obj_add_flag(blocker, LV_OBJ_FLAG_CLICKABLE);
     *out_root = blocker;
 

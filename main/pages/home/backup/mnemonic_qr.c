@@ -652,7 +652,7 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   char fingerprint_hex[9] = "--------";
   key_get_fingerprint_hex(fingerprint_hex);
   char fp_text[32];
-  snprintf(fp_text, sizeof(fp_text), "指纹 %s", fingerprint_hex);
+  snprintf(fp_text, sizeof(fp_text), "钱包指纹 %s", fingerprint_hex);
   fingerprint_label = theme_create_label(content_area, fp_text, false);
   lv_obj_set_style_text_font(fingerprint_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(fingerprint_label, highlight_color(), 0);

@@ -37,6 +37,7 @@
 #include "../shared/mnemonic_slots_page.h"
 #include "../shared/sensitive_pin.h"
 #include <ctype.h>
+#include <cJSON.h>
 #include <esp_err.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
@@ -169,9 +170,16 @@ typedef struct {
   char value[96];
   char to[48];
   char data_len[32];
+  char data_note[96];
+  char method[80];
+  char token_target[48];
+  char token_from[48];
+  char token_amount[96];
   char access_list_count[32];
   char error[96];
+  size_t payload_len;
   bool has_to;
+  bool value_is_zero;
   bool valid;
 } web3_tx_summary_t;
 
@@ -254,12 +262,15 @@ static void web3_pin_sign_after_summary_cb(lv_event_t *e);
 static void web3_mnemonic_sign_cb(lv_timer_t *timer);
 static bool web3_sign_with_mnemonic(void);
 static lv_obj_t *web3_prepare_page(void);
-static const char *web3_source_display_name(web3_sign_source_t source);
-static const char *web3_request_action_label(const web3_sign_request_t *req);
 static void web3_add_detail_field(lv_obj_t *parent, const char *title,
                                   const char *value, bool wrap);
+static int web3_estimate_visual_lines(const char *text, int columns);
+static int web3_detail_field_height(const char *title, const char *value,
+                                    bool wrap);
 static void web3_add_transaction_details(lv_obj_t *parent,
                                          const web3_sign_request_t *req);
+static void web3_add_typed_data_details(lv_obj_t *parent,
+                                        const web3_sign_request_t *req);
 static void web3_resume_current_step(void);
 static bool web3_compose_signature_bytes(const web3_sign_request_t *req,
                                          const uint8_t compact[64],
@@ -267,6 +278,7 @@ static bool web3_compose_signature_bytes(const web3_sign_request_t *req,
                                          uint8_t signature[72],
                                          size_t *signature_len);
 static bool contains_ci(const char *haystack, const char *needle);
+static bool starts_ci(const char *text, const char *prefix);
 
 static int max_i(int a, int b) { return a > b ? a : b; }
 
@@ -302,38 +314,25 @@ static lv_obj_t *web3_prepare_page(void) {
   return scan_screen;
 }
 
-static const char *web3_source_display_name(web3_sign_source_t source) {
-  switch (source) {
-  case WEB3_SIGN_SOURCE_SMARTCARD:
-    return "智能卡";
-  case WEB3_SIGN_SOURCE_MNEMONIC:
-    return "助记词";
-  default:
-    return "来源";
-  }
-}
+static lv_obj_t *web3_create_fixed_title(lv_obj_t *root, const char *text) {
+  lv_obj_t *header = lv_obj_create(root);
+  lv_obj_set_width(header, LV_PCT(100));
+  lv_obj_set_height(header, max_i(theme_get_corner_button_height() +
+                                      theme_get_small_padding() * 3,
+                                  76));
+  theme_apply_transparent_container(header);
+  lv_obj_set_style_pad_top(header, theme_get_small_padding(), 0);
+  lv_obj_set_style_pad_bottom(header, theme_get_small_padding(), 0);
+  lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
 
-static const char *web3_request_action_label(const web3_sign_request_t *req) {
-  if (!req)
-    return "签名";
-  switch (req->request_type_id) {
-  case WEB3_REQUEST_TYPE_PERSONAL:
-    return "消息签名";
-  case WEB3_REQUEST_TYPE_TYPED_DATA:
-    return "结构化签名";
-  case WEB3_REQUEST_TYPE_LEGACY_TX:
-  case WEB3_REQUEST_TYPE_TYPED_TX:
-    return "交易签名";
-  default:
-    break;
-  }
-  if (contains_ci(req->action, "personalSign"))
-    return "消息签名";
-  if (contains_ci(req->action, "TypedData"))
-    return "结构化签名";
-  if (contains_ci(req->action, "signTransaction"))
-    return "交易签名";
-  return "签名";
+  lv_obj_t *title = theme_create_label(header, text ? text : "", false);
+  lv_obj_set_width(title, LV_PCT(50));
+  lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_font(title, theme_font_medium(), 0);
+  lv_obj_set_style_text_color(title, main_color(), 0);
+  lv_obj_center(title);
+  return title;
 }
 
 static bool web3_bytes_are_readable_text(const uint8_t *data, size_t len) {
@@ -460,27 +459,91 @@ static void web3_add_detail_field(lv_obj_t *parent, const char *title,
 
   lv_obj_t *box = lv_obj_create(parent);
   lv_obj_set_width(box, LV_PCT(100));
-  lv_obj_set_height(box, LV_SIZE_CONTENT);
+  lv_obj_set_height(box, web3_detail_field_height(title, value, wrap));
   lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_START);
   lv_obj_set_style_bg_color(box, bg_color(), 0);
-  lv_obj_set_style_bg_opa(box, LV_OPA_50, 0);
-  lv_obj_set_style_border_color(box, lv_color_hex(0x343434), 0);
-  lv_obj_set_style_border_width(box, 1, 0);
-  lv_obj_set_style_radius(box, 10, 0);
+  lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(box, highlight_color(), 0);
+  lv_obj_set_style_border_width(box, 2, 0);
+  lv_obj_set_style_radius(box, 8, 0);
   lv_obj_set_style_pad_all(box, theme_get_small_padding(), 0);
-  lv_obj_set_style_pad_gap(box, 3, 0);
+  lv_obj_set_style_pad_gap(box, max_i(8, theme_get_small_padding()), 0);
   lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
 
   lv_obj_t *label = theme_create_label(box, title, true);
   lv_obj_set_width(label, LV_PCT(100));
+  lv_obj_set_height(label, LV_SIZE_CONTENT);
+  lv_obj_set_flex_grow(label, 0);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_color(label, highlight_color(), 0);
   lv_obj_set_style_text_font(label, theme_font_small(), 0);
+  lv_obj_set_style_text_line_space(label, 2, 0);
 
   lv_obj_t *text = theme_create_label(box, value ? value : "-", false);
   lv_obj_set_width(text, LV_PCT(100));
+  lv_obj_set_height(text, LV_SIZE_CONTENT);
+  lv_obj_set_flex_grow(text, 0);
   lv_label_set_long_mode(text, wrap ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
   lv_obj_set_style_text_font(text, theme_font_small(), 0);
-  lv_obj_set_style_text_line_space(text, 3, 0);
+  lv_obj_set_style_text_line_space(text, 5, 0);
+}
+
+static int web3_estimate_visual_lines(const char *text, int columns) {
+  if (!text || !text[0])
+    return 1;
+  if (columns < 12)
+    columns = 12;
+
+  int lines = 1;
+  int col = 0;
+  const unsigned char *p = (const unsigned char *)text;
+  while (*p) {
+    if (*p == '\n') {
+      lines++;
+      col = 0;
+      p++;
+      continue;
+    }
+
+    int width = 1;
+    if (*p >= 0x80) {
+      width = 2;
+      do {
+        p++;
+      } while ((*p & 0xC0) == 0x80);
+    } else {
+      p++;
+    }
+
+    col += width;
+    if (col >= columns) {
+      lines++;
+      col = 0;
+    }
+  }
+  return lines;
+}
+
+static int web3_detail_field_height(const char *title, const char *value,
+                                    bool wrap) {
+  const int pad = theme_get_small_padding();
+  const int screen_w = theme_get_screen_width();
+  const int content_w =
+      max_i(160, screen_w - theme_get_default_padding() * 2 - pad * 6 - 24);
+  const int columns = max_i(18, content_w / 10);
+  const int line_h = theme_font_small() ? theme_font_small()->line_height + 5
+                                       : 25;
+  const int gap = max_i(8, pad);
+  const int title_lines = web3_estimate_visual_lines(title, columns);
+  const int value_lines =
+      wrap ? web3_estimate_visual_lines(value ? value : "-", columns) : 1;
+  const int min_h = wrap ? max_i(92, theme_get_min_touch_size() + pad * 3)
+                         : max_i(68, theme_get_min_touch_size() + pad);
+  const int wanted =
+      pad * 2 + title_lines * line_h + gap + value_lines * line_h + 10;
+  return max_i(min_h, wanted);
 }
 
 static bool web3_rlp_read_item(const uint8_t *cursor, const uint8_t *end,
@@ -612,6 +675,16 @@ static void web3_rlp_quantity_text(const web3_rlp_item_t *item, char *out,
   web3_quantity_to_decimal(item->payload, item->payload_len, out, out_len);
 }
 
+static bool web3_rlp_quantity_is_zero(const web3_rlp_item_t *item) {
+  if (!item || item->is_list || item->payload_len == 0)
+    return true;
+  for (size_t i = 0; i < item->payload_len; i++) {
+    if (item->payload[i] != 0)
+      return false;
+  }
+  return true;
+}
+
 static void web3_rlp_address_text(const web3_rlp_item_t *item, char *out,
                                   size_t out_len, bool *has_to) {
   if (has_to)
@@ -639,17 +712,246 @@ static void web3_rlp_address_text(const web3_rlp_item_t *item, char *out,
     *has_to = true;
 }
 
-static const char *web3_tx_type_label(int tx_type) {
-  switch (tx_type) {
-  case 0:
-    return "Legacy";
-  case 1:
-    return "EIP-2930";
-  case 2:
-    return "EIP-1559";
-  default:
-    return "未知";
+static void web3_bytes_address_text(const uint8_t *bytes, char *out,
+                                    size_t out_len) {
+  if (!out || out_len == 0)
+    return;
+  out[0] = '\0';
+  if (!bytes) {
+    snprintf(out, out_len, "-");
+    return;
   }
+  size_t pos = 0;
+  pos += snprintf(out + pos, out_len - pos, "0x");
+  for (size_t i = 0; i < 20 && pos + 2 < out_len; i++)
+    pos += snprintf(out + pos, out_len - pos, "%02x", bytes[i]);
+}
+
+static bool web3_decimal_is_digits(const char *text) {
+  if (!text || !text[0])
+    return false;
+  for (const char *p = text; *p; p++) {
+    if (!isdigit((unsigned char)*p))
+      return false;
+  }
+  return true;
+}
+
+static bool web3_decimal_is_zero_text(const char *text) {
+  if (!web3_decimal_is_digits(text))
+    return false;
+  for (const char *p = text; *p; p++) {
+    if (*p != '0')
+      return false;
+  }
+  return true;
+}
+
+static bool web3_decimal_to_u64(const char *text, uint64_t *out) {
+  if (!text || !out)
+    return false;
+  uint64_t value = 0;
+  bool seen = false;
+  while (*text && isspace((unsigned char)*text))
+    text++;
+  for (const char *p = text; *p; p++) {
+    if (!isdigit((unsigned char)*p))
+      break;
+    uint64_t digit = (uint64_t)(*p - '0');
+    if (value > (UINT64_MAX - digit) / 10ULL)
+      return false;
+    value = value * 10ULL + digit;
+    seen = true;
+  }
+  if (!seen)
+    return false;
+  *out = value;
+  return true;
+}
+
+static const char *web3_chain_name_from_id(uint64_t chain_id) {
+  switch (chain_id) {
+  case 1:
+    return "Ethereum";
+  case 10:
+    return "Optimism";
+  case 25:
+    return "Cronos";
+  case 56:
+    return "BSC";
+  case 100:
+    return "Gnosis";
+  case 137:
+    return "Polygon";
+  case 250:
+    return "Fantom";
+  case 324:
+    return "zkSync Era";
+  case 1101:
+    return "Polygon zkEVM";
+  case 5000:
+    return "Mantle";
+  case 8453:
+    return "Base";
+  case 42161:
+    return "Arbitrum";
+  case 43114:
+    return "Avalanche";
+  case 59144:
+    return "Linea";
+  case 534352:
+    return "Scroll";
+  default:
+    return NULL;
+  }
+}
+
+static void web3_chain_display_from_id(uint64_t chain_id, char *out,
+                                       size_t out_len) {
+  if (!out || out_len == 0)
+    return;
+  const char *name = web3_chain_name_from_id(chain_id);
+  if (name)
+    snprintf(out, out_len, "%s", name);
+  else
+    snprintf(out, out_len, "EVM %llu", (unsigned long long)chain_id);
+}
+
+static void web3_request_chain_display(const web3_sign_request_t *req,
+                                       char *out, size_t out_len) {
+  if (!out || out_len == 0)
+    return;
+  if (req && req->chain[0] && !starts_ci(req->chain, "EVM")) {
+    snprintf(out, out_len, "%s", req->chain);
+    return;
+  }
+  if (req && req->chain_id > 0) {
+    web3_chain_display_from_id((uint64_t)req->chain_id, out, out_len);
+    return;
+  }
+  snprintf(out, out_len, "%s", (req && req->chain[0]) ? req->chain : "EVM");
+}
+
+static void web3_format_decimal_unit(const char *digits, unsigned decimals,
+                                     const char *unit, char *out,
+                                     size_t out_len) {
+  if (!out || out_len == 0)
+    return;
+  out[0] = '\0';
+  if (!web3_decimal_is_digits(digits)) {
+    snprintf(out, out_len, "%s", digits ? digits : "-");
+    return;
+  }
+
+  while (digits[0] == '0' && digits[1])
+    digits++;
+  if (web3_decimal_is_zero_text(digits)) {
+    snprintf(out, out_len, "0 %s", unit ? unit : "");
+    return;
+  }
+
+  char body[144];
+  size_t pos = 0;
+  size_t len = strlen(digits);
+  if (decimals == 0 || len > decimals) {
+    size_t whole_len = decimals == 0 ? len : len - decimals;
+    for (size_t i = 0; i < whole_len && pos + 1 < sizeof(body); i++)
+      body[pos++] = digits[i];
+    if (decimals > 0) {
+      size_t frac_start = whole_len;
+      size_t frac_len = len - whole_len;
+      while (frac_len > 0 && digits[frac_start + frac_len - 1] == '0')
+        frac_len--;
+      if (frac_len > 0 && pos + 1 < sizeof(body)) {
+        body[pos++] = '.';
+        for (size_t i = 0; i < frac_len && pos + 1 < sizeof(body); i++)
+          body[pos++] = digits[frac_start + i];
+      }
+    }
+  } else {
+    body[pos++] = '0';
+    if (pos + 1 < sizeof(body))
+      body[pos++] = '.';
+    for (size_t i = 0; i < decimals - len && pos + 1 < sizeof(body); i++)
+      body[pos++] = '0';
+    for (size_t i = 0; i < len && pos + 1 < sizeof(body); i++)
+      body[pos++] = digits[i];
+    while (pos > 0 && body[pos - 1] == '0')
+      pos--;
+    if (pos > 0 && body[pos - 1] == '.')
+      pos--;
+  }
+  body[pos] = '\0';
+  snprintf(out, out_len, "%s %s", body, unit ? unit : "");
+}
+
+static void web3_format_wei_amount(const char *wei, char *out,
+                                   size_t out_len) {
+  if (!out || out_len == 0)
+    return;
+  char eth[160];
+  web3_format_decimal_unit(wei, 18, "ETH", eth, sizeof(eth));
+  snprintf(out, out_len, "%s", eth);
+}
+
+static void web3_decode_known_calldata(const web3_rlp_item_t *data_item,
+                                       web3_tx_summary_t *summary) {
+  if (!data_item || data_item->is_list || !summary)
+    return;
+  const uint8_t *p = data_item->payload;
+  size_t len = data_item->payload_len;
+  summary->payload_len = len;
+  if (len == 0) {
+    snprintf(summary->data_note, sizeof(summary->data_note), "无");
+    return;
+  }
+
+  if (len >= 4) {
+    snprintf(summary->data_note, sizeof(summary->data_note),
+             "%u 字节，方法 0x%02x%02x%02x%02x", (unsigned)len, p[0], p[1],
+             p[2], p[3]);
+  } else {
+    snprintf(summary->data_note, sizeof(summary->data_note), "%u 字节",
+             (unsigned)len);
+    return;
+  }
+
+  if (len >= 68 && p[0] == 0xa9 && p[1] == 0x05 && p[2] == 0x9c &&
+      p[3] == 0xbb) {
+    snprintf(summary->method, sizeof(summary->method),
+             "ERC20 转账 transfer");
+    web3_bytes_address_text(p + 4 + 12, summary->token_target,
+                            sizeof(summary->token_target));
+    web3_quantity_to_decimal(p + 4 + 32, 32, summary->token_amount,
+                             sizeof(summary->token_amount));
+    return;
+  }
+
+  if (len >= 68 && p[0] == 0x09 && p[1] == 0x5e && p[2] == 0xa7 &&
+      p[3] == 0xb3) {
+    snprintf(summary->method, sizeof(summary->method),
+             "ERC20 授权 approve");
+    web3_bytes_address_text(p + 4 + 12, summary->token_target,
+                            sizeof(summary->token_target));
+    web3_quantity_to_decimal(p + 4 + 32, 32, summary->token_amount,
+                             sizeof(summary->token_amount));
+    return;
+  }
+
+  if (len >= 100 && p[0] == 0x23 && p[1] == 0xb8 && p[2] == 0x72 &&
+      p[3] == 0xdd) {
+    snprintf(summary->method, sizeof(summary->method),
+             "ERC20 代扣转账 transferFrom");
+    web3_bytes_address_text(p + 4 + 12, summary->token_from,
+                            sizeof(summary->token_from));
+    web3_bytes_address_text(p + 4 + 32 + 12, summary->token_target,
+                            sizeof(summary->token_target));
+    web3_quantity_to_decimal(p + 4 + 64, 32, summary->token_amount,
+                             sizeof(summary->token_amount));
+    return;
+  }
+
+  snprintf(summary->method, sizeof(summary->method), "合约调用");
 }
 
 static void web3_parse_tx_summary(const web3_sign_request_t *req,
@@ -699,8 +1001,10 @@ static void web3_parse_tx_summary(const web3_sign_request_t *req,
                           &summary->has_to);
     web3_rlp_quantity_text(&fields[4], summary->value,
                            sizeof(summary->value));
+    summary->value_is_zero = web3_rlp_quantity_is_zero(&fields[4]);
     snprintf(summary->data_len, sizeof(summary->data_len), "%u 字节",
              (unsigned)fields[5].payload_len);
+    web3_decode_known_calldata(&fields[5], summary);
     if (count > 6 && !fields[6].is_list && fields[6].payload_len > 0) {
       web3_rlp_quantity_text(&fields[6], summary->chain_id,
                              sizeof(summary->chain_id));
@@ -729,8 +1033,10 @@ static void web3_parse_tx_summary(const web3_sign_request_t *req,
                           &summary->has_to);
     web3_rlp_quantity_text(&fields[5], summary->value,
                            sizeof(summary->value));
+    summary->value_is_zero = web3_rlp_quantity_is_zero(&fields[5]);
     snprintf(summary->data_len, sizeof(summary->data_len), "%u 字节",
              (unsigned)fields[6].payload_len);
+    web3_decode_known_calldata(&fields[6], summary);
     snprintf(summary->access_list_count, sizeof(summary->access_list_count),
              "%u 项", fields[7].is_list
                          ? (unsigned)web3_rlp_collect_list(&fields[7], fields,
@@ -759,8 +1065,10 @@ static void web3_parse_tx_summary(const web3_sign_request_t *req,
                           &summary->has_to);
     web3_rlp_quantity_text(&fields[6], summary->value,
                            sizeof(summary->value));
+    summary->value_is_zero = web3_rlp_quantity_is_zero(&fields[6]);
     snprintf(summary->data_len, sizeof(summary->data_len), "%u 字节",
              (unsigned)fields[7].payload_len);
+    web3_decode_known_calldata(&fields[7], summary);
     snprintf(summary->access_list_count, sizeof(summary->access_list_count),
              "%u 项", fields[8].is_list
                          ? (unsigned)web3_rlp_collect_list(&fields[8], fields,
@@ -789,28 +1097,219 @@ static void web3_add_transaction_details(lv_obj_t *parent,
     return;
   }
 
-  web3_add_detail_field(parent, "交易类型", web3_tx_type_label(tx.tx_type),
-                        false);
-  web3_add_detail_field(parent, "交易链 ID", tx.chain_id, false);
-  web3_add_detail_field(parent, "收款地址", tx.to, true);
-  web3_add_detail_field(parent, "金额(wei)", tx.value, true);
-  web3_add_detail_field(parent, "Nonce", tx.nonce, false);
-  web3_add_detail_field(parent, "Gas Limit", tx.gas_limit, false);
-  if (tx.tx_type == 0 || tx.tx_type == 1) {
-    web3_add_detail_field(parent, "Gas Price", tx.gas_price, true);
-  } else if (tx.tx_type == 2) {
-    web3_add_detail_field(parent, "Priority Fee", tx.max_priority_fee, true);
-    web3_add_detail_field(parent, "Max Fee", tx.max_fee, true);
+  char action[96];
+  if (!tx.has_to) {
+    snprintf(action, sizeof(action), "合约创建");
+  } else if (tx.payload_len > 0 && tx.method[0]) {
+    snprintf(action, sizeof(action), "%s", tx.method);
+  } else if (tx.payload_len > 0) {
+    snprintf(action, sizeof(action), "合约调用");
+  } else {
+    snprintf(action, sizeof(action), "转账");
   }
-  web3_add_detail_field(parent, "交易数据", tx.data_len, false);
-  if (tx.tx_type == 1 || tx.tx_type == 2)
-    web3_add_detail_field(parent, "Access List", tx.access_list_count, false);
+
+  char chain_display[96];
+  uint64_t chain_id = 0;
+  if (web3_decimal_to_u64(tx.chain_id, &chain_id) && chain_id > 0)
+    web3_chain_display_from_id(chain_id, chain_display, sizeof(chain_display));
+  else
+    snprintf(chain_display, sizeof(chain_display), "%s", tx.chain_id);
+
+  char amount[192];
+  web3_format_wei_amount(tx.value, amount, sizeof(amount));
+
+  web3_add_detail_field(parent, "动作", action, true);
+  web3_add_detail_field(parent, "链", chain_display, false);
+  web3_add_detail_field(parent, tx.has_to ? "收款/合约" : "目标", tx.to,
+                        true);
+  if (tx.token_from[0])
+    web3_add_detail_field(parent, "转出", tx.token_from, true);
+  if (tx.token_target[0])
+    web3_add_detail_field(parent,
+                          contains_ci(tx.method, "授权") ? "授权对象"
+                                                          : "代币",
+                          tx.token_target, true);
+  if (tx.token_amount[0])
+    web3_add_detail_field(parent, "数量", tx.token_amount, true);
+  if (!tx.value_is_zero)
+    web3_add_detail_field(parent, "金额", amount, true);
+  if (tx.payload_len > 0) {
+    const char *notice = contains_ci(tx.method, "授权")
+                             ? "这是代币授权，请确认授权对象和数量。"
+                             : "这是合约交互，请确认 DApp、合约地址和金额。";
+    web3_add_detail_field(parent, "提示", notice, true);
+  }
+}
+
+static bool web3_cjson_value_text(const cJSON *item, char *out,
+                                  size_t out_len) {
+  if (!item || !out || out_len == 0)
+    return false;
+  out[0] = '\0';
+
+  if (cJSON_IsString(item) && item->valuestring) {
+    snprintf(out, out_len, "%s", item->valuestring);
+    return true;
+  }
+  if (cJSON_IsBool(item)) {
+    snprintf(out, out_len, "%s", cJSON_IsTrue(item) ? "true" : "false");
+    return true;
+  }
+
+  char *printed = cJSON_PrintUnformatted((cJSON *)item);
+  if (!printed)
+    return false;
+  if (strlen(printed) >= out_len) {
+    short_middle(out, out_len, printed, 96, 48);
+  } else {
+    snprintf(out, out_len, "%s", printed);
+  }
+  free(printed);
+  return true;
+}
+
+static void web3_add_cjson_field(lv_obj_t *parent, const char *title,
+                                 const cJSON *item) {
+  char value[256];
+  if (web3_cjson_value_text(item, value, sizeof(value)) && value[0])
+    web3_add_detail_field(parent, title, value, true);
+}
+
+static void web3_add_typed_data_details(lv_obj_t *parent,
+                                        const web3_sign_request_t *req) {
+  if (!parent || !req ||
+      req->request_type_id != WEB3_REQUEST_TYPE_TYPED_DATA ||
+      !req->sign_data || req->sign_data_len == 0) {
+    return;
+  }
+
+  char *json = malloc(req->sign_data_len + 1U);
+  if (!json)
+    return;
+  memcpy(json, req->sign_data, req->sign_data_len);
+  json[req->sign_data_len] = '\0';
+
+  cJSON *root = cJSON_Parse(json);
+  secure_memzero(json, req->sign_data_len);
+  free(json);
+  if (!cJSON_IsObject(root)) {
+    cJSON_Delete(root);
+    web3_add_detail_field(parent, "类型", "TypedData", false);
+    return;
+  }
+
+  web3_add_detail_field(parent, "类型", "DApp 结构化签名", false);
+  const cJSON *primary =
+      cJSON_GetObjectItemCaseSensitive(root, "primaryType");
+  web3_add_cjson_field(parent, "主要类型", primary);
+
+  const cJSON *domain = cJSON_GetObjectItemCaseSensitive(root, "domain");
+  bool chain_shown = false;
+  if (cJSON_IsObject(domain)) {
+    char dapp_text[128];
+    if (web3_cjson_value_text(
+            cJSON_GetObjectItemCaseSensitive((cJSON *)domain, "name"),
+            dapp_text, sizeof(dapp_text)) &&
+        dapp_text[0]) {
+      web3_add_detail_field(parent, "DApp", dapp_text, true);
+    } else if (req->origin[0]) {
+      web3_add_detail_field(parent, "DApp", req->origin, true);
+    }
+    web3_add_cjson_field(parent, "版本",
+                         cJSON_GetObjectItemCaseSensitive((cJSON *)domain,
+                                                          "version"));
+    char chain_text[64];
+    if (web3_cjson_value_text(
+            cJSON_GetObjectItemCaseSensitive((cJSON *)domain, "chainId"),
+            chain_text, sizeof(chain_text)) &&
+        chain_text[0]) {
+      char chain_display[96];
+      uint64_t chain_id = 0;
+      if (web3_decimal_to_u64(chain_text, &chain_id) && chain_id > 0) {
+        web3_chain_display_from_id(chain_id, chain_display,
+                                   sizeof(chain_display));
+      } else {
+        snprintf(chain_display, sizeof(chain_display), "%s", chain_text);
+      }
+      web3_add_detail_field(parent, "链", chain_display, false);
+      chain_shown = true;
+    }
+    web3_add_cjson_field(parent, "合约",
+                         cJSON_GetObjectItemCaseSensitive((cJSON *)domain,
+                                                          "verifyingContract"));
+  } else if (req->origin[0]) {
+    web3_add_detail_field(parent, "DApp", req->origin, true);
+  }
+  if (!chain_shown) {
+    char chain_display[96];
+    web3_request_chain_display(req, chain_display, sizeof(chain_display));
+    web3_add_detail_field(parent, "链", chain_display, false);
+  }
+
+  const cJSON *message = cJSON_GetObjectItemCaseSensitive(root, "message");
+  if (cJSON_IsObject(message)) {
+    static const struct {
+      const char *key;
+      const char *title;
+    } fields[] = {
+        {"from", "发送方"},       {"to", "接收方"},
+        {"owner", "持有人"},     {"spender", "授权对象"},
+        {"value", "数量"},       {"amount", "金额"},
+        {"tokenId", "代币 ID"},  {"nonce", "序号"},
+        {"deadline", "截止时间"}, {"contents", "内容"},
+        {"statement", "声明"},   {"uri", "链接"},
+    };
+    for (size_t i = 0; i < sizeof(fields) / sizeof(fields[0]); i++) {
+      web3_add_cjson_field(
+          parent, fields[i].title,
+          cJSON_GetObjectItemCaseSensitive((cJSON *)message, fields[i].key));
+    }
+  }
+
+  cJSON_Delete(root);
 }
 
 static void web3_add_full_sign_data_details(lv_obj_t *parent,
                                             const web3_sign_request_t *req) {
   if (!parent || !req || !req->sign_data || req->sign_data_len == 0)
     return;
+
+  if (req->request_type_id == WEB3_REQUEST_TYPE_LEGACY_TX ||
+      req->request_type_id == WEB3_REQUEST_TYPE_TYPED_TX) {
+    web3_tx_summary_t tx;
+    web3_parse_tx_summary(req, &tx);
+    if (tx.valid && tx.payload_len == 0)
+      return;
+    if (!tx.valid) {
+      web3_add_detail_field(parent, "原始交易",
+                            "交易字段解析失败，请核对原始十六进制内容。",
+                            true);
+      char *full = web3_format_full_data_alloc(req->sign_data,
+                                               req->sign_data_len, false);
+      if (full) {
+        web3_add_detail_field(parent, "完整原始交易", full, true);
+        free(full);
+      }
+      return;
+    }
+
+    char *full = web3_format_full_data_alloc(req->sign_data,
+                                             req->sign_data_len, false);
+    if (!full)
+      return;
+    web3_add_detail_field(parent, "完整原始交易(合约高级核对)", full, true);
+    free(full);
+    return;
+  }
+  if (req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA) {
+    char *full =
+        web3_format_full_data_alloc(req->sign_data, req->sign_data_len, true);
+    if (!full)
+      return;
+    web3_add_detail_field(parent, "完整 DApp 签名内容", full, true);
+    free(full);
+    return;
+  }
 
   const bool is_text = req->request_type_id == WEB3_REQUEST_TYPE_PERSONAL ||
                        req->request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA;
@@ -821,7 +1320,7 @@ static void web3_add_full_sign_data_details(lv_obj_t *parent,
     title = "完整 TypedData";
   else if (req->request_type_id == WEB3_REQUEST_TYPE_LEGACY_TX ||
            req->request_type_id == WEB3_REQUEST_TYPE_TYPED_TX)
-    title = "交易原文";
+    title = "原始交易(高级)";
 
   char *full = web3_format_full_data_alloc(req->sign_data, req->sign_data_len,
                                            is_text);
@@ -2667,8 +3166,7 @@ static void web3_pin_ready_cb(lv_event_t *event) {
 static void web3_show_pin_input(const web3_sign_request_t *req) {
   lv_obj_t *root = web3_prepare_page();
 
-  lv_obj_t *title = theme_create_page_title(root, "智能卡 PIN");
-  lv_obj_set_width(title, LV_PCT(62));
+  (void)web3_create_fixed_title(root, "智能卡 PIN");
 
   lv_obj_t *card = lv_obj_create(root);
   lv_obj_set_width(card, LV_PCT(100));
@@ -2679,7 +3177,7 @@ static void web3_show_pin_input(const web3_sign_request_t *req) {
   theme_apply_frame(card);
   lv_obj_set_style_pad_all(card, theme_get_small_padding() + 4, 0);
   lv_obj_set_style_pad_gap(card, theme_get_small_padding(), 0);
-  lv_obj_set_style_margin_top(card, theme_get_default_padding() * 2, 0);
+  lv_obj_set_style_margin_top(card, theme_get_small_padding(), 0);
 
   char wallet_line[96];
   snprintf(wallet_line, sizeof(wallet_line), "%s / %s",
@@ -2750,8 +3248,7 @@ static void web3_show_source_choice(void) {
   web3_summary_back_to_choice = false;
   lv_obj_t *root = web3_prepare_page();
 
-  lv_obj_t *title = theme_create_page_title(root, "签名方式");
-  lv_obj_set_width(title, LV_PCT(62));
+  (void)web3_create_fixed_title(root, "签名方式");
 
   lv_obj_t *row = lv_obj_create(root);
   lv_obj_set_width(row, LV_PCT(100));
@@ -2763,7 +3260,7 @@ static void web3_show_source_choice(void) {
   lv_obj_set_style_border_width(row, 0, 0);
   lv_obj_set_style_pad_all(row, 0, 0);
   lv_obj_set_style_pad_gap(row, theme_get_small_padding(), 0);
-  lv_obj_set_style_margin_top(row, theme_get_default_padding() * 2, 0);
+  lv_obj_set_style_margin_top(row, theme_get_small_padding(), 0);
 
   add_web3_source_button(row, "助记词", web3_source_mnemonic_cb);
   add_web3_source_button(row, "智能卡", web3_source_satochip_cb);
@@ -2826,43 +3323,38 @@ static void web3_show_request_summary_for_source(web3_sign_source_t source,
   web3_summary_back_to_choice = back_to_choice;
 
   lv_obj_t *root = web3_prepare_page();
-  lv_obj_t *title = theme_create_page_title(root, "确认签名");
-  lv_obj_set_width(title, LV_PCT(62));
+  (void)web3_create_fixed_title(root, "确认签名");
 
   lv_obj_t *card = lv_obj_create(root);
   lv_obj_set_width(card, LV_PCT(100));
   lv_obj_set_flex_grow(card, 1);
+  lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_START);
   lv_obj_set_scroll_dir(card, LV_DIR_VER);
   lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLLABLE);
   theme_apply_frame(card);
-  lv_obj_set_style_pad_gap(card, theme_get_small_padding(), 0);
-  lv_obj_set_style_margin_top(card, theme_get_default_padding() * 2, 0);
+  lv_obj_set_style_pad_all(card, theme_get_small_padding() + 6, 0);
+  lv_obj_set_style_pad_gap(card, theme_get_small_padding() + 2, 0);
+  lv_obj_set_style_pad_top(card, theme_get_small_padding() + 6, 0);
+  lv_obj_set_style_pad_bottom(card,
+                              theme_get_default_padding() +
+                                  theme_get_small_padding(),
+                              0);
+  lv_obj_set_style_margin_top(card, theme_get_small_padding(), 0);
 
-  web3_add_detail_field(card, "来源", web3_source_display_name(source),
-                        false);
   web3_add_detail_field(card, "钱包",
                         pending_web3_request.wallet[0]
                             ? pending_web3_request.wallet
                             : "Web3",
                         true);
-  web3_add_detail_field(card, "动作",
-                        web3_request_action_label(&pending_web3_request),
-                        false);
-  web3_add_detail_field(card, "链",
-                        pending_web3_request.chain[0]
-                            ? pending_web3_request.chain
-                            : "EVM",
-                        false);
-  web3_add_detail_field(card, "DApp",
-                        pending_web3_request.origin[0]
-                            ? pending_web3_request.origin
-                            : "-",
-                        true);
-  web3_add_detail_field(card, "请求 ID",
-                        pending_web3_request.request_id[0]
-                            ? pending_web3_request.request_id
-                            : "-",
-                        true);
+  web3_add_transaction_details(card, &pending_web3_request);
+  web3_add_typed_data_details(card, &pending_web3_request);
+
+  if (pending_web3_request.request_type_id == WEB3_REQUEST_TYPE_TYPED_DATA) {
+    web3_add_full_sign_data_details(card, &pending_web3_request);
+  }
+
   web3_add_detail_field(card, "路径",
                         pending_web3_request.path[0] ? pending_web3_request.path
                                                       : WEB3_DEFAULT_DERIVATION_PATH,
@@ -2872,22 +3364,27 @@ static void web3_show_request_summary_for_source(web3_sign_source_t source,
                             ? pending_web3_request.address
                             : "-",
                         true);
+  if (pending_web3_request.request_id[0])
+    web3_add_detail_field(card, "请求 ID",
+                          pending_web3_request.request_id, true);
 
-  web3_add_transaction_details(card, &pending_web3_request);
+  if (pending_web3_request.request_type_id == WEB3_REQUEST_TYPE_PERSONAL) {
+    char len_text[32];
+    snprintf(len_text, sizeof(len_text), "%u 字节",
+             (unsigned)pending_web3_request.sign_data_len);
+    web3_add_detail_field(card, "数据长度", len_text, false);
+  }
 
-  char len_text[32];
-  snprintf(len_text, sizeof(len_text), "%u 字节",
-           (unsigned)pending_web3_request.sign_data_len);
-  web3_add_detail_field(card, "数据长度", len_text, false);
-
-  web3_add_full_sign_data_details(card, &pending_web3_request);
+  if (pending_web3_request.request_type_id != WEB3_REQUEST_TYPE_TYPED_DATA)
+    web3_add_full_sign_data_details(card, &pending_web3_request);
 
   if (pending_web3_request.detail[0])
     web3_add_detail_field(card, "说明", pending_web3_request.detail, true);
 
   lv_obj_t *button_row = lv_obj_create(root);
   lv_obj_set_width(button_row, LV_PCT(100));
-  lv_obj_set_height(button_row, LV_SIZE_CONTENT);
+  lv_obj_set_height(button_row,
+                    theme_get_min_touch_size() + theme_get_small_padding());
   lv_obj_set_flex_flow(button_row, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(button_row, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -2898,7 +3395,7 @@ static void web3_show_request_summary_for_source(web3_sign_source_t source,
   lv_obj_set_style_margin_top(button_row, theme_get_small_padding(), 0);
 
   lv_obj_t *sign_btn = lv_btn_create(button_row);
-  lv_obj_set_size(sign_btn, LV_PCT(100), LV_SIZE_CONTENT);
+  lv_obj_set_size(sign_btn, LV_PCT(100), theme_get_min_touch_size());
   theme_apply_touch_button(sign_btn, false);
   lv_obj_add_event_cb(sign_btn, web3_summary_sign_cb, LV_EVENT_CLICKED, NULL);
   lv_obj_clear_flag(sign_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
@@ -3320,9 +3817,7 @@ static void show_btc_source_choice(void) {
   pending_btc_source = BTC_SIGN_SOURCE_NONE;
   lv_obj_t *root = btc_prepare_page();
 
-  lv_obj_t *title = theme_create_page_title(root, "签名方式");
-  lv_obj_set_width(title, LV_PCT(90));
-  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+  (void)web3_create_fixed_title(root, "签名方式");
 
   lv_obj_t *row = lv_obj_create(root);
   lv_obj_set_width(row, LV_PCT(100));
@@ -3334,6 +3829,7 @@ static void show_btc_source_choice(void) {
   lv_obj_set_style_border_width(row, 0, 0);
   lv_obj_set_style_pad_all(row, 0, 0);
   lv_obj_set_style_pad_gap(row, theme_get_default_padding(), 0);
+  lv_obj_set_style_margin_top(row, theme_get_small_padding(), 0);
 
   lv_obj_t *mnemonic_btn = lv_btn_create(row);
   lv_obj_set_size(mnemonic_btn, LV_PCT(48), 96);
@@ -4192,9 +4688,7 @@ static void btc_satochip_pin_back_cb(lv_event_t *e) {
 
 static void show_btc_satochip_pin_input(void) {
   lv_obj_t *root = btc_prepare_page();
-  lv_obj_t *title = theme_create_page_title(root, "智能卡 PIN");
-  lv_obj_set_width(title, LV_PCT(90));
-  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+  (void)web3_create_fixed_title(root, "智能卡 PIN");
 
   btc_satochip_pin_input_cleanup();
   ui_text_input_create(&btc_satochip_pin_input, root, "智能卡 PIN", true,
@@ -4530,6 +5024,58 @@ static void message_sign_button_cb(lv_event_t *e) {
   (void)e;
   sensitive_pin_require(request_message_final_confirm_after_pin, NULL);
 }
+
+#ifdef SIMULATOR
+static void scan_simulator_seed_web3_common(web3_sign_request_t *req,
+                                            const char *wallet,
+                                            const char *action) {
+  web3_request_clear(req);
+  req->valid = true;
+  req->chain_id = 1;
+  snprintf(req->wallet, sizeof(req->wallet), "%s", wallet);
+  snprintf(req->chain, sizeof(req->chain), "Ethereum");
+  snprintf(req->origin, sizeof(req->origin), "app.uniswap.org");
+  snprintf(req->action, sizeof(req->action), "%s", action);
+  snprintf(req->path, sizeof(req->path), "%s", WEB3_DEFAULT_DERIVATION_PATH);
+  snprintf(req->address, sizeof(req->address),
+           "0x1234567890abcdef1234567890abcdef12345678");
+  web3_set_request_id_string(req, "sim-web3-review");
+}
+
+void scan_simulator_show_web3_tx_review(void) {
+  scan_simulator_seed_web3_common(&pending_web3_request, "OKX",
+                                  "signTransaction");
+  pending_web3_request.request_type_id = WEB3_REQUEST_TYPE_LEGACY_TX;
+  (void)web3_copy_sign_data_from_hex(
+      &pending_web3_request,
+      "ec098504a817c800825208943535353535353535353535353535353535353535"
+      "880de0b6b3a764000080");
+  web3_show_request_summary_for_source(WEB3_SIGN_SOURCE_SMARTCARD, false);
+}
+
+void scan_simulator_show_web3_typed_review(void) {
+  static const char typed_json[] =
+      "{\"types\":{\"EIP712Domain\":[{\"name\":\"name\",\"type\":\"string\"},"
+      "{\"name\":\"version\",\"type\":\"string\"},{\"name\":\"chainId\","
+      "\"type\":\"uint256\"},{\"name\":\"verifyingContract\","
+      "\"type\":\"address\"}],\"Mail\":[{\"name\":\"from\","
+      "\"type\":\"address\"},{\"name\":\"to\",\"type\":\"address\"},"
+      "{\"name\":\"contents\",\"type\":\"string\"}]},"
+      "\"primaryType\":\"Mail\",\"domain\":{\"name\":\"Kern Test\","
+      "\"version\":\"1\",\"chainId\":1,\"verifyingContract\":"
+      "\"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC\"},"
+      "\"message\":{\"from\":\"0x1111111111111111111111111111111111111111\","
+      "\"to\":\"0x2222222222222222222222222222222222222222\","
+      "\"contents\":\"确认 DApp 授权测试\"}}";
+
+  scan_simulator_seed_web3_common(&pending_web3_request, "Bitget",
+                                  "signTypedData");
+  pending_web3_request.request_type_id = WEB3_REQUEST_TYPE_TYPED_DATA;
+  (void)web3_copy_sign_data(&pending_web3_request, (const uint8_t *)typed_json,
+                            strlen(typed_json));
+  web3_show_request_summary_for_source(WEB3_SIGN_SOURCE_SMARTCARD, false);
+}
+#endif
 
 void scan_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   if (!parent || !key_is_loaded()) {

@@ -284,7 +284,7 @@ void snapshot_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   snapshot_screen = lv_obj_create(lv_screen_active());
   lv_obj_set_size(snapshot_screen, LV_PCT(100), LV_PCT(100));
-  lv_obj_set_style_bg_color(snapshot_screen, lv_color_hex(0x1e1e1e), 0);
+  lv_obj_set_style_bg_color(snapshot_screen, bg_color(), 0);
   lv_obj_set_style_bg_opa(snapshot_screen, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(snapshot_screen, 0, 0);
   lv_obj_set_style_pad_all(snapshot_screen, 0, 0);

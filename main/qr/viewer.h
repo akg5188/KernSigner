@@ -16,6 +16,19 @@ bool qr_viewer_page_create(lv_obj_t *parent, const char *qr_content,
                            const char *title, void (*return_cb)(void));
 
 /**
+ * Create a QR viewer from prebuilt animated frames.
+ *
+ * This is for UR fountain frames that are already split by the encoder. The
+ * viewer must not split or add pNofM headers again, otherwise wallet scanners
+ * such as OKX cannot reconstruct the original UR.
+ */
+bool qr_viewer_page_create_frames(lv_obj_t *parent,
+                                  const char *const *qr_frames,
+                                  size_t frame_count, const char *title,
+                                  void (*return_cb)(void),
+                                  uint32_t interval_ms);
+
+/**
  * Create a low-density fullscreen QR viewer for printable backups.
  *
  * Long text is split into manual pNofM pages. No auto-rotation is used, so the

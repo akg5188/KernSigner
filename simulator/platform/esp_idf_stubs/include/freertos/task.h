@@ -26,6 +26,7 @@ void vTaskDelete(TaskHandle_t handle);
 void vTaskDeleteWithCaps(TaskHandle_t handle);
 void vTaskDelay(TickType_t ticks);
 void vTaskSuspend(TaskHandle_t handle);
+UBaseType_t uxTaskGetStackHighWaterMark(TaskHandle_t handle);
 
 static inline TaskHandle_t xTaskGetIdleTaskHandleForCore(int core_id) {
     (void)core_id;

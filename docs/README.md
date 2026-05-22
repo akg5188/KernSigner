@@ -17,11 +17,12 @@ The short version: the codebase contains real wallet functionality and real-devi
 - [THIRD_PARTY.md](THIRD_PARTY.md): third-party code, licenses, and attribution.
 - [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md): board details, OTG power rules, and smart-card cabling.
 - [连接钱包教程.zh-CN.md](连接钱包教程.zh-CN.md): beginner guide for connecting Web3 wallets, Bitcoin watch-only wallets, and signing QR/PSBT transactions.
-- [screens/gallery/README.md](screens/gallery/README.md): 常用 480x800 界面截图，方便 GitHub 预览和新手对照操作。
+- `docs/screens/`: generated simulator screenshots and acceptance artifacts. Old gallery screenshots were removed after the UI changed; regenerate fresh screenshots before publishing UI previews.
 - [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md): Android relay app guide for high-density Web3 QR codes.
 - Android relay APK mirror: https://github.com/akg5188/satochip-signer/releases
 - [MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md](MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md): beginner guide for creating mnemonics and verifying them with the BIP39 tool.
 - [BACKUP_AND_RECOVERY_GUIDE.zh-CN.md](BACKUP_AND_RECOVERY_GUIDE.zh-CN.md): backup and recovery guide for mnemonics, entropy, QR, metal backups, KEF, and smart cards.
+- [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md): Satochip/SeedKeeper real-device guide for powered OTG, PIN, write/read, reset, and fingerprint pitfalls.
 - [UNTESTED_FIRMWARE_NOTICE.md](UNTESTED_FIRMWARE_NOTICE.md): explicit notice for included untested development firmware.
 
 ## Build And Troubleshooting
@@ -43,6 +44,7 @@ The short version: the codebase contains real wallet functionality and real-devi
 ## Smart-Card And Satochip Scope
 
 - [SMARTCARD_CAPABILITY_BOUNDARY.md](SMARTCARD_CAPABILITY_BOUNDARY.md): what is exposed, hidden, or intentionally blocked.
+- [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md): current hands-on Satochip/SeedKeeper operation guide.
 - [SMARTCARD_HIDDEN_FEATURES_ACCEPTANCE.md](SMARTCARD_HIDDEN_FEATURES_ACCEPTANCE.md): checks that unfinished smart-card features stay hidden.
 - [SMARTCARD_ADAPTER_TEST_WORKFLOW.md](SMARTCARD_ADAPTER_TEST_WORKFLOW.md): adapter workflow.
 - [SMARTCARD_MIGRATION_MATRIX_20260520.md](SMARTCARD_MIGRATION_MATRIX_20260520.md): migration matrix.

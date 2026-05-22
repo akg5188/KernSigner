@@ -224,7 +224,7 @@ static void update_fingerprint_display(void) {
     char fp_hex[9];
     if (get_mnemonic_fingerprint_hex(fp_hex)) {
       char buf[32];
-      snprintf(buf, sizeof(buf), "指纹 %s", fp_hex);
+      snprintf(buf, sizeof(buf), "钱包指纹 %s", fp_hex);
       lv_label_set_text(fingerprint_label, buf);
       lv_obj_clear_flag(fingerprint_label, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -695,7 +695,7 @@ static void create_word_grid(void) {
 
 static void create_ui(void) {
   header_container = theme_create_flex_column(mnemonic_editor_screen);
-  lv_obj_set_width(header_container, LV_PCT(62));
+  lv_obj_set_width(header_container, LV_PCT(50));
   lv_obj_set_height(header_container, 56);
   lv_obj_set_style_pad_row(header_container, 2, 0);
   lv_obj_align(header_container, LV_ALIGN_TOP_MID, 0,

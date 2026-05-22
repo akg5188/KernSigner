@@ -1,11 +1,19 @@
 #include "../../main/ui/dialog.h"
+#include "../../main/core/custom_derivation.h"
 #include "../../main/core/evm.h"
+#include "../../main/core/key.h"
+#include "../../main/core/mnemonic_slots.h"
+#include "../../main/core/wallet.h"
 #include "../../main/smartcard/smartcard_satochip.h"
 #include "../../main/ui/input_helpers.h"
+#include "../../main/ui/theme.h"
 #include <esp_err.h>
 #include <lvgl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wally_bip39.h>
+#include <wally_core.h>
 
 static void fill_string(char *dst, size_t dst_len, const char *src) {
   if (!dst || dst_len == 0)
@@ -14,6 +22,88 @@ static void fill_string(char *dst, size_t dst_len, const char *src) {
     src = "";
   strncpy(dst, src, dst_len - 1);
   dst[dst_len - 1] = '\0';
+}
+
+static int sim_max_i(int a, int b) { return a > b ? a : b; }
+
+static void sim_style_black_orange_box(lv_obj_t *obj, int radius) {
+  if (!obj)
+    return;
+  lv_obj_set_style_bg_color(obj, bg_color(), LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_STATE_DEFAULT);
+  lv_obj_set_style_text_color(obj, main_color(), LV_STATE_DEFAULT);
+  lv_obj_set_style_border_color(obj, highlight_color(), LV_STATE_DEFAULT);
+  lv_obj_set_style_border_width(obj, 2, LV_STATE_DEFAULT);
+  lv_obj_set_style_radius(obj, radius, LV_STATE_DEFAULT);
+  lv_obj_set_style_shadow_width(obj, 0, LV_STATE_DEFAULT);
+  lv_obj_set_style_outline_width(obj, 0, LV_STATE_DEFAULT);
+}
+
+bool key_has_signing_key(void) { return true; }
+bool key_get_fingerprint_hex(char *hex_out) {
+  fill_string(hex_out, 9, "12345678");
+  return true;
+}
+bool key_get_session_passphrase(char **passphrase_out) {
+  if (passphrase_out)
+    *passphrase_out = NULL;
+  return false;
+}
+
+bool mnemonic_slots_get_info(size_t slot_index, mnemonic_slot_info_t *info_out) {
+  if (!info_out || slot_index != 0)
+    return false;
+  memset(info_out, 0, sizeof(*info_out));
+  info_out->used = true;
+  fill_string(info_out->fingerprint, sizeof(info_out->fingerprint), "87654321");
+  info_out->word_count = 12;
+  return true;
+}
+bool mnemonic_slots_load(size_t slot_index, const char *passphrase) {
+  (void)slot_index;
+  (void)passphrase;
+  return true;
+}
+void mnemonic_slots_clear_all(void) {}
+size_t mnemonic_slots_count(void) { return 1; }
+
+bool wallet_is_initialized(void) { return true; }
+wallet_network_t wallet_get_network(void) { return WALLET_NETWORK_MAINNET; }
+
+bool custom_derivation_get_address(const char *path, custom_address_type_t type,
+                                   bool is_testnet, char *address_out,
+                                   size_t address_out_len) {
+  (void)path;
+  (void)is_testnet;
+  if (type == CUSTOM_ADDR_EVM) {
+    fill_string(address_out, address_out_len,
+                "0x0000000000000000000000000000000000000000");
+  } else {
+    fill_string(address_out, address_out_len,
+                "bc1q000000000000000000000000000000000000000");
+  }
+  return true;
+}
+
+int wally_free_string(char *str) {
+  free(str);
+  return WALLY_OK;
+}
+int bip39_get_wordlist(const char *lang, struct words **output) {
+  (void)lang;
+  if (output)
+    *output = NULL;
+  return WALLY_ERROR;
+}
+int bip39_mnemonic_from_bytes(const struct words *w,
+                              const unsigned char *bytes, size_t bytes_len,
+                              char **output) {
+  (void)w;
+  (void)bytes;
+  (void)bytes_len;
+  if (output)
+    *output = NULL;
+  return WALLY_ERROR;
 }
 
 void dialog_show_error(const char *message, dialog_simple_callback_t callback,
@@ -62,26 +152,144 @@ lv_obj_t *dialog_show_progress(const char *title, const char *message,
   return lv_obj_create(lv_screen_active());
 }
 
+static void sim_eye_cb(lv_event_t *e) {
+  ui_text_input_t *input = lv_event_get_user_data(e);
+  if (!input || !input->textarea || !input->eye_label)
+    return;
+  bool hidden = lv_textarea_get_password_mode(input->textarea);
+  lv_textarea_set_password_mode(input->textarea, !hidden);
+  lv_label_set_text(input->eye_label, hidden ? "隐藏" : "显示");
+}
+
 void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
                           const char *placeholder, bool password_mode,
                           lv_event_cb_t ready_cb) {
-  (void)parent;
-  (void)placeholder;
-  (void)password_mode;
-  (void)ready_cb;
+  if (!input || !parent)
+    return;
   memset(input, 0, sizeof(*input));
+
+  input->textarea = lv_textarea_create(parent);
+  lv_obj_set_size(input->textarea, password_mode ? LV_PCT(76) : LV_PCT(90),
+                  58);
+  sim_style_black_orange_box(input->textarea, 8);
+  lv_obj_set_style_text_color(input->textarea, main_color(), 0);
+  lv_obj_set_style_text_color(input->textarea, main_color(),
+                              LV_PART_TEXTAREA_PLACEHOLDER);
+  lv_obj_set_style_bg_color(input->textarea, highlight_color(), LV_PART_CURSOR);
+  lv_obj_set_style_bg_opa(input->textarea, LV_OPA_COVER, LV_PART_CURSOR);
+  lv_obj_set_style_width(input->textarea, 4, LV_PART_CURSOR);
+  lv_textarea_set_one_line(input->textarea, true);
+  lv_textarea_set_password_mode(input->textarea, password_mode);
+  lv_textarea_set_placeholder_text(input->textarea, placeholder ? placeholder : "");
+  if (ready_cb)
+    lv_obj_add_event_cb(input->textarea, ready_cb, LV_EVENT_READY, NULL);
+
+  if (password_mode) {
+    input->eye_btn = lv_btn_create(parent);
+    lv_obj_set_size(input->eye_btn, 58, 58);
+    lv_obj_set_style_bg_opa(input->eye_btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(input->eye_btn, 0, 0);
+    lv_obj_set_style_shadow_width(input->eye_btn, 0, 0);
+    lv_obj_add_event_cb(input->eye_btn, sim_eye_cb, LV_EVENT_CLICKED, input);
+    input->eye_label = lv_label_create(input->eye_btn);
+    lv_label_set_text(input->eye_label, "显示");
+    lv_obj_set_style_text_color(input->eye_label, main_color(), 0);
+    lv_obj_center(input->eye_label);
+  }
+
+  input->input_group = lv_group_create();
+  lv_group_add_obj(input->input_group, input->textarea);
+
+  input->keyboard = lv_keyboard_create(lv_screen_active());
+  lv_obj_set_size(input->keyboard, LV_HOR_RES, LV_VER_RES * 36 / 100);
+  lv_obj_align(input->keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
+  lv_keyboard_set_textarea(input->keyboard, input->textarea);
+  lv_obj_set_style_bg_color(input->keyboard, bg_color(), 0);
+  lv_obj_set_style_bg_opa(input->keyboard, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(input->keyboard, 0, 0);
+  lv_obj_set_style_bg_color(input->keyboard, bg_color(), LV_PART_ITEMS);
+  lv_obj_set_style_text_color(input->keyboard, main_color(), LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(input->keyboard, bg_color(),
+                            LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_text_color(input->keyboard, main_color(),
+                              LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_bg_color(input->keyboard, bg_color(),
+                            LV_PART_ITEMS | LV_STATE_FOCUSED);
+  lv_obj_set_style_text_color(input->keyboard, main_color(),
+                              LV_PART_ITEMS | LV_STATE_FOCUSED);
+  lv_obj_set_style_border_color(input->keyboard, highlight_color(),
+                                LV_PART_ITEMS);
+  lv_obj_set_style_border_color(input->keyboard, highlight_color(),
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_border_color(input->keyboard, highlight_color(),
+                                LV_PART_ITEMS | LV_STATE_FOCUSED);
+  lv_obj_set_style_border_width(input->keyboard, 1, LV_PART_ITEMS);
+  lv_obj_set_style_border_width(input->keyboard, 1,
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_border_width(input->keyboard, 1,
+                                LV_PART_ITEMS | LV_STATE_FOCUSED);
+  lv_obj_set_style_radius(input->keyboard, 6, LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(input->keyboard, highlight_color(),
+                            LV_PART_ITEMS | LV_STATE_PRESSED);
+  lv_obj_add_flag(input->keyboard, LV_OBJ_FLAG_HIDDEN);
 }
 
-void ui_text_input_show(ui_text_input_t *input) { (void)input; }
-void ui_text_input_hide(ui_text_input_t *input) { (void)input; }
-void ui_text_input_destroy(ui_text_input_t *input) { (void)input; }
+void ui_text_input_show(ui_text_input_t *input) {
+  if (input && input->textarea)
+    lv_obj_clear_flag(input->textarea, LV_OBJ_FLAG_HIDDEN);
+  if (input && input->eye_btn)
+    lv_obj_clear_flag(input->eye_btn, LV_OBJ_FLAG_HIDDEN);
+  if (input && input->keyboard)
+    lv_obj_clear_flag(input->keyboard, LV_OBJ_FLAG_HIDDEN);
+}
+void ui_text_input_hide(ui_text_input_t *input) {
+  if (input && input->textarea)
+    lv_obj_add_flag(input->textarea, LV_OBJ_FLAG_HIDDEN);
+  if (input && input->eye_btn)
+    lv_obj_add_flag(input->eye_btn, LV_OBJ_FLAG_HIDDEN);
+  if (input && input->keyboard)
+    lv_obj_add_flag(input->keyboard, LV_OBJ_FLAG_HIDDEN);
+}
+void ui_text_input_destroy(ui_text_input_t *input) {
+  if (!input)
+    return;
+  if (input->input_group)
+    lv_group_del(input->input_group);
+  if (input->keyboard)
+    lv_obj_del(input->keyboard);
+  if (input->eye_btn)
+    lv_obj_del(input->eye_btn);
+  if (input->textarea)
+    lv_obj_del(input->textarea);
+  memset(input, 0, sizeof(*input));
+}
 void ui_keyboard_apply_safe_text_map(lv_obj_t *keyboard) { (void)keyboard; }
 void ui_textarea_enable_safe_keyboard_shortcuts(lv_obj_t *textarea) {
   (void)textarea;
 }
+void ui_textarea_keep_cursor_visible(lv_obj_t *textarea) {
+  if (textarea)
+    lv_obj_invalidate(textarea);
+}
 lv_obj_t *ui_create_back_button(lv_obj_t *parent, lv_event_cb_t event_cb) {
-  (void)event_cb;
-  return lv_btn_create(parent);
+  lv_obj_t *btn = lv_btn_create(parent);
+  lv_obj_set_size(btn, theme_get_corner_button_width(),
+                  theme_get_corner_button_height());
+  lv_obj_align(btn, LV_ALIGN_TOP_LEFT, theme_get_small_padding(),
+               theme_get_small_padding());
+  sim_style_black_orange_box(btn, 8);
+  lv_obj_set_style_pad_all(btn, 4, 0);
+  lv_obj_add_flag(btn, LV_OBJ_FLAG_FLOATING);
+  lv_obj_move_foreground(btn);
+  if (event_cb)
+    lv_obj_add_event_cb(btn, event_cb, LV_EVENT_CLICKED, NULL);
+  lv_obj_t *label = lv_label_create(btn);
+  lv_label_set_text(label, "返回");
+  lv_obj_set_width(label, LV_PCT(100));
+  lv_obj_set_style_text_color(label, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_center(label);
+  return btn;
 }
 lv_obj_t *ui_create_home_button(lv_obj_t *parent, lv_event_cb_t event_cb) {
   (void)event_cb;
@@ -99,6 +307,177 @@ lv_obj_t *ui_create_settings_button(lv_obj_t *parent,
 void ui_power_off_confirmed_cb(bool confirmed, void *user_data) {
   (void)confirmed;
   (void)user_data;
+}
+
+static int sim_web3_estimate_lines(const char *text, int columns) {
+  if (!text || !text[0])
+    return 1;
+  int lines = 1;
+  int col = 0;
+  const unsigned char *p = (const unsigned char *)text;
+  while (*p) {
+    if (*p == '\n') {
+      lines++;
+      col = 0;
+      p++;
+      continue;
+    }
+    int width = 1;
+    if (*p >= 0x80) {
+      width = 2;
+      do {
+        p++;
+      } while ((*p & 0xC0) == 0x80);
+    } else {
+      p++;
+    }
+    col += width;
+    if (col >= columns) {
+      lines++;
+      col = 0;
+    }
+  }
+  return lines;
+}
+
+static int sim_web3_field_height(const char *title, const char *value,
+                                 bool wrap) {
+  const int pad = theme_get_small_padding();
+  const int content_w = sim_max_i(160, theme_get_screen_width() -
+                                           theme_get_default_padding() * 2 -
+                                           pad * 6 - 24);
+  const int columns = sim_max_i(18, content_w / 10);
+  const int line_h = theme_font_small() ? theme_font_small()->line_height + 5
+                                       : 25;
+  const int value_lines =
+      wrap ? sim_web3_estimate_lines(value ? value : "-", columns) : 1;
+  const int title_lines = sim_web3_estimate_lines(title, columns);
+  const int min_h = wrap ? sim_max_i(92, theme_get_min_touch_size() + pad * 3)
+                         : sim_max_i(68, theme_get_min_touch_size() + pad);
+  return sim_max_i(min_h, pad * 2 + title_lines * line_h +
+                              sim_max_i(8, pad) + value_lines * line_h + 10);
+}
+
+static void sim_web3_add_field(lv_obj_t *parent, const char *title,
+                               const char *value, bool wrap) {
+  lv_obj_t *box = lv_obj_create(parent);
+  lv_obj_set_width(box, LV_PCT(100));
+  lv_obj_set_height(box, sim_web3_field_height(title, value, wrap));
+  lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_START);
+  lv_obj_set_style_bg_color(box, bg_color(), 0);
+  lv_obj_set_style_bg_opa(box, LV_OPA_50, 0);
+  lv_obj_set_style_border_color(box, lv_color_hex(0x343434), 0);
+  lv_obj_set_style_border_width(box, 1, 0);
+  lv_obj_set_style_radius(box, 10, 0);
+  lv_obj_set_style_pad_all(box, theme_get_small_padding(), 0);
+  lv_obj_set_style_pad_gap(box, sim_max_i(8, theme_get_small_padding()), 0);
+  lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t *label = theme_create_label(box, title, true);
+  lv_obj_set_width(label, LV_PCT(100));
+  lv_obj_set_height(label, LV_SIZE_CONTENT);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_color(label, highlight_color(), 0);
+  lv_obj_set_style_text_font(label, theme_font_small(), 0);
+
+  lv_obj_t *text = theme_create_label(box, value ? value : "-", false);
+  lv_obj_set_width(text, LV_PCT(100));
+  lv_obj_set_height(text, LV_SIZE_CONTENT);
+  lv_label_set_long_mode(text, wrap ? LV_LABEL_LONG_WRAP : LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_font(text, theme_font_small(), 0);
+  lv_obj_set_style_text_line_space(text, 5, 0);
+}
+
+static lv_obj_t *sim_web3_review_root(void) {
+  lv_obj_t *root = lv_screen_active();
+  lv_obj_clean(root);
+  theme_apply_screen(root);
+  lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(root, theme_get_default_padding(), 0);
+  lv_obj_set_style_pad_gap(root, theme_get_small_padding(), 0);
+
+  lv_obj_t *header = lv_obj_create(root);
+  lv_obj_set_width(header, LV_PCT(100));
+  lv_obj_set_height(header, sim_max_i(theme_get_corner_button_height() +
+                                          theme_get_small_padding() * 3,
+                                      76));
+  theme_apply_transparent_container(header);
+  lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+
+  lv_obj_t *title = theme_create_label(header, "确认签名", false);
+  lv_obj_set_width(title, LV_PCT(62));
+  lv_label_set_long_mode(title, LV_LABEL_LONG_DOT);
+  lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_font(title, theme_font_medium(), 0);
+  lv_obj_center(title);
+  (void)ui_create_back_button(root, NULL);
+
+  lv_obj_t *card = lv_obj_create(root);
+  lv_obj_set_width(card, LV_PCT(100));
+  lv_obj_set_flex_grow(card, 1);
+  lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_START);
+  lv_obj_set_scroll_dir(card, LV_DIR_VER);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+  theme_apply_frame(card);
+  lv_obj_set_style_pad_all(card, theme_get_small_padding() + 6, 0);
+  lv_obj_set_style_pad_gap(card, theme_get_small_padding() + 2, 0);
+  lv_obj_set_style_margin_top(card, theme_get_small_padding(), 0);
+  return card;
+}
+
+static void sim_web3_add_button_row(lv_obj_t *root) {
+  lv_obj_t *row = lv_obj_create(root);
+  lv_obj_set_width(row, LV_PCT(100));
+  lv_obj_set_height(row, theme_get_min_touch_size() + theme_get_small_padding());
+  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(row, 0, 0);
+  lv_obj_set_style_pad_all(row, 0, 0);
+  lv_obj_set_style_pad_gap(row, theme_get_small_padding(), 0);
+
+  lv_obj_t *btn = theme_create_button(row, "签名", true);
+  lv_obj_set_width(btn, LV_PCT(44));
+  lv_obj_t *cancel = theme_create_button(row, "返回", false);
+  lv_obj_set_width(cancel, LV_PCT(44));
+}
+
+void scan_simulator_show_web3_tx_review(void) {
+  lv_obj_t *card = sim_web3_review_root();
+  sim_web3_add_field(card, "钱包", "OKX", false);
+  sim_web3_add_field(card, "动作", "转账", false);
+  sim_web3_add_field(card, "链", "Ethereum (1)", false);
+  sim_web3_add_field(card, "收款/合约",
+                     "0x3535353535353535353535353535353535353535", true);
+  sim_web3_add_field(card, "金额", "1 ETH", false);
+  sim_web3_add_field(card, "路径", "m/44'/60'/0'/0/0", true);
+  sim_web3_add_field(card, "地址",
+                     "0x1234567890abcdef1234567890abcdef12345678", true);
+  sim_web3_add_button_row(lv_screen_active());
+}
+
+void scan_simulator_show_web3_typed_review(void) {
+  lv_obj_t *card = sim_web3_review_root();
+  sim_web3_add_field(card, "钱包", "Bitget", false);
+  sim_web3_add_field(card, "类型", "DApp 结构化签名", false);
+  sim_web3_add_field(card, "主要类型", "Mail", false);
+  sim_web3_add_field(card, "DApp", "Kern Test", true);
+  sim_web3_add_field(card, "链", "Ethereum (1)", false);
+  sim_web3_add_field(card, "合约",
+                     "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC", true);
+  sim_web3_add_field(card, "发送方",
+                     "0x1111111111111111111111111111111111111111", true);
+  sim_web3_add_field(card, "接收方",
+                     "0x2222222222222222222222222222222222222222", true);
+  sim_web3_add_field(card, "内容", "确认 DApp 授权测试", true);
+  sim_web3_add_button_row(lv_screen_active());
 }
 
 bool evm_get_address(char *address_out, size_t address_out_len) {
@@ -177,8 +556,10 @@ void smartcard_satochip_format_label(const smartcard_satochip_label_t *label,
   (void)label;
   fill_string(out, out_len, "模拟器");
 }
-esp_err_t smartcard_seedkeeper_read_status(
-    smartcard_seedkeeper_status_t *out, uint32_t timeout_ms) {
+esp_err_t smartcard_seedkeeper_read_status(const char *pin,
+                                           smartcard_seedkeeper_status_t *out,
+                                           uint32_t timeout_ms) {
+  (void)pin;
   (void)timeout_ms;
   if (out)
     memset(out, 0, sizeof(*out));
@@ -193,7 +574,13 @@ esp_err_t smartcard_satochip_get_eth_account(const char *pin, const char *path,
                                              smartcard_satochip_account_t *out,
                                              uint32_t timeout_ms) {
   (void)pin; (void)path; (void)timeout_ms;
-  if (out) memset(out, 0, sizeof(*out));
+  if (out) {
+    memset(out, 0, sizeof(*out));
+    out->has_address = true;
+    fill_string(out->address, sizeof(out->address),
+                "0x0000000000000000000000000000000000000000");
+    fill_string(out->detail, sizeof(out->detail), "模拟器智能卡地址");
+  }
   return ESP_OK;
 }
 esp_err_t smartcard_satochip_get_web3_account(
@@ -222,7 +609,13 @@ esp_err_t smartcard_satochip_get_btc_address(
     bool is_testnet, smartcard_satochip_btc_address_t *out,
     uint32_t timeout_ms) {
   (void)pin; (void)path; (void)script; (void)is_testnet; (void)timeout_ms;
-  if (out) memset(out, 0, sizeof(*out));
+  if (out) {
+    memset(out, 0, sizeof(*out));
+    out->has_address = true;
+    fill_string(out->address, sizeof(out->address),
+                "bc1q000000000000000000000000000000000000000");
+    fill_string(out->detail, sizeof(out->detail), "模拟器智能卡地址");
+  }
   return ESP_OK;
 }
 esp_err_t smartcard_satochip_card_set_label(
@@ -244,8 +637,36 @@ esp_err_t smartcard_satochip_card_reset_factory_signal(
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
   (void)timeout_ms; if (out) memset(out, 0, sizeof(*out)); return ESP_OK;
 }
-esp_err_t smartcard_seedkeeper_reset_factory_signal(
+esp_err_t smartcard_satochip_card_setup_pin(
+    const char *new_pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms) {
+  (void)new_pin;
+  (void)timeout_ms;
+  if (out) {
+    memset(out, 0, sizeof(*out));
+    out->sw = 0x9000;
+    fill_string(out->detail, sizeof(out->detail), "模拟器设置 Satochip PIN");
+  }
+  return ESP_OK;
+}
+esp_err_t smartcard_satochip_card_import_mnemonic_seed(
+    const char *pin, const char *mnemonic, const char *passphrase,
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
+  (void)pin;
+  (void)mnemonic;
+  (void)passphrase;
+  (void)timeout_ms;
+  if (out) {
+    memset(out, 0, sizeof(*out));
+    out->sw = 0x9000;
+    fill_string(out->detail, sizeof(out->detail), "模拟器写入 Satochip");
+  }
+  return ESP_OK;
+}
+esp_err_t smartcard_seedkeeper_reset_factory_signal(
+    const char *pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms) {
+  (void)pin;
   (void)timeout_ms;
   if (out) memset(out, 0, sizeof(*out));
   return ESP_OK;
@@ -265,6 +686,30 @@ esp_err_t smartcard_seedkeeper_change_pin(
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
   (void)pin_nbr; (void)old_pin; (void)new_pin; (void)timeout_ms;
   if (out) memset(out, 0, sizeof(*out));
+  return ESP_OK;
+}
+esp_err_t smartcard_seedkeeper_reset_wrong_pin_step(
+    const char *wrong_pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms) {
+  (void)wrong_pin;
+  (void)timeout_ms;
+  if (out) {
+    memset(out, 0, sizeof(*out));
+    out->sw = 0x63C0;
+    fill_string(out->detail, sizeof(out->detail), "模拟器 SeedKeeper 错 PIN");
+  }
+  return ESP_OK;
+}
+esp_err_t smartcard_seedkeeper_reset_wrong_puk_step(
+    const char *wrong_puk, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms) {
+  (void)wrong_puk;
+  (void)timeout_ms;
+  if (out) {
+    memset(out, 0, sizeof(*out));
+    out->sw = 0x63C0;
+    fill_string(out->detail, sizeof(out->detail), "模拟器 SeedKeeper 错 PUK");
+  }
   return ESP_OK;
 }
 esp_err_t smartcard_satochip_card_unblock_pin(
@@ -442,6 +887,18 @@ esp_err_t smartcard_seedkeeper_reset_secret(
     const char *pin, uint16_t sid, smartcard_satochip_apdu_result_t *out,
     uint32_t timeout_ms) {
   (void)pin; (void)sid; (void)timeout_ms; if (out) memset(out, 0, sizeof(*out)); return ESP_OK;
+}
+esp_err_t smartcard_seedkeeper_setup_pin(
+    const char *new_pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms) {
+  (void)new_pin;
+  (void)timeout_ms;
+  if (out) {
+    memset(out, 0, sizeof(*out));
+    out->sw = 0x9000;
+    fill_string(out->detail, sizeof(out->detail), "模拟器设置 SeedKeeper PIN");
+  }
+  return ESP_OK;
 }
 esp_err_t smartcard_seedkeeper_print_logs(
     const char *pin, smartcard_satochip_apdu_result_t *out,

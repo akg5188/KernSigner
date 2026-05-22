@@ -1,6 +1,6 @@
 # Kern/Krux 真钱包功能版交付状态与验收清单
 
-> 2026-05-20 智能卡迁移更新：外接供电后 ACR39U-NF + Satochip 已跑通，Kern 已接入 Satochip Web3 连接/签名基础，并新增 `智能卡 -> 路径地址 / 观察公钥`，可读取 BTC xpub/ypub/zpub/tpub/upub/vpub。本轮多专家复查后，补了 Web3 签名二维码兼容、异步任务删除竞态、二维码参数解析、日志脱敏、相机复用保护和商业门禁文档。写卡、改 PIN、重置、SeedKeeper 管理、Satochip BTC PSBT/消息签名仍需单独安全实现，当前不做假入口。当前仍是“真钱包功能验收版”，不是已审计量产资金版。
+> 2026-05-22 智能卡迁移更新：外接供电后 ACR39U-NF + Satochip/SeedKeeper 已跑通。Satochip 已可用于 Web3 连接码、OKX/Bitget 测试转账签名、路径地址和 BTC 观察公钥；SeedKeeper 已可测设置 PIN、改 PIN、写入助记词、查看/导入条目和重置。新版 SeedKeeper 重置不走旧 `B0 FF`，必须用 `错PIN一步` 和 `错PUK一步` 到 `FF00`。当前仍是测试资金验收版，不是已审计量产资金版。
 
 本文档面向 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 真机交付验收，记录当前 Kern/Krux 真钱包功能版的可交付范围、真机验收步骤和下一阶段建议。
 
@@ -10,6 +10,7 @@
 - `docs/FLASH_PRECHECK.md`
 - `docs/REAL_DEVICE_ACCEPTANCE_CHECKLIST.md`
 - `docs/SMARTCARD_CAPABILITY_BOUNDARY.md`
+- `docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md`
 - `docs/SMARTCARD_REAL_DEVICE_ACCEPTANCE.md`
 - `docs/SMARTCARD_TEST_VECTORS_AND_EVIDENCE.md`
 - `docs/SMARTCARD_HIDDEN_FEATURES_ACCEPTANCE.md`
@@ -31,7 +32,7 @@
 - 新增并加严 `tools/kern_delivery.sh prodcheck` / `tools/kern_production_check.sh`，商业真钱包生产发布前会检查 Secure Boot、Flash Encryption、NVS 加密、蓝牙/WiFi 关闭、USB Serial/JTAG 关闭、GDB stub 关闭、UART/USB 控制台关闭、panic 静默重启、WDT panic 和发布工作区干净等硬条件。
 - Waveshare 4.3 寸显示底包已收紧启动失败路径：显示、触摸、LVGL 适配层初始化失败时不再走未初始化句柄、`assert` 或直接 abort，而是记录日志并由主程序可控重启。
 
-2026-05-20 智能卡同步说明：用户确认外接供电后 ACR39U-NF 读卡器可识别，Satochip 卡已可生成 Web3 连接码并完成 OKX/Bitget Web3 转账签名。当前智能卡菜单保留 `扫码 Web3`、`生成连接码`、`路径地址`、`观察公钥`、`读卡状态`；`观察公钥` 下读取 BTC xpub/ypub/zpub/tpub/upub/vpub。通过卡 PIN 读取公开地址或观察公钥；不会写卡、不会改卡 PIN、不会重置卡片。
+2026-05-22 智能卡同步说明：用户确认外接供电后 ACR39U-NF 读卡器可识别，Satochip 卡已可生成 Web3 连接码并完成 OKX/Bitget Web3 转账签名。SeedKeeper 已修正为新版重置流程：旧 `B0 FF` 返回 `9C20` 时不是驱动坏，而是应使用错 PIN/错 PUK 流程直到 `FF00`。当前智能卡菜单包含 Satochip 和 SeedKeeper 两类：Satochip 侧用于连接、签名、地址、公钥、PIN/维护；SeedKeeper 侧用于设置 PIN、改 PIN、保存和查看秘密、导入本机、重置。
 
 交付包中的 `kern.bin` 是 app 分区升级固件，不是空白板完整 factory 刷机包。正常升级请使用本文的 `appflash` 命令，不要全擦后只刷 `kern.bin`。
 
@@ -39,7 +40,7 @@
 
 `ACCEPTANCE_REPORT.txt` 的 `FINAL: PASS` 代表模拟器页面、首屏截图、可滚动页面底部截图、关键页面、中文缺字、UI 烟测、返回/回首页/关键按钮点击验收通过。模拟器环境会把旧 Kern 钱包入口映射到对应的 Krux Shell 页面；真机固件中的同一入口会进入旧 Kern 真实钱包页面。真实钱包创建、导入、备份或签名流程仍需按本文“真机验收步骤”逐项点测。
 
-当前版本已经不是空壳或演示页：旧 Kern 钱包核心单测通过，真机固件已有加载助记词、创建助记词、钱包首页、扩展公钥、地址、备份和扫码签名入口，并新增智能卡读卡器安全检测页和 Satochip 连接/签名/公钥读取基础。但在主网真实资金使用前，仍必须完成真机全流程复核、生产安全审计、`prodcheck` 通过和回归测试。智能卡写卡、改 PIN、重置、SeedKeeper 管理、Satochip PSBT/BTC 消息签名仍未开放。
+当前版本已经不是空壳或演示页：旧 Kern 钱包核心单测通过，真机固件已有加载助记词、创建助记词、钱包首页、扩展公钥、地址、备份和扫码签名入口，并新增智能卡读卡器检测、Satochip 连接/签名/公钥读取和 SeedKeeper 管理基础。但在主网真实资金使用前，仍必须完成真机全流程复核、生产安全审计、`prodcheck` 通过和回归测试。Satochip PSBT/BTC 消息签名仍未作为生产能力开放。
 
 ## 当前可交付功能
 
@@ -56,10 +57,10 @@
 - 助记词导入恢复：当前已接入 `手动单词`、`编号导入`、`钢板数字恢复`、`点阵和1248导入`、`点阵板恢复`、`1248恢复`。
 - 助记词核对与备份：当前已接入 `BIP39 自检`、`BIP39序号`、`原始熵`、`钢板打孔`、`点阵板`、`1248打孔`、`二维码备份`、`加密备份`。
 - 地址与连接：当前已接入 `自定义路径`，可查看 BTC Legacy/Nested/Native/Taproot 与 EVM 地址，并显示二维码。
-- 智能卡检测与 Satochip：当前已接入 `设备检查 -> 智能卡检测`，可检测 ACR39U-NF 等 CCID 读卡器、读取 ATR、识别 Satochip/SeedKeeper，并显示只读状态 APDU 结果；已接入 Satochip Web3 连接/签名、按路径查看地址、`连接钱包 -> 比特币钱包 -> 智能卡账户` 下 BlueWallet zpub/xpub，`扫码签名 -> 智能卡 -> 观察公钥` 下 BTC xpub/ypub/zpub/tpub/upub/vpub 读取。
+- 智能卡检测与 Satochip/SeedKeeper：当前已接入 `设备检查 -> 智能卡检测`，可检测 ACR39U-NF 等 CCID 读卡器、读取 ATR、识别 Satochip/SeedKeeper，并显示状态 APDU 结果；已接入 Satochip Web3 连接/签名、按路径查看地址、`连接钱包 -> 比特币钱包 -> 智能卡账户` 下 BlueWallet zpub/xpub，`扫码签名 -> 智能卡 -> 观察公钥` 下 BTC xpub/ypub/zpub/tpub/upub/vpub 读取；SeedKeeper 已接入设置 PIN、改 PIN、写入助记词、查看/导入卡内条目、保存密码/描述符和新版重置流程。
 - 设备检查/交付验收页：集中展示固件信息、硬件快照和可用范围，并提供扫码、二维码、存储、触摸、亮度和钱包验收入口。
 - 自动验收：模拟器生成 `manifest.tsv`、`glyph_check.tsv`、`smoke_check.tsv`、`scroll_check.tsv`、`interaction_check.tsv`、首屏/底部截图、关键截图 PNG、全页面拼图和 `ACCEPTANCE_REPORT.txt`。
-- 未接专项：BIP85 的密码/原始熵、打印机、智能卡写卡/改 PIN/重置、SeedKeeper 管理、Satochip PSBT/BTC 消息签名等未放进本轮可交付范围，不冒充已完成。
+- 未接专项：BIP85 的密码/原始熵、打印机、Satochip PSBT/BTC 消息签名等未放进本轮生产可交付范围，不冒充已完成。智能卡维护和写卡功能只按测试卡验收能力说明。
 - 开发者交付脚本：`tools/kern_delivery.sh` 提供常用检查、刷写和串口观察命令。
 - 生产发布检查：`tools/kern_delivery.sh prodcheck` 会阻止未启用 Secure Boot、Flash Encryption、NVS 加密、仍开启调试/控制台通道或工作区未提交的固件被标记为商业资金版。
 
@@ -71,7 +72,7 @@
 - 扩展公钥、地址派生、地址二维码和描述符显示与独立工具交叉校验。
 - PSBT 解析、审核、找零判断、手续费显示、拒签、签名、导出和取消路径。
 - SeedQR、加密备份、KEF、助记词工具等与种子材料相关的功能要单独审查。
-- 智能卡写卡、改 PIN、重置、SeedKeeper 管理、Satochip PSBT/BTC 消息签名或卡片生命周期管理。
+- Satochip PSBT/BTC 消息签名、复杂卡片生命周期批量管理和未经审计的生产资金智能卡托管。
 - 任何可导致真实比特币或其他链上资产转移的操作，都必须先用测试资金跑通。
 - 当前默认开发配置下 `prodcheck` 预期会失败，因为 Secure Boot、Flash Encryption、NVS 加密、调试口/控制台关闭、panic/WDT 策略和 clean release provenance 尚未全部满足；这不是功能测试失败，而是防止误发真钱生产版的安全闸门。
 
@@ -82,7 +83,7 @@
 - Krux 原生专项入口：还没有完全接到旧 Kern 钱包服务的 Web3、BIP85、打印机、加密工具、二级助记词和 Mnemonic XOR 不放进真钱包主菜单。
 - SeedQR/文件导入类：SeedQR 和 KEF 已从旧 Kern 钱包流程进入；新增 Krux 原生实现前不另开平行入口。
 - 签名类：BTC PSBT 和消息签名走旧 Kern 扫码签名入口；Web3 智能卡签名已接 Satochip，TypedData/复杂交易格式仍需持续回归。
-- 智能卡类：卡片助记词、写入 SeedKeeper、写入 Satochip、卡片 PIN 管理、重置、SeedKeeper 管理、Satochip PSBT/BTC 消息签名。
+- 智能卡类：Satochip PSBT/BTC 消息签名仍未作为生产能力开放；卡片助记词、写入 SeedKeeper、写入 Satochip、卡片 PIN 管理、重置、SeedKeeper 管理属于测试卡验收能力。
 - 高风险工具：加密、二级助记词、Mnemonic XOR、BIP85 等会派生或处理真实秘密材料的路径。
 
 ## 真机验收步骤
@@ -141,7 +142,7 @@
 1. 在首页点击“设备检查”，进入状态总览/交付验收相关页面。
 2. 确认页面显示固件版本、IDF 版本、目标板和硬件快照。
 3. 依次点击扫码预览、文本二维码、触摸测试、亮度设置、存储卡读写、文件刷新。
-4. 确认页面明确提示当前已接真钱包主路径，但还不是生产审计版；智能卡开放检测、Satochip Web3 连接/签名、路径地址和 BTC xpub/ypub/zpub/tpub/upub/vpub，不开放写卡、改 PIN、重置或 SeedKeeper 管理。
+4. 确认页面明确提示当前已接真钱包主路径，但还不是生产审计版；智能卡开放检测、Satochip Web3 连接/签名、路径地址、BTC xpub/ypub/zpub/tpub/upub/vpub，以及 SeedKeeper 测试卡维护路径。
 
 ### 9. 模拟器覆盖重点
 
@@ -259,7 +260,7 @@ tools/kern_delivery.sh final
 
 ## 已知风险
 
-- USB CCID 读卡器已接入安全检测页；Satochip Web3 连接/签名、路径地址、BTC xpub/ypub/zpub/tpub/upub/vpub 已进入可测范围。智能卡写卡、改 PIN、重置、SeedKeeper 管理、Satochip PSBT/BTC 消息签名不能作为可用功能验收。
+- USB CCID 读卡器已接入安全检测页；Satochip Web3 连接/签名、路径地址、BTC xpub/ypub/zpub/tpub/upub/vpub 已进入可测范围；SeedKeeper 设置/改 PIN、写入、查看/导入和重置已进入测试卡验收范围。Satochip PSBT/BTC 消息签名不能作为可用功能验收。
 - 钱包逻辑已接入：旧 Kern 钱包核心和入口已编译进真机固件，但缺少完整真机钱包流程验收和生产安全审计，不能直接放真钱。
 - 串口刷写低速：当前建议使用低速稳定刷写，后续再优化高速下载稳定性。
 - 屏幕中文新增需烘焙字体：新增中文文案后必须重新执行字体烘焙，否则可能出现缺字、方块或显示异常。
@@ -269,7 +270,7 @@ tools/kern_delivery.sh final
 ## 下一阶段建议
 
 1. 完成真机验收记录：按本文清单补充实拍照片、串口日志和验收结论。
-2. 扩展 USB CCID 智能卡：在当前枚举、ATR、Satochip Web3、xpub/地址稳定后，再分阶段开放 SeedKeeper 只读列表、Satochip PSBT/BTC 消息签名，最后才评估写卡、改 PIN 和重置。
+2. 扩展 USB CCID 智能卡：在当前枚举、ATR、Satochip Web3、xpub/地址、SeedKeeper 写入/查看/重置稳定后，再评估 Satochip PSBT/BTC 消息签名和更完整的卡生命周期管理。
 3. 完成真钱包流程验收：创建、导入、xpub、地址、备份、擦除、PSBT、消息签名、取消和错误路径。
 4. 建立安全开关矩阵：把生产资金版、测试资金版、开发者模式和智能卡实验模式分别做成可审计配置。
 5. 固化中文字体流程：新增中文文案时自动检查缺字并触发字体烘焙。
@@ -278,7 +279,7 @@ tools/kern_delivery.sh final
 # 2026-05-19 17:34 集成交付记录
 
 - 三路评测已合并：安全状态、UI/文案、缺口扫描。
-- 正式 UI 已开放 `智能卡检测`、Satochip Web3 连接/签名、路径地址、`观察公钥` 下 BTC xpub/ypub/zpub/tpub/upub/vpub；写卡、改 PIN、重置和 SeedKeeper 管理继续隐藏。
+- 正式 UI 已开放 `智能卡检测`、Satochip Web3 连接/签名、路径地址、`观察公钥` 下 BTC xpub/ypub/zpub/tpub/upub/vpub，并开放 SeedKeeper 测试卡设置 PIN、改 PIN、写入、查看/导入和重置。
 - 临时/无校验助记词只允许助记词变换和还原，核心层禁止签名、地址派生、xpub、Web3、备份导出。
 - 助记词本机 Flash 保存被存储层拒绝，保留 SD 卡加密备份路径。
 - passphrase 会话在合法重载/切换路径中保留，避免静默变成无口令钱包。

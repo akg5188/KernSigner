@@ -59,7 +59,7 @@ typedef struct {
   smartcard_satochip_account_t parent_key;
   smartcard_satochip_account_t ledger_live[10];
   size_t ledger_live_count;
-  smartcard_satochip_account_t btc[2];
+  smartcard_satochip_account_t btc[8];
   size_t btc_count;
   uint8_t master_fingerprint[4];
   bool has_master_fingerprint;
@@ -208,8 +208,9 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
                                        uint32_t timeout_ms);
 void smartcard_satochip_format_label(const smartcard_satochip_label_t *label,
                                      char *out, size_t out_len);
-esp_err_t smartcard_seedkeeper_read_status(
-    smartcard_seedkeeper_status_t *out, uint32_t timeout_ms);
+esp_err_t smartcard_seedkeeper_read_status(const char *pin,
+                                           smartcard_seedkeeper_status_t *out,
+                                           uint32_t timeout_ms);
 void smartcard_seedkeeper_format_status(
     const smartcard_seedkeeper_status_t *status, char *out, size_t out_len);
 esp_err_t smartcard_satochip_get_eth_account(const char *pin, const char *path,
@@ -239,8 +240,14 @@ esp_err_t smartcard_satochip_card_set_feature_policy(
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms);
 esp_err_t smartcard_satochip_card_reset_factory_signal(
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms);
+esp_err_t smartcard_satochip_card_setup_pin(
+    const char *new_pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms);
 esp_err_t smartcard_satochip_card_reset_seed(
     const char *pin, const uint8_t *hmac, size_t hmac_len,
+    smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms);
+esp_err_t smartcard_satochip_card_import_mnemonic_seed(
+    const char *pin, const char *mnemonic, const char *passphrase,
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms);
 esp_err_t smartcard_satochip_card_change_pin(
     uint8_t pin_nbr, const char *old_pin, const char *new_pin,
@@ -314,11 +321,21 @@ esp_err_t smartcard_seedkeeper_export_secret_to_satochip(
 esp_err_t smartcard_seedkeeper_reset_secret(
     const char *pin, uint16_t sid, smartcard_satochip_apdu_result_t *out,
     uint32_t timeout_ms);
+esp_err_t smartcard_seedkeeper_setup_pin(
+    const char *new_pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms);
 esp_err_t smartcard_seedkeeper_change_pin(
     uint8_t pin_nbr, const char *old_pin, const char *new_pin,
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms);
+esp_err_t smartcard_seedkeeper_reset_wrong_pin_step(
+    const char *wrong_pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms);
+esp_err_t smartcard_seedkeeper_reset_wrong_puk_step(
+    const char *wrong_puk, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms);
 esp_err_t smartcard_seedkeeper_reset_factory_signal(
-    smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms);
+    const char *pin, smartcard_satochip_apdu_result_t *out,
+    uint32_t timeout_ms);
 esp_err_t smartcard_seedkeeper_print_logs(
     const char *pin, smartcard_satochip_apdu_result_t *out,
     uint32_t timeout_ms);

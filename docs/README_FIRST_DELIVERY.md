@@ -1,12 +1,12 @@
 # 先读我：Kern 交付入口
 
-日期：2026-05-20
+日期：2026-05-22
 
 这份文件是交付前的总入口。每次准备刷机、发包、演示或继续开发前，先看这里，避免把测试资金验收版误当商业生产钱包。
 
 ## 当前定位
 
-当前 Kern 是 Waveshare ESP32-P4 4.3 寸设备上的真机验收固件。它已经接入旧 Kern 钱包核心、中文 UI、助记词主流程、扫码签名、连接钱包、设备检查和 Satochip Web3 主线。
+当前 Kern 是 Waveshare ESP32-P4 4.3 寸设备上的真机验收固件。它已经接入旧 Kern 钱包核心、中文 UI、助记词主流程、扫码签名、连接钱包、设备检查、Satochip Web3 主线和 SeedKeeper 测试卡维护主线。
 
 这个仓库里的大部分实现由 AI 辅助完成，仍在持续打磨中，只适合学习、交流和测试，不要把真实资产放进去。
 
@@ -23,14 +23,15 @@
 - Satochip 常见 EVM 测试资金签名。
 - Satochip 路径地址。
 - Satochip BTC 观察公钥 `xpub/ypub/zpub/tpub/upub/vpub`。
+- SeedKeeper 设置 PIN、改 PIN、写入助记词、查看/导入条目、重置。
+- SeedKeeper 新版重置流程：错 PIN、错 PUK，直到返回 `FF00`。
 
 ## 不能宣称
 
 - 不能宣称商业生产版。
 - 不能宣称可以直接放真钱。
 - 不能宣称完整迁移了 `/home/ak/123/satochip-signer`。
-- 不能宣称支持 SeedKeeper 管理。
-- 不能宣称支持写卡、改 PIN、重置。
+- 不能宣称 SeedKeeper、写卡、改 PIN、重置已经过生产审计。
 - 不能宣称支持 Satochip BTC PSBT 卡签名。
 - 不能宣称支持 TypedData/EIP-712。
 - 不能宣称卡片真伪检查已完成。
@@ -47,6 +48,7 @@
 - `docs/BACKUP_AND_RECOVERY_GUIDE.zh-CN.md`：助记词备份和恢复演练。
 - `docs/连接钱包教程.zh-CN.md`：Web3 商业钱包、BTC 观察钱包和扫码签名新手教程。
 - `docs/SECURITY_PIN_GUIDE.zh-CN.md`：开发板 PIN、智能卡 PIN、PUK、错误次数和新手操作说明。
+- `docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md`：Satochip/SeedKeeper 实测操作手册，包含供电、PIN、写卡、查看、重置和指纹说明。
 - `docs/MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md`：几种助记词创建方式和 BIP39 网站验证。
 - `docs/DOCUMENTATION_COVERAGE.md`：文档覆盖地图，改功能时看它决定要同步哪份文档。
 - `docs/RELEASE_POINTERS_AND_HISTORY.md`：发布包指针、旧包和本轮未出固件说明。

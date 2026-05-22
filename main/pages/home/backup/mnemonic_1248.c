@@ -77,15 +77,11 @@ static void create_label_cell(lv_obj_t *parent, const char *text, int width,
 static void create_punch_cell(lv_obj_t *parent, int value, bool active) {
   lv_obj_t *cell = lv_obj_create(parent);
   lv_obj_set_size(cell, STACKBIT_CELL_W, STACKBIT_CELL_H);
-  lv_obj_set_style_bg_color(cell, active ? lv_color_hex(0xF59E0B)
-                                         : lv_color_hex(0x111827),
-                            0);
+  lv_obj_set_style_bg_color(cell, active ? highlight_color() : bg_color(), 0);
   lv_obj_set_style_bg_opa(cell, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(cell, active ? lv_color_hex(0xFBBF24)
-                                            : lv_color_hex(0x2563EB),
-                                0);
-  lv_obj_set_style_border_width(cell, active ? 2 : 1, 0);
-  lv_obj_set_style_radius(cell, 7, 0);
+  lv_obj_set_style_border_color(cell, highlight_color(), 0);
+  lv_obj_set_style_border_width(cell, 2, 0);
+  lv_obj_set_style_radius(cell, 8, 0);
   lv_obj_set_style_pad_all(cell, 0, 0);
   lv_obj_clear_flag(cell, LV_OBJ_FLAG_SCROLLABLE);
 
@@ -95,8 +91,7 @@ static void create_punch_cell(lv_obj_t *parent, int value, bool active) {
   lv_label_set_text(label, text);
   lv_obj_set_style_text_font(label, theme_font_small(), 0);
   lv_obj_set_style_text_color(label,
-                              active ? lv_color_hex(0x111827) : main_color(),
-                              0);
+                              active ? bg_color() : main_color(), 0);
   lv_obj_center(label);
 }
 
@@ -159,11 +154,11 @@ void mnemonic_1248_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_t *list = lv_obj_create(stack_screen);
   lv_obj_set_size(list, LV_PCT(94), LV_PCT(84));
   lv_obj_align(list, LV_ALIGN_BOTTOM_MID, 0, -theme_get_small_padding());
-  lv_obj_set_style_bg_color(list, panel_color(), 0);
-  lv_obj_set_style_bg_opa(list, LV_OPA_80, 0);
+  lv_obj_set_style_bg_color(list, bg_color(), 0);
+  lv_obj_set_style_bg_opa(list, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(list, highlight_color(), 0);
-  lv_obj_set_style_border_width(list, 1, 0);
-  lv_obj_set_style_radius(list, 14, 0);
+  lv_obj_set_style_border_width(list, 2, 0);
+  lv_obj_set_style_radius(list, 8, 0);
   lv_obj_set_style_pad_all(list, 8, 0);
   lv_obj_set_style_pad_gap(list, 6, 0);
   lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
@@ -180,10 +175,10 @@ void mnemonic_1248_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
     lv_obj_set_width(card, LV_PCT(100));
     lv_obj_set_height(card, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_color(card, bg_color(), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_60, 0);
-    lv_obj_set_style_border_color(card, lv_color_hex(0x334155), 0);
-    lv_obj_set_style_border_width(card, 1, 0);
-    lv_obj_set_style_radius(card, 12, 0);
+    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(card, highlight_color(), 0);
+    lv_obj_set_style_border_width(card, 2, 0);
+    lv_obj_set_style_radius(card, 8, 0);
     lv_obj_set_style_pad_all(card, theme_get_small_padding(), 0);
     lv_obj_set_style_pad_gap(card, 4, 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);

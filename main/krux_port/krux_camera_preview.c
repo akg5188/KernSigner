@@ -555,7 +555,7 @@ bool krux_camera_preview_open_ex(const char *title, const char *notice,
   lv_obj_set_style_bg_opa(frame, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(frame, highlight_color(), 0);
   lv_obj_set_style_border_width(frame, 2, 0);
-  lv_obj_set_style_radius(frame, 18, 0);
+  lv_obj_set_style_radius(frame, 8, 0);
   lv_obj_set_style_pad_all(frame, 0, 0);
   lv_obj_clear_flag(frame, LV_OBJ_FLAG_SCROLLABLE);
 

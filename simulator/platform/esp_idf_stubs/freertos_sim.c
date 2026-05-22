@@ -133,6 +133,11 @@ void vTaskSuspend(TaskHandle_t handle) {
     pause();
 }
 
+UBaseType_t uxTaskGetStackHighWaterMark(TaskHandle_t handle) {
+    (void)handle;
+    return 4096;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Semaphores                                                                  */
 /* -------------------------------------------------------------------------- */

@@ -38,15 +38,9 @@ static void add_square(lv_obj_t *row, bool filled, int size) {
     dot_size = 10;
   lv_obj_set_size(dot, dot_size, dot_size);
   lv_obj_set_style_radius(dot, 4, 0);
-  lv_obj_set_style_border_color(dot,
-                                filled ? lv_color_hex(0xF59E0B)
-                                       : lv_color_hex(0x374151),
-                                0);
-  lv_obj_set_style_border_width(dot, 1, 0);
-  lv_obj_set_style_bg_color(dot,
-                            filled ? lv_color_hex(0xF97316)
-                                   : lv_color_hex(0x111827),
-                            0);
+  lv_obj_set_style_border_color(dot, highlight_color(), 0);
+  lv_obj_set_style_border_width(dot, 2, 0);
+  lv_obj_set_style_bg_color(dot, filled ? highlight_color() : bg_color(), 0);
   lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
   lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_center(dot);
@@ -114,11 +108,11 @@ void mnemonic_tinyseed_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_width(list, LV_PCT(100));
   lv_obj_set_height(list, LV_PCT(84));
   lv_obj_align(list, LV_ALIGN_BOTTOM_MID, 0, -theme_get_small_padding());
-  lv_obj_set_style_bg_color(list, lv_color_hex(0x050505), 0);
+  lv_obj_set_style_bg_color(list, bg_color(), 0);
   lv_obj_set_style_bg_opa(list, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(list, lv_color_hex(0x1F2937), 0);
-  lv_obj_set_style_border_width(list, 1, 0);
-  lv_obj_set_style_radius(list, 16, 0);
+  lv_obj_set_style_border_color(list, highlight_color(), 0);
+  lv_obj_set_style_border_width(list, 2, 0);
+  lv_obj_set_style_radius(list, 8, 0);
   lv_obj_set_style_pad_all(list, 8, 0);
   lv_obj_set_style_pad_gap(list, 4, 0);
   lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);

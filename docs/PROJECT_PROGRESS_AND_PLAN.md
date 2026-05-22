@@ -1,6 +1,6 @@
 # Kern/Krux 项目总进展与详细计划
 
-> 2026-05-20 智能卡更新：用户确认外接供电后 ACR39U-NF 读卡器可识别。当前已把 CCID 探针抽成 Kern 智能卡安全检测页，支持读卡器枚举、ATR、Satochip/SeedKeeper AID 识别和只读状态 APDU；Satochip Web3 连接/签名已跑通，并补入路径地址与 BTC xpub/ypub/zpub/tpub/upub/vpub 读取入口。写卡、改 PIN、重置、SeedKeeper 管理和 Satochip BTC PSBT/消息签名仍保持隐藏。
+> 2026-05-22 智能卡更新：用户确认外接供电后 ACR39U-NF 读卡器可识别，Satochip/SeedKeeper 主线已经跑通。Satochip 已可测 Web3 连接/签名、路径地址和 BTC xpub/ypub/zpub/tpub/upub/vpub；SeedKeeper 已可测设置 PIN、改 PIN、写入助记词、查看/导入条目和重置。新版 SeedKeeper 重置必须用错 PIN/错 PUK 到 `FF00`，旧 `B0 FF` 返回 `9C20` 不是驱动坏。Satochip BTC PSBT/消息签名仍未作为生产能力开放。
 
 本文档是当前项目的总控说明，面向 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 上的 Kern/Krux 移植工作。它回答三个问题：现在做到哪里、哪些边界不能作为已交付能力宣传、下一步怎么按安全顺序推进。
 
@@ -29,7 +29,7 @@
 - 未经过独立交叉校验的地址派生、备份、擦除和会话清理。
 - 未经过交易详情审查、拒签、取消和错误路径测试的 PSBT/消息签名。
 - 未完成安全审查的 SeedQR、加密备份、BIP85 和高级助记词工具。
-- USB CCID 智能卡写卡、改 PIN、重置、SeedKeeper 管理和未完成的 BTC 卡片签名操作。
+- 未完成的 Satochip BTC 卡片签名操作，以及未经过生产审计的智能卡维护操作。
 - 未完成 EVM 交易可读解析、Secure Channel 认证加固和生产配置前，Satochip Web3 签名只作为测试资金验收能力。
 - 任何会导致真实资产转移或泄露的钱包动作。
 
@@ -227,13 +227,13 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 
 ### USB CCID 智能卡
 
-当前状态：安全检测已接入，可作为读卡器/ATR/只读状态验收；Satochip Web3 连接/常见 EVM 签名、路径地址和 BTC 观察公钥读取已进入可测主线；写卡、改 PIN、重置、SeedKeeper 管理、TypedData 和 Satochip BTC PSBT/消息签名仍隐藏。
+当前状态：安全检测已接入，可作为读卡器/ATR/状态验收；Satochip Web3 连接/常见 EVM 签名、路径地址和 BTC 观察公钥读取已进入可测主线；SeedKeeper 设置 PIN、改 PIN、写入助记词、查看/导入条目和新版重置流程已进入测试卡验收范围。TypedData 和 Satochip BTC PSBT/消息签名仍未作为生产能力开放。
 
 原因：
 
 - ACR39U-NF Pocketmate II 是 CCID 读卡器，软件需要 USB Host CCID 驱动和 APDU 层。
 - 之前真机直插读卡器供电和枚举不稳定；现在确认需要外接供电 Hub 或供电转接线。
-- 钱包智能卡功能涉及密钥材料，当前只开放已经跑通的 Satochip 读公钥/地址/Web3 摘要签名；写卡和管理类操作必须等协议、安全和 UI 审查完成后再开放。
+- 钱包智能卡功能涉及密钥材料，当前只把已经跑通的 Satochip 读公钥/地址/Web3 摘要签名和 SeedKeeper 测试卡维护作为验收能力；生产资金版仍需要协议、安全和 UI 审查。
 
 后续最低验收标准：
 
@@ -242,9 +242,10 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 - 能在外接供电下稳定上电读卡器。
 - 能读取卡 ATR。
 - 能发送只读 APDU 并拿到稳定响应。
-- 能识别 Satochip/SeedKeeper AID 并读取只读状态。
+- 能识别 Satochip/SeedKeeper AID 并读取状态。
 - Satochip Web3 签名必须只用测试资金回归，确认二维码、PIN、签名、返回码和二次签名后的相机恢复都稳定。
-- 不能暴露写卡、改 PIN、重置、SeedKeeper 管理、TypedData 或 BTC 卡片签名假入口。
+- SeedKeeper 写入、查看、导入、改 PIN、重置必须只用测试卡回归，确认不会蓝屏、不会误清卡。
+- 不能暴露 TypedData 或 BTC 卡片签名假入口。
 
 ### 钱包/助记词/签名
 

@@ -56,6 +56,9 @@
 #include "pages/shared/sensitive_pin.h"
 #include "core/mnemonic_tools.h"
 #endif
+#ifdef SIMULATOR
+#include "pages/shared/custom_derivation_page.h"
+#endif
 
 #include <bsp/display.h>
 #include <esp_app_desc.h>
@@ -68,6 +71,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wally_bip32.h>
+#include <wally_bip39.h>
+#include <wally_core.h>
 
 static const char *TAG = "KERN_KRUX";
 #ifndef ESP_ERR_INVALID_RESPONSE
@@ -105,6 +111,7 @@ static satochip_tool_mode_t s_satochip_tool_mode = SATOCHIP_TOOL_NONE;
 static lv_obj_t *s_satochip_path_textarea;
 #ifndef SIMULATOR
 static bool s_allow_sensitive_render;
+static char s_custom_derivation_return_id[40];
 #endif
 
 static const char *const KRUX_HOME_MENU_IDS[] = {
@@ -165,8 +172,8 @@ static const char *shell_alias_target_for_id(const char *id) {
     return "connect_rabby";
   if (strcmp(id, "web3_tokenpocket") == 0)
     return "connect_tokenpocket";
-  if (strcmp(id, "web3_address") == 0)
-    return "connect_address";
+  if (strcmp(id, "connect_address") == 0 || strcmp(id, "web3_address") == 0)
+    return "custom_derivation";
   return NULL;
 }
 
@@ -251,8 +258,14 @@ static const krux_menu_override_t KRUX_PI_MNEMONIC_MENU[] = {
     {"创建", "new_mnemonic"},
     {"导入", "load_mnemonic"},
     {"本机助记词", "legacy_select_mnemonic"},
+    {"写卡", "mnemonic_write_smartcard"},
     {"密语", "login_passphrase"},
     {"高级", "pi_mnemonic_advanced"},
+};
+
+static const krux_menu_override_t KRUX_MNEMONIC_WRITE_SMARTCARD_MENU[] = {
+    {"SeedKeeper", "smartcard_seedkeeper_write_mnemonic"},
+    {"Satochip", "smartcard_satochip_write_mnemonic"},
 };
 
 static const krux_menu_override_t KRUX_PI_MNEMONIC_ADVANCED_MENU[] = {
@@ -268,7 +281,7 @@ static const krux_menu_override_t KRUX_PI_CONNECT_MENU[] = {
     {"MetaMask", "connect_metamask"},
     {"Rabby", "connect_rabby"},
     {"TokenPocket", "connect_tokenpocket"},
-    {"地址", "connect_address"},
+    {"派生地址", "custom_derivation"},
     {"BTC", "btc_wallet"},
 };
 
@@ -305,11 +318,6 @@ static const krux_menu_override_t KRUX_CONNECT_TOKENPOCKET_MENU[] = {
     {"智能卡", "web3_tokenpocket_satochip"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_ADDRESS_MENU[] = {
-    {"助记词", "web3_address_mnemonic"},
-    {"智能卡", "web3_address_satochip"},
-};
-
 static const krux_menu_override_t KRUX_BTC_WALLET_MENU[] = {
     {"助记词", "btc_mnemonic"},
     {"智能卡", "btc_satochip"},
@@ -337,7 +345,7 @@ static const krux_menu_override_t KRUX_WALLET_MENU[] = {
     {"助记词", "legacy_select_mnemonic"},
     {"扫码签名", "legacy_scan_sign"},
     {"公钥", "legacy_public_key"},
-    {"地址", "legacy_addresses"},
+    {"派生地址", "custom_derivation"},
     {"备份", "legacy_backup_wallet"},
     {"设置", "settings_wallet"},
     {"清除会话", "login_clear_session"},
@@ -390,6 +398,7 @@ static const krux_menu_override_t KRUX_SMARTCARD_MENU[] = {
 static const krux_menu_override_t KRUX_SMARTCARD_SATOCHIP_MENU[] = {
     {"信息", "smartcard_card_info"},
     {"地址", "satochip_path_address"},
+    {"写入", "smartcard_satochip_write_mnemonic"},
     {"BTC公钥", "satochip_btc_pubkeys"},
     {"维护", "smartcard_satochip_maint"},
     {"高级", "smartcard_satochip_advanced_tools"},
@@ -397,6 +406,7 @@ static const krux_menu_override_t KRUX_SMARTCARD_SATOCHIP_MENU[] = {
 };
 
 static const krux_menu_override_t KRUX_SMARTCARD_MAINT_MENU[] = {
+    {"设置PIN", "smartcard_satochip_setup_pin"},
     {"改PIN", "smartcard_satochip_change_pin"},
     {"解锁", "smartcard_satochip_unblock_pin"},
     {"改标签", "smartcard_satochip_set_label"},
@@ -431,6 +441,9 @@ static const krux_menu_override_t KRUX_SMARTCARD_SESSION_MENU[] = {
 
 static const krux_menu_override_t KRUX_SMARTCARD_SEEDKEEPER_MENU[] = {
     {"状态", "smartcard_seedkeeper_status_page"},
+    {"设置PIN", "smartcard_seedkeeper_setup_pin"},
+    {"改PIN", "smartcard_seedkeeper_change_pin"},
+    {"重置", "smartcard_seedkeeper_reset"},
     {"剩余空间", "smartcard_seedkeeper_free_space"},
     {"列表", "smartcard_seedkeeper_list_page"},
     {"创建", "smartcard_seedkeeper_create_mnemonic"},
@@ -441,8 +454,6 @@ static const krux_menu_override_t KRUX_SMARTCARD_SEEDKEEPER_MENU[] = {
     {"读描述符", "smartcard_seedkeeper_load_descriptor"},
     {"存描述符", "smartcard_seedkeeper_save_descriptor"},
     {"克隆", "smartcard_seedkeeper_clone"},
-    {"改PIN", "smartcard_seedkeeper_change_pin"},
-    {"重置", "smartcard_seedkeeper_reset"},
     {"高级", "smartcard_seedkeeper_advanced_tools"},
 };
 
@@ -459,6 +470,14 @@ static const krux_menu_override_t KRUX_SMARTCARD_CERTIFICATE_MENU[] = {
 };
 
 static const krux_feature_t KRUX_LOCAL_SMARTCARD_FEATURES[] = {
+    {"mnemonic_write_smartcard", "pi_mnemonic_tools", "写卡",
+     "SeedKeeper / Satochip", "把当前助记词写入智能卡。",
+     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_GROUP,
+     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+    {"smartcard_satochip_write_mnemonic", "smartcard_satochip_tools",
+     "写入", "当前助记词", "把当前助记词写入 Satochip。",
+     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
+     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_seedkeeper_tools", "smartcard_tools",
      "SeedKeeper", "状态 / 助记词 / 高级",
      "管理 SeedKeeper。",
@@ -469,6 +488,11 @@ static const krux_feature_t KRUX_LOCAL_SMARTCARD_FEATURES[] = {
      "查看 SeedKeeper 状态和空间。",
      "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
      KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_EXTERNAL_IO},
+    {"smartcard_seedkeeper_setup_pin",
+     "smartcard_satochip_seedkeeper_tools", "设置PIN", "新卡初始化",
+     "给新 SeedKeeper 或重置后的卡设置 PIN。",
+     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
+     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_free_space",
      "smartcard_satochip_seedkeeper_tools", "剩余空间", "可用空间",
      "查看 SeedKeeper 剩余空间。",
@@ -477,11 +501,6 @@ static const krux_feature_t KRUX_LOCAL_SMARTCARD_FEATURES[] = {
     {"smartcard_seedkeeper_list_page",
      "smartcard_satochip_seedkeeper_tools", "列表", "条目",
      "查看卡内条目列表。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
-    {"smartcard_seedkeeper_logs_page",
-     "smartcard_satochip_seedkeeper_tools", "日志", "卡日志",
-     "查看 SeedKeeper 日志。",
      "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
      KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_advanced_tools",
@@ -555,8 +574,8 @@ static const krux_feature_t KRUX_LOCAL_SMARTCARD_FEATURES[] = {
      "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
      KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_reset",
-     "smartcard_satochip_seedkeeper_tools", "重置", "按 SID 删除",
-     "重置或删除 SeedKeeper 条目。",
+     "smartcard_satochip_seedkeeper_tools", "重置", "恢复出厂",
+     "清空 SeedKeeper 并回到未初始化。",
      "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
      KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
     {"new_seedkeeper_create_mnemonic",
@@ -634,8 +653,9 @@ static const krux_menu_override_t KRUX_BACKUP_MENU[] = {
 };
 
 static const krux_menu_override_t KRUX_ADDRESSES_MENU[] = {
-    {"收款", "legacy_addresses"},
-    {"找零", "legacy_addresses"},
+    {"派生地址", "custom_derivation"},
+    {"收款", "custom_derivation"},
+    {"找零", "custom_derivation"},
     {"扫码", "legacy_addresses"},
     {"二维码", "legacy_addresses"},
 };
@@ -664,7 +684,6 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "connect_metamask",
     "connect_rabby",
     "connect_tokenpocket",
-    "connect_address",
     "web3_okx_mnemonic",
     "web3_okx_satochip",
     "web3_bitget_mnemonic",
@@ -675,8 +694,6 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "web3_rabby_satochip",
     "web3_tokenpocket_mnemonic",
     "web3_tokenpocket_satochip",
-    "web3_address_mnemonic",
-    "web3_address_satochip",
     "btc_wallet",
     "btc_mnemonic",
     "btc_satochip",
@@ -686,8 +703,10 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "btc_satochip_xpub",
     "custom_derivation",
     "pi_mnemonic_tools",
+    "mnemonic_write_smartcard",
     "smartcard_tools",
     "smartcard_satochip_tools",
+    "smartcard_satochip_write_mnemonic",
     "smartcard_satochip_maint",
     "smartcard_satochip_advanced_tools",
     "smartcard_satochip_pubkey_tools",
@@ -703,6 +722,7 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "smartcard_satochip_reset_seed",
     "smartcard_satochip_reset_factory",
     "smartcard_satochip_authenticity",
+    "smartcard_satochip_setup_pin",
     "smartcard_satochip_export_authentikey",
     "smartcard_satochip_import_ndef_authentikey",
     "smartcard_satochip_import_trusted_pubkey",
@@ -713,8 +733,8 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "smartcard_seedkeeper_status_page",
     "smartcard_seedkeeper_free_space",
     "smartcard_seedkeeper_list_page",
-    "smartcard_seedkeeper_logs_page",
     "smartcard_seedkeeper_advanced_tools",
+    "smartcard_seedkeeper_setup_pin",
     "smartcard_seedkeeper_create_mnemonic",
     "smartcard_seedkeeper_write_mnemonic",
     "smartcard_seedkeeper_view_mnemonic",
@@ -731,7 +751,6 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "smartcard_seedkeeper_reset_secret",
     "new_seedkeeper_create_mnemonic",
     "load_seedkeeper_mnemonic",
-    "smartcard_certificate_export",
     "smartcard_certificate_import",
     "satochip_btc_pubkeys",
     "satochip_btc_ypub",
@@ -779,11 +798,6 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "backup_grid",
     "backup_seed_qr",
     "backup_kef",
-    "addresses",
-    "addr_receive",
-    "addr_change",
-    "addr_scan_check",
-    "addr_qr_view",
     "smartcard_card_info",
     "satochip_path_address",
     "satochip_btc_zpub",
@@ -816,9 +830,18 @@ static bool product_screen_is_visible(const char *id) {
          !krux_id_is_any(id, "smartcard_seedkeeper_status",
                          "smartcard_seedkeeper_list") &&
          strcmp(id, "smartcard_seedkeeper_logs") != 0 &&
+         strcmp(id, "smartcard_seedkeeper_logs_page") != 0 &&
          !krux_id_is_any(id, "seedkeeper_status", "seedkeeper_list") &&
          strcmp(id, "seedkeeper_logs") != 0 &&
+         strcmp(id, "connect_address") != 0 &&
+         !krux_id_is_any(id, "web3_address_mnemonic",
+                         "web3_address_satochip") &&
+         !krux_id_is_any(id, "addresses", "addr_receive") &&
+         !krux_id_is_any(id, "addr_change", "addr_scan_check") &&
+         strcmp(id, "addr_qr_view") != 0 &&
          strcmp(id, "connect_web3") != 0 &&
+         strcmp(id, "smartcard_web3_scan") != 0 &&
+         strcmp(id, "web3_satochip") != 0 &&
          !krux_id_is_any(id, "sign_mnemonic", "sign_satochip") &&
          !krux_id_is_any(id, "web3", "web3_okx") &&
          !krux_id_is_any(id, "web3_bitget", "web3_metamask") &&
@@ -849,8 +872,8 @@ static const krux_feature_t *shell_feature_find(const char *id) {
 static int max_i(int a, int b) { return a > b ? a : b; }
 
 static lv_color_t krux_canvas_color(void) { return lv_color_hex(0x000000); }
-static lv_color_t krux_card_color(void) { return panel_color(); }
-static lv_color_t krux_card_pressed_color(void) { return lv_color_hex(0x2A1A10); }
+static lv_color_t krux_card_color(void) { return bg_color(); }
+static lv_color_t krux_card_pressed_color(void) { return highlight_color(); }
 static lv_color_t krux_text_color(void) { return main_color(); }
 static lv_color_t krux_muted_color(void) { return secondary_color(); }
 
@@ -888,7 +911,7 @@ static int shell_root_gap(bool is_home) {
 }
 
 static int shell_card_radius(void) {
-  return shell_is_wave_43_portrait() ? 10 : 0;
+  return 8;
 }
 
 static int shell_menu_button_height(bool multiline, bool has_subtitle) {
@@ -1005,14 +1028,15 @@ static lv_obj_t *create_text(lv_obj_t *parent, const char *text, bool medium,
 
 static lv_obj_t *create_panel(lv_obj_t *parent, lv_color_t border_color,
                               int pad) {
+  (void)border_color;
   lv_obj_t *panel = lv_obj_create(parent);
   lv_obj_set_width(panel, LV_PCT(100));
   lv_obj_set_height(panel, LV_SIZE_CONTENT);
-  lv_obj_set_style_bg_color(panel, panel_color(), 0);
-  lv_obj_set_style_bg_opa(panel, LV_OPA_80, 0);
-  lv_obj_set_style_border_color(panel, border_color, 0);
-  lv_obj_set_style_border_width(panel, 1, 0);
-  lv_obj_set_style_radius(panel, 18, 0);
+  lv_obj_set_style_bg_color(panel, bg_color(), 0);
+  lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(panel, highlight_color(), 0);
+  lv_obj_set_style_border_width(panel, 2, 0);
+  lv_obj_set_style_radius(panel, 8, 0);
   lv_obj_set_style_shadow_width(panel, 0, 0);
   lv_obj_set_style_pad_all(panel, pad, 0);
   lv_obj_set_style_pad_gap(panel, theme_get_small_padding(), 0);
@@ -1024,14 +1048,17 @@ static lv_obj_t *create_panel(lv_obj_t *parent, lv_color_t border_color,
 
 static lv_obj_t *create_chip(lv_obj_t *parent, const char *text,
                              lv_color_t color) {
+  (void)color;
   lv_obj_t *chip = lv_label_create(parent);
   lv_label_set_text(chip, text ? text : "");
   lv_label_set_long_mode(chip, LV_LABEL_LONG_CLIP);
   lv_obj_set_style_text_font(chip, theme_font_small(), 0);
   lv_obj_set_style_text_color(chip, main_color(), 0);
-  lv_obj_set_style_bg_color(chip, color, 0);
-  lv_obj_set_style_bg_opa(chip, LV_OPA_40, 0);
-  lv_obj_set_style_radius(chip, 10, 0);
+  lv_obj_set_style_bg_color(chip, bg_color(), 0);
+  lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(chip, highlight_color(), 0);
+  lv_obj_set_style_border_width(chip, 1, 0);
+  lv_obj_set_style_radius(chip, 8, 0);
   lv_obj_set_style_pad_left(chip, 8, 0);
   lv_obj_set_style_pad_right(chip, 8, 0);
   lv_obj_set_style_pad_top(chip, 4, 0);
@@ -1061,10 +1088,46 @@ static bool satochip_legacy_seedkeeper_id(const char *id);
 static bool smartcard_task_busy(void);
 static void smartcard_probe_start(lv_obj_t *label);
 static void satochip_status_start(lv_obj_t *label);
+static lv_obj_t *satochip_maint_attach_extra_field(lv_obj_t *parent,
+                                                   const char *label_text,
+                                                   const char *placeholder,
+                                                   const char *default_text,
+                                                   bool password_mode,
+                                                   bool multiline,
+                                                   size_t max_len,
+                                                   lv_obj_t **slot);
 static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature);
 static void create_krux_child_menu(lv_obj_t *list,
                                    const krux_feature_t *feature);
 static const krux_feature_t *shell_feature_find(const char *id);
+#ifdef SIMULATOR
+static bool simulator_launch_custom_derivation(void);
+#endif
+
+#ifdef SIMULATOR
+static void simulator_custom_derivation_return_cb(void) {
+  custom_derivation_page_destroy();
+  (void)krux_shell_show_screen("pi_connect_wallet");
+}
+
+static void simulator_custom_derivation_import_cb(void) {
+  custom_derivation_page_destroy();
+  (void)krux_shell_show_screen("load_mnemonic");
+}
+
+static bool simulator_launch_custom_derivation(void) {
+  if (!s_parent)
+    s_parent = lv_screen_active();
+  shell_transient_state_reset();
+  lv_obj_clean(s_parent);
+  s_current_screen_id = "custom_derivation";
+  custom_derivation_page_create_with_import(
+      s_parent, simulator_custom_derivation_return_cb,
+      simulator_custom_derivation_import_cb);
+  custom_derivation_page_show();
+  return true;
+}
+#endif
 
 #ifndef SIMULATOR
 static bool wallet_ready_for_legacy_pages(void) {
@@ -1236,7 +1299,14 @@ static void shell_return_from_stackbit_restore_cb(void) {
 
 static void shell_return_from_custom_derivation_cb(void) {
   custom_derivation_page_destroy();
-  (void)krux_shell_show_screen("pi_connect_wallet");
+  (void)krux_shell_show_screen(s_custom_derivation_return_id[0]
+                                   ? s_custom_derivation_return_id
+                                   : "pi_connect_wallet");
+}
+
+static void shell_import_from_custom_derivation_cb(void) {
+  custom_derivation_page_destroy();
+  legacy_wallet_launch_load();
 }
 
 static void legacy_wallet_launch_words(void) {
@@ -1629,6 +1699,8 @@ static bool legacy_wallet_needs_mnemonic_slot_choice(const char *id) {
                 strcmp(id, "web3_rabby_mnemonic") == 0 ||
                 strcmp(id, "web3_tokenpocket_mnemonic") == 0 ||
                 strcmp(id, "web3_address_mnemonic") == 0 ||
+                strcmp(id, "smartcard_satochip_write_mnemonic") == 0 ||
+                strcmp(id, "smartcard_seedkeeper_write_mnemonic") == 0 ||
                 strcmp(id, "btc_mnemonic") == 0 ||
                 strcmp(id, "btc_bluewallet_zpub") == 0 ||
                 strcmp(id, "btc_bluewallet_xpub") == 0 ||
@@ -1672,8 +1744,12 @@ static void legacy_wallet_launch_pending_public_key_mode(void) {
 }
 
 static void legacy_wallet_launch_custom_derivation_unlocked(void) {
+  snprintf(s_custom_derivation_return_id, sizeof(s_custom_derivation_return_id),
+           "%s", s_current_screen_id ? s_current_screen_id : "pi_connect_wallet");
   lv_obj_t *root = legacy_wallet_prepare_root();
-  custom_derivation_page_create(root, shell_return_from_custom_derivation_cb);
+  custom_derivation_page_create_with_import(
+      root, shell_return_from_custom_derivation_cb,
+      shell_import_from_custom_derivation_cb);
   custom_derivation_page_show();
 }
 
@@ -1868,9 +1944,16 @@ static bool legacy_wallet_handle_direct_target(const char *target_id) {
     return true;
   }
   if (strcmp(target_id, "custom_derivation") == 0) {
-    if (!legacy_wallet_require_signing_key())
-      return true;
     sensitive_pin_require(legacy_wallet_launch_custom_derivation_unlocked,
+                          legacy_wallet_cancel_direct_sensitive);
+    return true;
+  }
+  if (strcmp(target_id, "smartcard_satochip_write_mnemonic") == 0 ||
+      strcmp(target_id, "smartcard_seedkeeper_write_mnemonic") == 0) {
+    if (!legacy_wallet_require_valid_mnemonic())
+      return true;
+    s_pending_sensitive_screen = target_id;
+    sensitive_pin_require(legacy_wallet_show_pending_sensitive_screen,
                           legacy_wallet_cancel_direct_sensitive);
     return true;
   }
@@ -2330,16 +2413,13 @@ static lv_obj_t *create_menu_card(lv_obj_t *parent,
   lv_obj_set_height(btn, max_i(two_columns ? 102 : 86,
                                theme_get_min_touch_size()));
   theme_apply_touch_button(btn, primary);
-  lv_obj_set_style_bg_color(btn, panel_color(), 0);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_80, 0);
+  lv_obj_set_style_bg_color(btn, bg_color(), 0);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
   lv_obj_set_style_pad_all(btn, 12, 0);
   lv_obj_set_style_pad_gap(btn, 7, 0);
-  lv_obj_set_style_radius(btn, 16, 0);
-  lv_obj_set_style_border_width(btn, 1, 0);
-  lv_obj_set_style_border_color(btn,
-                                primary ? highlight_color()
-                                        : disabled_color(),
-                                0);
+  lv_obj_set_style_radius(btn, 8, 0);
+  lv_obj_set_style_border_width(btn, 2, 0);
+  lv_obj_set_style_border_color(btn, highlight_color(), 0);
   lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START,
                         LV_FLEX_ALIGN_START);
@@ -2353,8 +2433,7 @@ static lv_obj_t *create_menu_card(lv_obj_t *parent,
   lv_obj_set_width(btn_label, LV_PCT(58));
   lv_label_set_long_mode(btn_label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_font(btn_label, theme_font_medium(), 0);
-  lv_obj_set_style_text_color(btn_label,
-                              primary ? highlight_color() : main_color(), 0);
+  lv_obj_set_style_text_color(btn_label, main_color(), 0);
 
   create_chip(title_row, krux_feature_status_name(feature->status),
               status_color(feature->status));
@@ -2367,14 +2446,11 @@ static lv_obj_t *create_nav_button(lv_obj_t *parent, const char *label,
   lv_obj_set_width(btn, LV_PCT(100));
   lv_obj_set_height(btn, max_i(58, theme_get_min_touch_size() * 2 / 3));
   theme_apply_touch_button(btn, primary);
-  lv_obj_set_style_bg_color(btn, panel_color(), 0);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_80, 0);
-  lv_obj_set_style_radius(btn, 16, 0);
-  lv_obj_set_style_border_width(btn, 1, 0);
-  lv_obj_set_style_border_color(btn,
-                                primary ? highlight_color()
-                                        : disabled_color(),
-                                0);
+  lv_obj_set_style_bg_color(btn, bg_color(), 0);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(btn, 8, 0);
+  lv_obj_set_style_border_width(btn, 2, 0);
+  lv_obj_set_style_border_color(btn, highlight_color(), 0);
   if (target_id && target_id[0]) {
     lv_obj_add_event_cb(btn, nav_event_cb, LV_EVENT_CLICKED, (void *)target_id);
   } else {
@@ -2384,8 +2460,7 @@ static lv_obj_t *create_nav_button(lv_obj_t *parent, const char *label,
   lv_obj_t *btn_label = lv_label_create(btn);
   lv_label_set_text(btn_label, label);
   lv_obj_set_style_text_font(btn_label, theme_font_medium(), 0);
-  lv_obj_set_style_text_color(btn_label,
-                              primary ? highlight_color() : main_color(), 0);
+  lv_obj_set_style_text_color(btn_label, main_color(), 0);
   lv_obj_center(btn_label);
   return btn;
 }
@@ -2397,14 +2472,11 @@ static lv_obj_t *create_action_button(lv_obj_t *parent, const char *label,
   lv_obj_set_width(btn, LV_PCT(100));
   lv_obj_set_height(btn, max_i(58, theme_get_min_touch_size() * 2 / 3));
   theme_apply_touch_button(btn, primary);
-  lv_obj_set_style_bg_color(btn, panel_color(), 0);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_80, 0);
-  lv_obj_set_style_radius(btn, 16, 0);
-  lv_obj_set_style_border_width(btn, 1, 0);
-  lv_obj_set_style_border_color(btn,
-                                primary ? highlight_color()
-                                        : disabled_color(),
-                                0);
+  lv_obj_set_style_bg_color(btn, bg_color(), 0);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+  lv_obj_set_style_radius(btn, 8, 0);
+  lv_obj_set_style_border_width(btn, 2, 0);
+  lv_obj_set_style_border_color(btn, highlight_color(), 0);
   if (cb) {
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
   } else {
@@ -2414,8 +2486,7 @@ static lv_obj_t *create_action_button(lv_obj_t *parent, const char *label,
   lv_obj_t *btn_label = lv_label_create(btn);
   lv_label_set_text(btn_label, label);
   lv_obj_set_style_text_font(btn_label, theme_font_medium(), 0);
-  lv_obj_set_style_text_color(btn_label,
-                              primary ? highlight_color() : main_color(), 0);
+  lv_obj_set_style_text_color(btn_label, main_color(), 0);
   lv_obj_center(btn_label);
   return btn;
 }
@@ -2423,8 +2494,10 @@ static lv_obj_t *create_action_button(lv_obj_t *parent, const char *label,
 static void style_slider(lv_obj_t *slider) {
   lv_obj_set_width(slider, LV_PCT(100));
   lv_obj_set_height(slider, 14);
-  lv_obj_set_style_bg_color(slider, panel_color(), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(slider, bg_color(), LV_PART_MAIN);
   lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_border_color(slider, highlight_color(), LV_PART_MAIN);
+  lv_obj_set_style_border_width(slider, 1, LV_PART_MAIN);
   lv_obj_set_style_bg_color(slider, highlight_color(), LV_PART_INDICATOR);
   lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_INDICATOR);
   lv_obj_set_style_bg_color(slider, main_color(), LV_PART_KNOB);
@@ -2709,8 +2782,7 @@ static bool is_connect_wallet_source_menu(const char *id) {
                 strcmp(id, "connect_bitget") == 0 ||
                 strcmp(id, "connect_metamask") == 0 ||
                 strcmp(id, "connect_rabby") == 0 ||
-                strcmp(id, "connect_tokenpocket") == 0 ||
-                strcmp(id, "connect_address") == 0);
+                strcmp(id, "connect_tokenpocket") == 0);
 }
 
 static bool is_connect_wallet_group_menu(const char *id) {
@@ -2729,8 +2801,7 @@ static bool is_btc_wallet_choice(const char *id) {
 static bool target_requires_signing_key(const char *id) {
   return id && (is_btc_wallet_choice(id) ||
                 strcmp(id, "legacy_public_key") == 0 ||
-                strcmp(id, "legacy_addresses") == 0 ||
-                strcmp(id, "custom_derivation") == 0);
+                strcmp(id, "legacy_addresses") == 0);
 }
 
 static bool target_requires_shell_gate(const char *id) {
@@ -2802,13 +2873,19 @@ static void web3_qr_return_cb(void) {
 
 static void web3_qr_event_cb(lv_event_t *event) {
   (void)event;
-  if (s_web3_qr_page_index >= s_web3_qr_bundle.page_count ||
-      !s_web3_qr_bundle.pages[s_web3_qr_page_index])
+  if (s_web3_qr_bundle.page_count == 0)
     return;
   web3_qr_timer_stop();
-  if (!qr_viewer_page_create(lv_screen_active(),
-                             s_web3_qr_bundle.pages[s_web3_qr_page_index],
-                             "连接钱包", web3_qr_return_cb)) {
+  const char *const *frames = (const char *const *)s_web3_qr_bundle.pages;
+  bool shown = s_web3_qr_bundle.page_count > 1
+                   ? qr_viewer_page_create_frames(
+                         lv_screen_active(), frames,
+                         s_web3_qr_bundle.page_count, "连接钱包",
+                         web3_qr_return_cb, 170)
+                   : qr_viewer_page_create(lv_screen_active(),
+                                           s_web3_qr_bundle.pages[0],
+                                           "连接钱包", web3_qr_return_cb);
+  if (!shown) {
     dialog_show_error("连接码显示失败", NULL, 2000);
     return;
   }
@@ -2972,7 +3049,7 @@ static void create_connect_wallet_block(lv_obj_t *parent,
   web3_update_qr_display();
 
   if (s_web3_qr_bundle.page_count > 1) {
-    s_web3_qr_timer = lv_timer_create(web3_auto_page_timer_cb, 1200, NULL);
+    s_web3_qr_timer = lv_timer_create(web3_auto_page_timer_cb, 170, NULL);
     create_action_button(panel, "下一片", web3_next_page_event_cb, NULL, true);
   }
 #ifndef SIMULATOR
@@ -3084,7 +3161,7 @@ static void create_satochip_qr_block(lv_obj_t *panel,
   web3_update_qr_display();
 
   if (s_web3_qr_bundle.page_count > 1) {
-    s_web3_qr_timer = lv_timer_create(web3_auto_page_timer_cb, 1200, NULL);
+    s_web3_qr_timer = lv_timer_create(web3_auto_page_timer_cb, 170, NULL);
     create_action_button(panel, "下一片", web3_next_page_event_cb, NULL, true);
   }
 #ifndef SIMULATOR
@@ -3971,12 +4048,13 @@ static void create_satochip_tool_block(lv_obj_t *parent,
     lv_textarea_set_placeholder_text(s_satochip_path_textarea,
                                      "m/44'/60'/0'/0/0");
     lv_textarea_set_text(s_satochip_path_textarea, "m/44'/60'/0'/0/0");
-    lv_obj_set_style_bg_color(s_satochip_path_textarea, panel_color(), 0);
+    lv_obj_set_style_bg_color(s_satochip_path_textarea, bg_color(), 0);
+    lv_obj_set_style_bg_opa(s_satochip_path_textarea, LV_OPA_COVER, 0);
     lv_obj_set_style_text_color(s_satochip_path_textarea, main_color(), 0);
-    lv_obj_set_style_border_color(s_satochip_path_textarea, secondary_color(),
+    lv_obj_set_style_border_color(s_satochip_path_textarea, highlight_color(),
                                   0);
-    lv_obj_set_style_border_width(s_satochip_path_textarea, 1, 0);
-    lv_obj_set_style_radius(s_satochip_path_textarea, 12, 0);
+    lv_obj_set_style_border_width(s_satochip_path_textarea, 2, 0);
+    lv_obj_set_style_radius(s_satochip_path_textarea, 8, 0);
     lv_obj_set_style_pad_top(s_satochip_path_textarea, 8, 0);
     lv_obj_set_style_pad_bottom(s_satochip_path_textarea, 8, 0);
     lv_obj_set_style_pad_left(s_satochip_path_textarea, 12, 0);
@@ -4016,7 +4094,7 @@ static void create_btc_wallet_block(lv_obj_t *parent,
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "比特币钱包", true, main_color());
   create_nav_button(panel, "导出公钥", "legacy_public_key", true);
-  create_nav_button(panel, "地址", "legacy_addresses", true);
+  create_nav_button(panel, "派生地址", "custom_derivation", true);
 }
 
 static void create_direct_input_block(lv_obj_t *parent,
@@ -4493,10 +4571,11 @@ static void create_smartcard_probe_block(lv_obj_t *parent) {
   refresh_smartcard_label(result);
 }
 
-#define SATOCHIP_MAINT_TASK_STACK_SIZE 16384
+#define SATOCHIP_MAINT_TASK_STACK_SIZE 32768
 
 typedef enum {
   SATOCHIP_MAINT_NONE = 0,
+  SATOCHIP_MAINT_SETUP_PIN,
   SATOCHIP_MAINT_CHANGE_PIN,
   SATOCHIP_MAINT_UNBLOCK_PIN,
   SATOCHIP_MAINT_SET_LABEL,
@@ -4508,6 +4587,7 @@ typedef enum {
   SATOCHIP_MAINT_IMPORT_NDEF_AUTHENTIKEY,
   SATOCHIP_MAINT_IMPORT_TRUSTED_PUBKEY,
   SATOCHIP_MAINT_EXPORT_TRUSTED_PUBKEY,
+  SATOCHIP_MAINT_SATOCHIP_WRITE_MNEMONIC,
   SATOCHIP_MAINT_SET_2FA_KEY,
   SATOCHIP_MAINT_RESET_2FA_KEY,
   SATOCHIP_MAINT_LOGOUT_ALL,
@@ -4523,8 +4603,11 @@ typedef enum {
   SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR,
   SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR,
   SATOCHIP_MAINT_SEEDKEEPER_CLONE,
+  SATOCHIP_MAINT_SEEDKEEPER_SETUP_PIN,
   SATOCHIP_MAINT_SEEDKEEPER_CHANGE_PIN,
   SATOCHIP_MAINT_SEEDKEEPER_RESET,
+  SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP,
+  SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP,
   SATOCHIP_MAINT_SEEDKEEPER_GENERATE_MASTERSEED,
   SATOCHIP_MAINT_SEEDKEEPER_GENERATE_2FA_SECRET,
   SATOCHIP_MAINT_SEEDKEEPER_DERIVE_MASTER_PASSWORD,
@@ -4551,6 +4634,60 @@ static char s_satochip_maint_pin[80];
 static char s_satochip_maint_text_a[1024];
 static char s_satochip_maint_text_b[4096];
 static char s_satochip_maint_text_c[4096];
+static smartcard_seedkeeper_header_list_t s_satochip_seedkeeper_last_list;
+static bool s_satochip_seedkeeper_last_list_valid;
+static satochip_maint_mode_t s_satochip_seedkeeper_last_list_mode =
+    SATOCHIP_MAINT_NONE;
+typedef enum {
+  SATOCHIP_SEEDKEEPER_LOOKUP_ENTER_PIN = 0,
+  SATOCHIP_SEEDKEEPER_LOOKUP_LIST,
+  SATOCHIP_SEEDKEEPER_LOOKUP_ITEM,
+  SATOCHIP_SEEDKEEPER_LOOKUP_EDIT,
+} satochip_seedkeeper_lookup_stage_t;
+
+typedef enum {
+  SATOCHIP_SEEDKEEPER_ITEM_OP_VIEW = 0,
+  SATOCHIP_SEEDKEEPER_ITEM_OP_LOAD,
+  SATOCHIP_SEEDKEEPER_ITEM_OP_DELETE,
+  SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE,
+} satochip_seedkeeper_item_op_t;
+
+static satochip_seedkeeper_lookup_stage_t s_satochip_seedkeeper_lookup_stage =
+    SATOCHIP_SEEDKEEPER_LOOKUP_ENTER_PIN;
+static satochip_seedkeeper_item_op_t s_satochip_seedkeeper_item_op =
+    SATOCHIP_SEEDKEEPER_ITEM_OP_VIEW;
+static uint16_t s_satochip_seedkeeper_selected_sid;
+static smartcard_seedkeeper_header_t s_satochip_seedkeeper_selected_header;
+static bool s_satochip_seedkeeper_selected_header_valid;
+static char s_satochip_seedkeeper_cached_pin[80];
+static void satochip_seedkeeper_lookup_state_reset(void);
+static void satochip_seedkeeper_render_lookup_content(lv_obj_t *panel);
+static void satochip_seedkeeper_lookup_select_item(uint16_t sid);
+static void satochip_seedkeeper_select_item_cb(lv_event_t *event);
+static void satochip_seedkeeper_lookup_back_cb(lv_event_t *event);
+static void satochip_seedkeeper_lookup_edit_back_cb(lv_event_t *event);
+static void satochip_seedkeeper_lookup_item_action_cb(lv_event_t *event);
+static void satochip_seedkeeper_lookup_edit_cb(lv_event_t *event);
+static void satochip_maint_start(void);
+static void satochip_maint_start_event_cb(lv_event_t *event);
+static void satochip_seedkeeper_reset_pin_step_event_cb(lv_event_t *event);
+static void satochip_seedkeeper_reset_puk_step_event_cb(lv_event_t *event);
+static void satochip_maint_attach_primary_input(lv_obj_t *parent,
+                                                const char *placeholder,
+                                                bool password,
+                                                bool multiline,
+                                                size_t max_len,
+                                                const char *initial);
+static lv_obj_t *satochip_maint_attach_extra_field(lv_obj_t *parent,
+                                                   const char *label_text,
+                                                   const char *placeholder,
+                                                   const char *default_text,
+                                                   bool password_mode,
+                                                   bool multiline,
+                                                   size_t max_len,
+                                                   lv_obj_t **slot);
+static void satochip_hex_bytes_upper(const uint8_t *data, size_t len, char *out,
+                                     size_t out_len);
 
 static bool smartcard_task_busy(void) {
   return s_satochip_task_handle || s_satochip_tool_task_handle ||
@@ -4606,14 +4743,19 @@ static void satochip_maint_focus_extra_cb(lv_event_t *event) {
   }
 }
 
-static void satochip_maint_zero_textarea(lv_obj_t *textarea) {
-  if (!textarea)
+static void satochip_maint_destroy_textarea(lv_obj_t **slot) {
+  if (!slot || !*slot)
+    return;
+  lv_obj_t *textarea = *slot;
+  *slot = NULL;
+  if (!lv_obj_is_valid(textarea))
     return;
   const char *text = lv_textarea_get_text(textarea);
   if (text && text[0]) {
     secure_memzero((void *)text, strlen(text));
     lv_textarea_set_text(textarea, "");
   }
+  lv_obj_del(textarea);
 }
 
 static void satochip_maint_input_cleanup(void) {
@@ -4622,18 +4764,34 @@ static void satochip_maint_input_cleanup(void) {
     memset(&s_satochip_maint_input, 0, sizeof(s_satochip_maint_input));
     s_satochip_maint_input_active = false;
   }
-  satochip_maint_zero_textarea(s_satochip_maint_extra_a);
-  satochip_maint_zero_textarea(s_satochip_maint_extra_b);
-  satochip_maint_zero_textarea(s_satochip_maint_extra_c);
-  s_satochip_maint_extra_a = NULL;
-  s_satochip_maint_extra_b = NULL;
-  s_satochip_maint_extra_c = NULL;
+  satochip_maint_destroy_textarea(&s_satochip_maint_extra_a);
+  satochip_maint_destroy_textarea(&s_satochip_maint_extra_b);
+  satochip_maint_destroy_textarea(&s_satochip_maint_extra_c);
+}
+
+static void satochip_maint_hide_inputs(void) {
+  ui_text_input_hide(&s_satochip_maint_input);
+  if (s_satochip_maint_extra_a)
+    lv_obj_add_flag(s_satochip_maint_extra_a, LV_OBJ_FLAG_HIDDEN);
+  if (s_satochip_maint_extra_b)
+    lv_obj_add_flag(s_satochip_maint_extra_b, LV_OBJ_FLAG_HIDDEN);
+  if (s_satochip_maint_extra_c)
+    lv_obj_add_flag(s_satochip_maint_extra_c, LV_OBJ_FLAG_HIDDEN);
 }
 
 static void shell_transient_state_reset(void) {
   web3_qr_state_reset();
   satochip_pin_input_cleanup();
   satochip_maint_input_cleanup();
+  bool seedkeeper_lookup_screen =
+      strcmp(s_current_screen_id, "smartcard_seedkeeper_view_mnemonic") == 0 ||
+      strcmp(s_current_screen_id, "smartcard_seedkeeper_load_mnemonic") == 0 ||
+      strcmp(s_current_screen_id, "load_seedkeeper_mnemonic") == 0;
+  bool seedkeeper_lookup_mode =
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC ||
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC;
+  if (!seedkeeper_lookup_screen && seedkeeper_lookup_mode)
+    satochip_seedkeeper_lookup_state_reset();
 }
 
 static void satochip_maint_result_clear(void) {
@@ -4641,10 +4799,403 @@ static void satochip_maint_result_clear(void) {
   s_satochip_maint_task_err = ESP_ERR_INVALID_STATE;
 }
 
+static void satochip_maint_log_stack_watermark(const char *stage) {
+  ESP_LOGI(TAG, "satochip maint %s stack watermark=%u words",
+           stage ? stage : "?", (unsigned)uxTaskGetStackHighWaterMark(NULL));
+}
+
+static const char *seedkeeper_wordlist_name_from_byte(uint8_t wordlist_byte) {
+  switch (wordlist_byte) {
+  case 0x00:
+    return "english";
+  case 0x01:
+    return "japanese";
+  case 0x02:
+    return "korean";
+  case 0x03:
+    return "spanish";
+  case 0x04:
+    return "chinese_simplified";
+  case 0x05:
+    return "chinese_traditional";
+  case 0x06:
+    return "french";
+  case 0x07:
+    return "italian";
+  case 0x08:
+    return "czech";
+  case 0x09:
+    return "portuguese";
+  default:
+    return NULL;
+  }
+}
+
+static char *dup_wally_string_local(char *wally_str) {
+  if (!wally_str)
+    return NULL;
+  char *copy = strdup(wally_str);
+  wally_free_string(wally_str);
+  return copy;
+}
+
+static bool seedkeeper_header_is_loadable_mnemonic(
+    const smartcard_seedkeeper_header_t *header) {
+  return header &&
+         ((header->type == SEEDKEEPER_TYPE_BIP39_MNEMONIC) ||
+          (header->type == SEEDKEEPER_TYPE_MASTERSEED &&
+           header->subtype == 0x01));
+}
+
+static bool seedkeeper_header_is_password(
+    const smartcard_seedkeeper_header_t *header) {
+  return header && header->type == SEEDKEEPER_TYPE_PASSWORD;
+}
+
+static bool seedkeeper_header_is_viewable(
+    const smartcard_seedkeeper_header_t *header) {
+  return seedkeeper_header_is_loadable_mnemonic(header) ||
+         seedkeeper_header_is_password(header);
+}
+
+static const char *seedkeeper_header_kind_label(
+    const smartcard_seedkeeper_header_t *header) {
+  if (seedkeeper_header_is_password(header))
+    return "密码";
+  if (seedkeeper_header_is_loadable_mnemonic(header))
+    return "助记词";
+  return "条目";
+}
+
+static bool seedkeeper_fingerprint_from_mnemonic(
+    const char *mnemonic, const char *passphrase, uint8_t out[4]) {
+#ifdef SIMULATOR
+  (void)mnemonic;
+  (void)passphrase;
+  (void)out;
+  return false;
+#else
+  if (!mnemonic || !mnemonic[0] || !out)
+    return false;
+
+  unsigned char seed[BIP39_SEED_LEN_512];
+  unsigned char fingerprint[BIP32_KEY_FINGERPRINT_LEN];
+  struct ext_key *master_key = NULL;
+  bool ok = false;
+  memset(seed, 0, sizeof(seed));
+  memset(fingerprint, 0, sizeof(fingerprint));
+
+  if (bip39_mnemonic_to_seed512(mnemonic, passphrase ? passphrase : "", seed,
+                                sizeof(seed)) != WALLY_OK)
+    goto cleanup;
+  if (bip32_key_from_seed_alloc(seed, sizeof(seed), BIP32_VER_MAIN_PRIVATE, 0,
+                                &master_key) != WALLY_OK)
+    goto cleanup;
+  if (bip32_key_get_fingerprint(master_key, fingerprint,
+                                BIP32_KEY_FINGERPRINT_LEN) != WALLY_OK)
+    goto cleanup;
+
+  memcpy(out, fingerprint, 4);
+  ok = true;
+
+cleanup:
+  if (master_key)
+    bip32_key_free(master_key);
+  secure_memzero(seed, sizeof(seed));
+  secure_memzero(fingerprint, sizeof(fingerprint));
+  return ok;
+#endif
+}
+
+static bool seedkeeper_wallet_fingerprint_hex_from_mnemonic(
+    const char *mnemonic, const char *passphrase, char out[9]) {
+  if (!out)
+    return false;
+  out[0] = '\0';
+  uint8_t fp[4];
+  if (!seedkeeper_fingerprint_from_mnemonic(mnemonic, passphrase, fp)) {
+    secure_memzero(fp, sizeof(fp));
+    return false;
+  }
+  snprintf(out, 9, "%02x%02x%02x%02x", fp[0], fp[1], fp[2], fp[3]);
+  secure_memzero(fp, sizeof(fp));
+  return true;
+}
+
+static void seedkeeper_label_with_wallet_fp(const char *label, const char *fp,
+                                            char out[SEEDKEEPER_LABEL_MAX_BYTES + 1]) {
+  if (!out)
+    return;
+  const char *safe_label = (label && label[0]) ? label : "Kern 助记词";
+  if (!fp || !fp[0] || strstr(safe_label, fp)) {
+    snprintf(out, SEEDKEEPER_LABEL_MAX_BYTES + 1, "%s", safe_label);
+    return;
+  }
+  int written = snprintf(out, SEEDKEEPER_LABEL_MAX_BYTES + 1, "%s %s",
+                         safe_label, fp);
+  if (written < 0)
+    out[0] = '\0';
+}
+
+static void satochip_seedkeeper_store_last_list(
+    const smartcard_seedkeeper_header_list_t *list,
+    satochip_maint_mode_t mode) {
+  secure_memzero(&s_satochip_seedkeeper_last_list,
+                 sizeof(s_satochip_seedkeeper_last_list));
+  if (!list || list->count == 0) {
+    s_satochip_seedkeeper_last_list_valid = false;
+    s_satochip_seedkeeper_last_list_mode = SATOCHIP_MAINT_NONE;
+    return;
+  }
+  memcpy(&s_satochip_seedkeeper_last_list, list, sizeof(*list));
+  s_satochip_seedkeeper_last_list_valid = true;
+  s_satochip_seedkeeper_last_list_mode = mode;
+}
+
+static const smartcard_seedkeeper_header_t *
+satochip_seedkeeper_find_last_header(uint16_t sid) {
+  if (!s_satochip_seedkeeper_last_list_valid)
+    return NULL;
+  for (size_t i = 0; i < s_satochip_seedkeeper_last_list.count; i++) {
+    const smartcard_seedkeeper_header_t *header =
+        &s_satochip_seedkeeper_last_list.headers[i];
+    if (header->id == sid)
+      return header;
+  }
+  return NULL;
+}
+
+static void satochip_seedkeeper_lookup_state_reset(void) {
+  secure_memzero(&s_satochip_seedkeeper_last_list,
+                 sizeof(s_satochip_seedkeeper_last_list));
+  s_satochip_seedkeeper_last_list_valid = false;
+  s_satochip_seedkeeper_last_list_mode = SATOCHIP_MAINT_NONE;
+  s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_ENTER_PIN;
+  s_satochip_seedkeeper_item_op = SATOCHIP_SEEDKEEPER_ITEM_OP_VIEW;
+  s_satochip_seedkeeper_selected_sid = 0;
+  s_satochip_seedkeeper_selected_header_valid = false;
+  secure_memzero(&s_satochip_seedkeeper_selected_header,
+                 sizeof(s_satochip_seedkeeper_selected_header));
+  secure_memzero(s_satochip_seedkeeper_cached_pin,
+                 sizeof(s_satochip_seedkeeper_cached_pin));
+}
+
+static void satochip_seedkeeper_lookup_select_item(uint16_t sid) {
+  const smartcard_seedkeeper_header_t *header =
+      satochip_seedkeeper_find_last_header(sid);
+  if (!header) {
+    dialog_show_error("条目已失效", NULL, 1600);
+    return;
+  }
+  s_satochip_seedkeeper_selected_sid = sid;
+  memcpy(&s_satochip_seedkeeper_selected_header, header,
+         sizeof(s_satochip_seedkeeper_selected_header));
+  s_satochip_seedkeeper_selected_header_valid = true;
+  s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_ITEM;
+  s_satochip_maint_result[0] = '\0';
+  (void)krux_shell_show_screen(s_current_screen_id);
+}
+
+static void satochip_seedkeeper_select_item_cb(lv_event_t *event) {
+  if (!event)
+    return;
+  uintptr_t sid_value = (uintptr_t)lv_event_get_user_data(event);
+  if (sid_value == 0)
+    return;
+  satochip_seedkeeper_lookup_select_item((uint16_t)sid_value);
+}
+
+static void satochip_seedkeeper_lookup_back_cb(lv_event_t *event) {
+  (void)event;
+  s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_LIST;
+  s_satochip_seedkeeper_selected_sid = 0;
+  s_satochip_seedkeeper_selected_header_valid = false;
+  secure_memzero(&s_satochip_seedkeeper_selected_header,
+                 sizeof(s_satochip_seedkeeper_selected_header));
+  s_satochip_maint_result[0] = '\0';
+  (void)krux_shell_show_screen(s_current_screen_id);
+}
+
+static void satochip_seedkeeper_lookup_edit_back_cb(lv_event_t *event) {
+  (void)event;
+  s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_ITEM;
+  s_satochip_maint_result[0] = '\0';
+  (void)krux_shell_show_screen(s_current_screen_id);
+}
+
+static void satochip_seedkeeper_lookup_item_action_cb(lv_event_t *event) {
+  uintptr_t action = (uintptr_t)lv_event_get_user_data(event);
+  s_satochip_seedkeeper_item_op = (satochip_seedkeeper_item_op_t)action;
+  if (s_satochip_seedkeeper_item_op ==
+      SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE) {
+    s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_EDIT;
+    s_satochip_maint_result[0] = '\0';
+    (void)krux_shell_show_screen(s_current_screen_id);
+    return;
+  }
+  satochip_maint_start();
+}
+
+static void satochip_seedkeeper_lookup_edit_cb(lv_event_t *event) {
+  (void)event;
+  s_satochip_seedkeeper_item_op = SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE;
+  satochip_maint_start();
+}
+
+static void satochip_seedkeeper_render_list_entries(lv_obj_t *panel) {
+  if (!panel || !s_satochip_seedkeeper_last_list_valid)
+    return;
+  if (s_satochip_seedkeeper_last_list_mode != s_satochip_maint_mode)
+    return;
+  if (s_satochip_seedkeeper_lookup_stage != SATOCHIP_SEEDKEEPER_LOOKUP_LIST)
+    return;
+  if (s_satochip_maint_mode != SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC &&
+      s_satochip_maint_mode != SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC)
+    return;
+
+  bool has_buttons = false;
+  create_text(panel, "点条目进入。", false, secondary_color());
+
+  for (size_t i = 0; i < s_satochip_seedkeeper_last_list.count; i++) {
+    const smartcard_seedkeeper_header_t *header =
+        &s_satochip_seedkeeper_last_list.headers[i];
+    if (s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC &&
+        !seedkeeper_header_is_loadable_mnemonic(header))
+      continue;
+    if (s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC &&
+        !seedkeeper_header_is_viewable(header))
+      continue;
+
+    char fingerprint[16];
+    satochip_hex_bytes_upper(header->fingerprint, sizeof(header->fingerprint),
+                             fingerprint, sizeof(fingerprint));
+    char label[96];
+    if (seedkeeper_header_is_password(header)) {
+      snprintf(label, sizeof(label), "密码 %s",
+               header->label[0] ? header->label : fingerprint);
+    } else {
+      if (header->label[0])
+        snprintf(label, sizeof(label), "助记词 %s", header->label);
+      else
+        snprintf(label, sizeof(label), "助记词 ID%u", (unsigned)header->id);
+    }
+    create_action_button(panel, label, satochip_seedkeeper_select_item_cb,
+                         (void *)(uintptr_t)header->id, false);
+    has_buttons = true;
+  }
+
+  if (!has_buttons)
+    create_text(panel, "没有可查看条目。", false, secondary_color());
+}
+
+static void satochip_seedkeeper_render_lookup_content(lv_obj_t *panel) {
+  if (!panel)
+    return;
+
+  if (s_satochip_seedkeeper_lookup_stage ==
+      SATOCHIP_SEEDKEEPER_LOOKUP_ENTER_PIN) {
+    satochip_maint_attach_primary_input(panel, "卡 PIN", true, false, 64, "");
+    if (s_satochip_maint_result[0])
+      create_text(panel, s_satochip_maint_result, false,
+                  s_satochip_maint_task_err == ESP_OK ? main_color()
+                                                      : error_color());
+    create_action_button(panel, "读取列表", satochip_maint_start_event_cb, NULL,
+                         true);
+    return;
+  }
+
+  if (s_satochip_seedkeeper_lookup_stage == SATOCHIP_SEEDKEEPER_LOOKUP_LIST) {
+    satochip_seedkeeper_render_list_entries(panel);
+    if (s_satochip_maint_result[0] && !s_satochip_seedkeeper_last_list_valid)
+      create_text(panel, s_satochip_maint_result, false,
+                  s_satochip_maint_task_err == ESP_OK ? main_color()
+                                                      : error_color());
+    create_action_button(panel, "重新读取", satochip_maint_start_event_cb, NULL,
+                         false);
+    return;
+  }
+
+  const smartcard_seedkeeper_header_t *header =
+      s_satochip_seedkeeper_selected_header_valid
+          ? &s_satochip_seedkeeper_selected_header
+          : satochip_seedkeeper_find_last_header(
+                s_satochip_seedkeeper_selected_sid);
+
+  char title[48];
+  snprintf(title, sizeof(title), "%s", seedkeeper_header_kind_label(header));
+  create_text(panel, title, true, highlight_color());
+  if (header && header->label[0])
+    create_text(panel, header->label, false, secondary_color());
+  if (s_satochip_maint_result[0])
+    create_text(panel, s_satochip_maint_result, false,
+                s_satochip_maint_task_err == ESP_OK ? main_color()
+                                                    : error_color());
+
+  if (s_satochip_seedkeeper_lookup_stage == SATOCHIP_SEEDKEEPER_LOOKUP_EDIT) {
+    if (!seedkeeper_header_is_password(header)) {
+      create_text(panel, "只有密码条目可以修改。", false, error_color());
+      create_action_button(panel, "返回", satochip_seedkeeper_lookup_edit_back_cb,
+                           NULL, true);
+      return;
+    }
+    satochip_maint_attach_primary_input(panel, "新密码", true, false, 512, "");
+    satochip_maint_attach_extra_field(panel, "标签", "密码名称",
+                                      header && header->label[0] ? header->label
+                                                                 : "密码",
+                                      false, false, 80,
+                                      &s_satochip_maint_extra_a);
+    create_action_button(panel, "保存修改", satochip_seedkeeper_lookup_edit_cb,
+                         NULL, true);
+    create_action_button(panel, "返回", satochip_seedkeeper_lookup_edit_back_cb,
+                         NULL, false);
+    return;
+  }
+
+  if (seedkeeper_header_is_password(header)) {
+    create_action_button(panel, "查看密码",
+                         satochip_seedkeeper_lookup_item_action_cb,
+                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_VIEW,
+                         true);
+    create_action_button(panel, "修改",
+                         satochip_seedkeeper_lookup_item_action_cb,
+                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE,
+                         false);
+  } else {
+    create_action_button(panel, "查看助记词",
+                         satochip_seedkeeper_lookup_item_action_cb,
+                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_VIEW,
+                         true);
+    create_action_button(panel, "导入本机",
+                         satochip_seedkeeper_lookup_item_action_cb,
+                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_LOAD,
+                         false);
+  }
+  create_action_button(panel, "删除", satochip_seedkeeper_lookup_item_action_cb,
+                       (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_DELETE,
+                       false);
+  create_action_button(panel, "返回列表", satochip_seedkeeper_lookup_back_cb, NULL,
+                       false);
+}
+
 static void satochip_maint_prepare(satochip_maint_mode_t mode) {
-  if (s_satochip_maint_mode != mode)
+  bool mode_changed = s_satochip_maint_mode != mode;
+  bool was_seedkeeper_lookup =
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC ||
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC;
+  bool is_seedkeeper_lookup =
+      mode == SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC ||
+      mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC;
+  bool returning_from_seedkeeper_reset_step =
+      mode == SATOCHIP_MAINT_SEEDKEEPER_RESET &&
+      (s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP ||
+       s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP);
+  if (mode_changed && !returning_from_seedkeeper_reset_step)
     satochip_maint_result_clear();
   s_satochip_maint_mode = mode;
+  smartcard_ccid_set_factory_reset_mode(
+      mode == SATOCHIP_MAINT_RESET_FACTORY);
+  if (mode_changed && (is_seedkeeper_lookup || was_seedkeeper_lookup))
+    satochip_seedkeeper_lookup_state_reset();
 }
 
 static void satochip_maint_copy_text(char *dst, size_t dst_len,
@@ -4840,6 +5391,38 @@ static void satochip_format_apdu_result(char *dst, size_t dst_len,
     return;
   }
   satochip_appendf(dst, dst_len, &pos, "SW：%04X\n", res->sw);
+  if (res->detail[0])
+    satochip_appendf(dst, dst_len, &pos, "%s\n", res->detail);
+  if (res->response_len > 0) {
+    char hex[1536];
+    satochip_hex_bytes_spaced(res->response,
+                              res->response_len > 96 ? 96 : res->response_len,
+                              hex, sizeof(hex));
+    satochip_appendf(dst, dst_len, &pos, "响应：%u 字节\n%s\n",
+                     (unsigned)res->response_len, hex);
+  }
+}
+
+static void satochip_format_seedkeeper_write_mnemonic_result(
+    char *dst, size_t dst_len, const smartcard_satochip_apdu_result_t *res,
+    const char *wallet_fp) {
+  if (!dst || dst_len == 0)
+    return;
+  size_t pos = 0;
+  dst[0] = '\0';
+  satochip_appendf(dst, dst_len, &pos, "写入助记词\n");
+  if (!res) {
+    satochip_appendf(dst, dst_len, &pos, "没有结果。");
+    return;
+  }
+  satochip_appendf(dst, dst_len, &pos, "SW：%04X\n", res->sw);
+  if (res->sw == 0x9000 && res->response_len >= 6) {
+    uint16_t sid = ((uint16_t)res->response[0] << 8) | res->response[1];
+    satochip_appendf(dst, dst_len, &pos, "SID：%u\n", (unsigned)sid);
+    satochip_appendf(dst, dst_len, &pos, "钱包指纹：%s\n",
+                     wallet_fp && wallet_fp[0] ? wallet_fp : "--");
+    return;
+  }
   if (res->detail[0])
     satochip_appendf(dst, dst_len, &pos, "%s\n", res->detail);
   if (res->response_len > 0) {
@@ -5156,34 +5739,87 @@ static bool seedkeeper_extract_bip39_mnemonic(
   if (!seedkeeper_collect_plain_secret(apdu, secret, sizeof(secret),
                                        &secret_len, &header))
     return false;
-  if (header.type != SEEDKEEPER_TYPE_BIP39_MNEMONIC)
-    return false;
 
   const uint8_t *payload = secret;
   size_t payload_len = secret_len;
-  if (payload_len < 2)
-    return false;
-
   size_t pos = 0;
-  size_t mnemonic_len = payload[pos++];
-  if (mnemonic_len == 0 || mnemonic_len >= mnemonic_out_len ||
-      pos + mnemonic_len > payload_len)
-    return false;
-  memcpy(mnemonic_out, payload + pos, mnemonic_len);
-  mnemonic_out[mnemonic_len] = '\0';
-  pos += mnemonic_len;
+  if (header.type == SEEDKEEPER_TYPE_BIP39_MNEMONIC) {
+    if (payload_len < 2)
+      return false;
 
-  if (pos >= payload_len)
+    size_t mnemonic_len = payload[pos++];
+    if (mnemonic_len == 0 || mnemonic_len >= mnemonic_out_len ||
+        pos + mnemonic_len > payload_len)
+      return false;
+    memcpy(mnemonic_out, payload + pos, mnemonic_len);
+    mnemonic_out[mnemonic_len] = '\0';
+    pos += mnemonic_len;
+
+    if (pos >= payload_len)
+      return false;
+    size_t passphrase_len = payload[pos++];
+    if (pos + passphrase_len > payload_len)
+      return false;
+    if (passphrase_out && passphrase_out_len > 0) {
+      size_t copy = passphrase_len;
+      if (copy >= passphrase_out_len)
+        copy = passphrase_out_len - 1;
+      memcpy(passphrase_out, payload + pos, copy);
+      passphrase_out[copy] = '\0';
+    }
+  } else if (header.type == SEEDKEEPER_TYPE_MASTERSEED &&
+             header.subtype == 0x01) {
+    if (payload_len < 4)
+      return false;
+
+    size_t masterseed_len = payload[pos++];
+    if (masterseed_len == 0 || pos + masterseed_len > payload_len)
+      return false;
+    pos += masterseed_len;
+
+    if (pos >= payload_len)
+      return false;
+    const char *wordlist_name = seedkeeper_wordlist_name_from_byte(payload[pos++]);
+    if (!wordlist_name)
+      return false;
+
+    if (pos >= payload_len)
+      return false;
+    size_t entropy_len = payload[pos++];
+    if (entropy_len < 16 || entropy_len > 32 || (entropy_len % 4) != 0 ||
+        pos + entropy_len > payload_len)
+      return false;
+
+    struct words *wordlist = NULL;
+    if (bip39_get_wordlist(wordlist_name, &wordlist) != WALLY_OK || !wordlist)
+      return false;
+
+    char *mnemonic = NULL;
+    if (bip39_mnemonic_from_bytes(wordlist, payload + pos, entropy_len,
+                                  &mnemonic) != WALLY_OK || !mnemonic)
+      return false;
+
+    char *mnemonic_copy = dup_wally_string_local(mnemonic);
+    if (!mnemonic_copy)
+      return false;
+    snprintf(mnemonic_out, mnemonic_out_len, "%s", mnemonic_copy);
+    SECURE_FREE_STRING(mnemonic_copy);
+    pos += entropy_len;
+
+    if (pos >= payload_len)
+      return false;
+    size_t passphrase_len = payload[pos++];
+    if (pos + passphrase_len > payload_len)
+      return false;
+    if (passphrase_out && passphrase_out_len > 0) {
+      size_t copy = passphrase_len;
+      if (copy >= passphrase_out_len)
+        copy = passphrase_out_len - 1;
+      memcpy(passphrase_out, payload + pos, copy);
+      passphrase_out[copy] = '\0';
+    }
+  } else {
     return false;
-  size_t passphrase_len = payload[pos++];
-  if (pos + passphrase_len > payload_len)
-    return false;
-  if (passphrase_out && passphrase_out_len > 0) {
-    size_t copy = passphrase_len;
-    if (copy >= passphrase_out_len)
-      copy = passphrase_out_len - 1;
-    memcpy(passphrase_out, payload + pos, copy);
-    passphrase_out[copy] = '\0';
   }
 
   if (header_out)
@@ -5281,9 +5917,13 @@ static void satochip_format_seedkeeper_mnemonic_result(
     return;
   }
 
-  satochip_appendf(dst, dst_len, &pos, "SID：%u\n标签：%s\n\n%s",
+  char wallet_fp[9] = "";
+  (void)seedkeeper_wallet_fingerprint_hex_from_mnemonic(mnemonic, passphrase,
+                                                        wallet_fp);
+  satochip_appendf(dst, dst_len, &pos, "SID：%u\n标签：%s\n钱包指纹：%s\n\n%s",
                    (unsigned)header.id,
-                   header.label[0] ? header.label : "(无标签)", mnemonic);
+                   header.label[0] ? header.label : "(无标签)",
+                   wallet_fp[0] ? wallet_fp : "--", mnemonic);
   if (passphrase[0])
     satochip_appendf(dst, dst_len, &pos, "\n\n密语：%s", passphrase);
   if (load_result)
@@ -5291,12 +5931,51 @@ static void satochip_format_seedkeeper_mnemonic_result(
                      loaded_ok ? "成功，槽位 " : "失败",
                      loaded_ok ? "" : "。",
                      loaded_ok ? (unsigned)(slot_index + 1U) : 0U);
+#ifndef SIMULATOR
+  if (load_result && loaded_ok) {
+    char loaded_fp[9] = "";
+    if (key_get_fingerprint_hex(loaded_fp))
+      satochip_appendf(dst, dst_len, &pos, "\n钱包指纹：%s", loaded_fp);
+  }
+#endif
+}
+
+static void satochip_format_seedkeeper_password_result(
+    char *dst, size_t dst_len, const char *title,
+    const smartcard_satochip_apdu_result_t *apdu) {
+  if (!dst || dst_len == 0)
+    return;
+
+  char password[1024];
+  smartcard_seedkeeper_header_t header;
+  bool parsed = seedkeeper_extract_text_secret(apdu, password, sizeof(password),
+                                               &header);
+
+  size_t pos = 0;
+  dst[0] = '\0';
+  satochip_appendf(dst, dst_len, &pos, "%s\n", title ? title : "查看密码");
+  if (apdu)
+    satochip_appendf(dst, dst_len, &pos, "SW：%04X\n", apdu->sw);
+  if (apdu && apdu->detail[0])
+    satochip_appendf(dst, dst_len, &pos, "%s\n", apdu->detail);
+  if (!parsed) {
+    satochip_appendf(dst, dst_len, &pos,
+                     "没有解析到密码。请确认 SID 和导出权限。");
+    return;
+  }
+
+  satochip_appendf(dst, dst_len, &pos, "SID：%u\n标签：%s\n\n%s",
+                   (unsigned)header.id,
+                   header.label[0] ? header.label : "(无标签)", password);
+  secure_memzero(password, sizeof(password));
+  secure_memzero(&header, sizeof(header));
 }
 
 static void satochip_format_seedkeeper_create_result(
     char *dst, size_t dst_len, const char *title, uint16_t sid,
     const uint8_t fingerprint[4], const char *mnemonic, bool loaded_ok,
     size_t slot_index) {
+  (void)fingerprint;
   if (!dst || dst_len == 0)
     return;
 
@@ -5306,16 +5985,19 @@ static void satochip_format_seedkeeper_create_result(
                    title ? title : "智能卡创建");
   if (sid)
     satochip_appendf(dst, dst_len, &pos, "SID：%u\n", (unsigned)sid);
-  if (fingerprint)
-    satochip_appendf(dst, dst_len, &pos, "指纹：%02X%02X%02X%02X\n",
-                     fingerprint[0], fingerprint[1], fingerprint[2],
-                     fingerprint[3]);
   if (mnemonic && mnemonic[0])
     satochip_appendf(dst, dst_len, &pos, "\n%s", mnemonic);
   satochip_appendf(dst, dst_len, &pos, "\n\n加载：%s%s%u",
                    loaded_ok ? "成功，槽位 " : "失败",
                    loaded_ok ? "" : "。",
                    loaded_ok ? (unsigned)(slot_index + 1U) : 0U);
+#ifndef SIMULATOR
+  if (loaded_ok) {
+    char loaded_fp[9] = "";
+    if (key_get_fingerprint_hex(loaded_fp))
+      satochip_appendf(dst, dst_len, &pos, "\n钱包指纹：%s", loaded_fp);
+  }
+#endif
 }
 
 static void satochip_format_certificate_export(
@@ -5391,21 +6073,19 @@ static void satochip_format_seedkeeper_header_list_result(
 
   for (size_t i = 0; i < list->count; i++) {
     const smartcard_seedkeeper_header_t *header = &list->headers[i];
-    char fingerprint[16];
-    satochip_hex_bytes_upper(header->fingerprint, sizeof(header->fingerprint),
-                             fingerprint, sizeof(fingerprint));
     satochip_appendf(dst, dst_len, &pos,
                      "\n#%u ID=%u\n"
                      "标签：%s\n"
-                     "类型：%u/%u 源：%u 权限：%u 计数：%u\n"
-                     "指纹：%s\n",
+                     "类型：%u/%u 源：%u 权限：%u 计数：%u\n",
                      (unsigned)(i + 1U), (unsigned)header->id,
                      header->label[0] ? header->label : "(无标签)",
                      (unsigned)header->type, (unsigned)header->subtype,
                      (unsigned)header->origin,
                      (unsigned)header->export_rights,
-                     (unsigned)header->export_counter, fingerprint);
+                     (unsigned)header->export_counter);
   }
+
+  satochip_appendf(dst, dst_len, &pos, "\n\n点条目查看或导入。");
 }
 
 static const char *
@@ -5419,9 +6099,14 @@ satochip_seedkeeper_stub_title(satochip_maint_mode_t mode) {
     return "存描述符";
   case SATOCHIP_MAINT_SEEDKEEPER_CLONE:
     return "克隆";
+  case SATOCHIP_MAINT_SEEDKEEPER_SETUP_PIN:
+    return "设置PIN";
   case SATOCHIP_MAINT_SEEDKEEPER_RESET:
-  case SATOCHIP_MAINT_SEEDKEEPER_RESET_SECRET:
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP:
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP:
     return "重置";
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET_SECRET:
+    return "删条目";
   case SATOCHIP_MAINT_SEEDKEEPER_GENERATE_MASTERSEED:
     return "主种子";
   case SATOCHIP_MAINT_SEEDKEEPER_GENERATE_2FA_SECRET:
@@ -5434,12 +6119,16 @@ satochip_seedkeeper_stub_title(satochip_maint_mode_t mode) {
 }
 
 static bool satochip_maint_mode_requires_pin(satochip_maint_mode_t mode) {
-  return mode == SATOCHIP_MAINT_CHANGE_PIN ||
+  return mode == SATOCHIP_MAINT_SETUP_PIN ||
+         mode == SATOCHIP_MAINT_CHANGE_PIN ||
+         mode == SATOCHIP_MAINT_SEEDKEEPER_SETUP_PIN ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_CHANGE_PIN ||
+         mode == SATOCHIP_MAINT_RESET_FACTORY ||
          mode == SATOCHIP_MAINT_SET_LABEL ||
          mode == SATOCHIP_MAINT_NFC_POLICY ||
          mode == SATOCHIP_MAINT_FEATURE_POLICY ||
          mode == SATOCHIP_MAINT_RESET_SEED ||
+         mode == SATOCHIP_MAINT_SATOCHIP_WRITE_MNEMONIC ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_CREATE_MNEMONIC ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_WRITE_MNEMONIC ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC ||
@@ -5448,7 +6137,6 @@ static bool satochip_maint_mode_requires_pin(satochip_maint_mode_t mode) {
          mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_CLONE ||
-         mode == SATOCHIP_MAINT_SEEDKEEPER_RESET ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_GENERATE_MASTERSEED ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_GENERATE_2FA_SECRET ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_DERIVE_MASTER_PASSWORD ||
@@ -5468,12 +6156,15 @@ static bool satochip_legacy_seedkeeper_id(const char *id) {
 static bool satochip_screen_uses_onscreen_keyboard(const char *id) {
   return id &&
          (is_web3_satochip_choice(id) ||
+          strcmp(id, "smartcard_satochip_setup_pin") == 0 ||
           strcmp(id, "smartcard_satochip_change_pin") == 0 ||
           strcmp(id, "smartcard_satochip_unblock_pin") == 0 ||
           strcmp(id, "smartcard_satochip_set_label") == 0 ||
           strcmp(id, "smartcard_satochip_nfc_policy") == 0 ||
           strcmp(id, "smartcard_satochip_feature_policy") == 0 ||
           strcmp(id, "smartcard_satochip_reset_seed") == 0 ||
+          strcmp(id, "smartcard_satochip_reset_factory") == 0 ||
+          strcmp(id, "smartcard_satochip_write_mnemonic") == 0 ||
           strcmp(id, "smartcard_satochip_import_ndef_authentikey") == 0 ||
           strcmp(id, "smartcard_satochip_import_trusted_pubkey") == 0 ||
           strcmp(id, "smartcard_satochip_set_2fa_key") == 0 ||
@@ -5489,6 +6180,7 @@ static bool satochip_screen_uses_onscreen_keyboard(const char *id) {
           strcmp(id, "smartcard_seedkeeper_load_descriptor") == 0 ||
           strcmp(id, "smartcard_seedkeeper_save_descriptor") == 0 ||
           strcmp(id, "smartcard_seedkeeper_clone") == 0 ||
+          strcmp(id, "smartcard_seedkeeper_setup_pin") == 0 ||
           strcmp(id, "smartcard_seedkeeper_change_pin") == 0 ||
           strcmp(id, "smartcard_seedkeeper_reset") == 0 ||
           strcmp(id, "smartcard_seedkeeper_generate_masterseed") == 0 ||
@@ -5530,11 +6222,11 @@ static void satochip_maint_attach_primary_input(lv_obj_t *parent,
     lv_textarea_set_max_length(textarea, max_len);
   lv_obj_set_style_text_font(textarea, theme_font_small(), 0);
   lv_obj_set_style_text_color(textarea, main_color(), 0);
-  lv_obj_set_style_bg_color(textarea, panel_color(), 0);
+  lv_obj_set_style_bg_color(textarea, bg_color(), 0);
   lv_obj_set_style_bg_opa(textarea, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(textarea, highlight_color(), 0);
-  lv_obj_set_style_border_width(textarea, 1, 0);
-  lv_obj_set_style_radius(textarea, 12, 0);
+  lv_obj_set_style_border_width(textarea, 2, 0);
+  lv_obj_set_style_radius(textarea, 8, 0);
   lv_obj_set_style_pad_top(textarea, 8, 0);
   lv_obj_set_style_pad_bottom(textarea, 8, 0);
   lv_obj_set_style_pad_left(textarea, 12, 0);
@@ -5561,15 +6253,28 @@ static void satochip_maint_attach_primary_input(lv_obj_t *parent,
   lv_obj_set_style_border_width(s_satochip_maint_input.keyboard, 0, 0);
   lv_obj_set_style_pad_all(s_satochip_maint_input.keyboard, 4, 0);
   lv_obj_set_style_pad_gap(s_satochip_maint_input.keyboard, 6, 0);
-  lv_obj_set_style_bg_color(s_satochip_maint_input.keyboard, disabled_color(),
+  lv_obj_set_style_bg_color(s_satochip_maint_input.keyboard, bg_color(),
                             LV_PART_ITEMS);
   lv_obj_set_style_text_color(s_satochip_maint_input.keyboard, main_color(),
                               LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(s_satochip_maint_input.keyboard, bg_color(),
+                            LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_text_color(s_satochip_maint_input.keyboard, main_color(),
+                              LV_PART_ITEMS | LV_STATE_CHECKED);
   lv_obj_set_style_text_font(s_satochip_maint_input.keyboard,
                              theme_font_small(), LV_PART_ITEMS);
-  lv_obj_set_style_border_width(s_satochip_maint_input.keyboard, 0,
+  lv_obj_set_style_border_color(s_satochip_maint_input.keyboard,
+                                highlight_color(), LV_PART_ITEMS);
+  lv_obj_set_style_border_color(s_satochip_maint_input.keyboard,
+                                highlight_color(),
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_border_width(s_satochip_maint_input.keyboard, 1,
                                 LV_PART_ITEMS);
+  lv_obj_set_style_border_width(s_satochip_maint_input.keyboard, 1,
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
   lv_obj_set_style_radius(s_satochip_maint_input.keyboard, 6, LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(s_satochip_maint_input.keyboard, highlight_color(),
+                            LV_PART_ITEMS | LV_STATE_PRESSED);
   lv_obj_add_flag(s_satochip_maint_input.keyboard, LV_OBJ_FLAG_HIDDEN);
 }
 
@@ -5596,11 +6301,11 @@ static lv_obj_t *satochip_maint_attach_extra_field(lv_obj_t *parent,
     lv_textarea_set_max_length(textarea, max_len);
   lv_obj_set_style_text_font(textarea, theme_font_small(), 0);
   lv_obj_set_style_text_color(textarea, main_color(), 0);
-  lv_obj_set_style_bg_color(textarea, panel_color(), 0);
+  lv_obj_set_style_bg_color(textarea, bg_color(), 0);
   lv_obj_set_style_bg_opa(textarea, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(textarea, highlight_color(), 0);
-  lv_obj_set_style_border_width(textarea, 1, 0);
-  lv_obj_set_style_radius(textarea, 12, 0);
+  lv_obj_set_style_border_width(textarea, 2, 0);
+  lv_obj_set_style_radius(textarea, 8, 0);
   lv_obj_set_style_pad_top(textarea, 8, 0);
   lv_obj_set_style_pad_bottom(textarea, 8, 0);
   lv_obj_set_style_pad_left(textarea, 12, 0);
@@ -5622,6 +6327,7 @@ static void satochip_maint_task(void *arg) {
   const bool delete_with_caps = s_satochip_maint_task_with_caps;
   s_satochip_maint_task_err = ESP_ERR_INVALID_STATE;
   s_satochip_maint_result[0] = '\0';
+  satochip_maint_log_stack_watermark("start");
 
   smartcard_satochip_apdu_result_t *apdu =
       heap_caps_calloc(1, sizeof(*apdu), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -5645,36 +6351,50 @@ static void satochip_maint_task(void *arg) {
   }
 
   switch (s_satochip_maint_mode) {
+  case SATOCHIP_MAINT_SETUP_PIN:
+    s_satochip_maint_task_err =
+        smartcard_satochip_card_setup_pin(s_satochip_maint_pin, apdu, 30000);
+    satochip_format_apdu_result(s_satochip_maint_result,
+                                sizeof(s_satochip_maint_result),
+                                "Satochip 设置PIN", apdu);
+    break;
   case SATOCHIP_MAINT_CHANGE_PIN: {
-    uint8_t pin_nbr = 0;
-    if (!satochip_parse_u8_text(s_satochip_maint_text_c, &pin_nbr)) {
-      s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
-      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "PIN 编号无效。");
-      break;
-    }
     s_satochip_maint_task_err = smartcard_satochip_card_change_pin(
-        pin_nbr, s_satochip_maint_pin, s_satochip_maint_text_a, apdu, 20000);
+        0, s_satochip_maint_pin, s_satochip_maint_text_a, apdu, 20000);
     satochip_format_apdu_result(s_satochip_maint_result,
                                 sizeof(s_satochip_maint_result), "改 PIN",
                                 apdu);
     break;
   }
+  case SATOCHIP_MAINT_SEEDKEEPER_SETUP_PIN:
+    s_satochip_maint_task_err = smartcard_seedkeeper_setup_pin(
+        s_satochip_maint_pin, apdu, 30000);
+    satochip_format_apdu_result(s_satochip_maint_result,
+                                sizeof(s_satochip_maint_result),
+                                "SeedKeeper 设置PIN", apdu);
+    break;
   case SATOCHIP_MAINT_SEEDKEEPER_CHANGE_PIN: {
-    uint8_t pin_nbr = 0;
-    if (!satochip_parse_u8_text(s_satochip_maint_text_c, &pin_nbr)) {
-      s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
-      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "PIN 编号无效。");
-      break;
-    }
     s_satochip_maint_task_err = smartcard_seedkeeper_change_pin(
-        pin_nbr, s_satochip_maint_pin, s_satochip_maint_text_a, apdu, 20000);
+        0, s_satochip_maint_pin, s_satochip_maint_text_a, apdu, 20000);
     satochip_format_apdu_result(s_satochip_maint_result,
                                 sizeof(s_satochip_maint_result),
                                 "SeedKeeper 改PIN", apdu);
     break;
   }
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP:
+    s_satochip_maint_task_err = smartcard_seedkeeper_reset_wrong_pin_step(
+        s_satochip_maint_pin, apdu, 20000);
+    satochip_format_apdu_result(s_satochip_maint_result,
+                                sizeof(s_satochip_maint_result),
+                                "SeedKeeper 错PIN", apdu);
+    break;
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP:
+    s_satochip_maint_task_err = smartcard_seedkeeper_reset_wrong_puk_step(
+        s_satochip_maint_pin, apdu, 20000);
+    satochip_format_apdu_result(s_satochip_maint_result,
+                                sizeof(s_satochip_maint_result),
+                                "SeedKeeper 错PUK", apdu);
+    break;
   case SATOCHIP_MAINT_UNBLOCK_PIN: {
     size_t puk_len = strlen(s_satochip_maint_text_a);
     if (puk_len < 4) {
@@ -5699,10 +6419,11 @@ static void satochip_maint_task(void *arg) {
     break;
   case SATOCHIP_MAINT_NFC_POLICY: {
     uint8_t policy = 0;
-    if (!satochip_parse_u8_text(s_satochip_maint_text_a, &policy)) {
+    if (!satochip_parse_u8_text(s_satochip_maint_text_a, &policy) ||
+        policy > 2) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "NFC 策略值无效。");
+               "NFC 策略只能是 0/1/2。");
       break;
     }
     s_satochip_maint_task_err = smartcard_satochip_card_set_nfc_policy(
@@ -5716,10 +6437,11 @@ static void satochip_maint_task(void *arg) {
     uint8_t feature_id = 0;
     uint8_t policy = 0;
     if (!satochip_parse_u8_text(s_satochip_maint_text_a, &feature_id) ||
-        !satochip_parse_u8_text(s_satochip_maint_text_b, &policy)) {
+        !satochip_parse_u8_text(s_satochip_maint_text_b, &policy) ||
+        feature_id > 2 || policy > 2) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "功能号或策略值无效。");
+               "功能和策略只能是 0/1/2。");
       break;
     }
     s_satochip_maint_task_err = smartcard_satochip_card_set_feature_policy(
@@ -5807,6 +6529,35 @@ static void satochip_maint_task(void *arg) {
                                 sizeof(s_satochip_maint_result), "导信任钥",
                                 apdu);
     break;
+  case SATOCHIP_MAINT_SATOCHIP_WRITE_MNEMONIC: {
+#ifdef SIMULATOR
+    const char *mnemonic =
+        "abandon abandon abandon abandon abandon abandon abandon abandon "
+        "abandon abandon abandon about";
+    const char *passphrase = "";
+    s_satochip_maint_task_err = smartcard_satochip_card_import_mnemonic_seed(
+        s_satochip_maint_pin, mnemonic, passphrase, apdu, 30000);
+#else
+    char *mnemonic_owned = NULL;
+    char *passphrase_owned = NULL;
+    if (!key_get_mnemonic(&mnemonic_owned)) {
+      s_satochip_maint_task_err = ESP_ERR_INVALID_STATE;
+      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+               "请先导入或创建助记词。");
+      break;
+    }
+    (void)key_get_session_passphrase(&passphrase_owned);
+    s_satochip_maint_task_err = smartcard_satochip_card_import_mnemonic_seed(
+        s_satochip_maint_pin, mnemonic_owned,
+        passphrase_owned ? passphrase_owned : "", apdu, 30000);
+    SECURE_FREE_STRING(mnemonic_owned);
+    SECURE_FREE_STRING(passphrase_owned);
+#endif
+    satochip_format_apdu_result(s_satochip_maint_result,
+                                sizeof(s_satochip_maint_result),
+                                "写入 Satochip", apdu);
+    break;
+  }
   case SATOCHIP_MAINT_SET_2FA_KEY: {
     uint8_t key[20];
     size_t key_len =
@@ -5865,7 +6616,8 @@ static void satochip_maint_task(void *arg) {
                "内存不足，无法读取状态。");
       break;
     }
-    s_satochip_maint_task_err = smartcard_seedkeeper_read_status(status, 12000);
+    s_satochip_maint_task_err = smartcard_seedkeeper_read_status(
+        s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, status, 12000);
     smartcard_seedkeeper_format_status(status, s_satochip_maint_result,
                                        sizeof(s_satochip_maint_result));
     secure_memzero(status, sizeof(*status));
@@ -5887,6 +6639,7 @@ static void satochip_maint_task(void *arg) {
         s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, list, 12000);
     satochip_format_seedkeeper_header_list_result(
         list, s_satochip_maint_result, sizeof(s_satochip_maint_result));
+    satochip_seedkeeper_store_last_list(list, SATOCHIP_MAINT_SEEDKEEPER_LIST);
     secure_memzero(list, sizeof(*list));
     free(list);
     break;
@@ -6032,22 +6785,22 @@ static void satochip_maint_task(void *arg) {
     }
     const char *mnemonic = mnemonic_owned;
 #endif
-    uint8_t header[15 + SEEDKEEPER_LABEL_MAX_BYTES];
-    uint8_t secret[2 + SEEDKEEPER_MNEMONIC_MAX_BYTES * 2];
-    uint8_t secret_hash[CRYPTO_SHA256_SIZE];
-    size_t header_len = 0;
-    size_t secret_len = 0;
-    const char *label = s_satochip_maint_text_a[0] ? s_satochip_maint_text_a
-                                                    : "Kern 助记词";
+	    uint8_t header[15 + SEEDKEEPER_LABEL_MAX_BYTES];
+	    uint8_t secret[2 + SEEDKEEPER_MNEMONIC_MAX_BYTES * 2];
+	    uint8_t secret_hash[CRYPTO_SHA256_SIZE];
+	    uint8_t header_fingerprint[4];
+	    char wallet_fp[9] = "";
+	    char label_with_fp[SEEDKEEPER_LABEL_MAX_BYTES + 1];
+	    size_t header_len = 0;
+	    size_t secret_len = 0;
+	    const char *label = s_satochip_maint_text_a[0] ? s_satochip_maint_text_a
+	                                                    : "Kern 助记词";
     const char *passphrase =
         s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "";
+    memset(header_fingerprint, 0, sizeof(header_fingerprint));
     if (!seedkeeper_build_mnemonic_secret(mnemonic, passphrase, secret,
                                           sizeof(secret), &secret_len) ||
-        crypto_sha256(secret, secret_len, secret_hash) != CRYPTO_OK ||
-        !seedkeeper_build_plain_header(
-            SEEDKEEPER_TYPE_BIP39_MNEMONIC, 0x00,
-            SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, label, secret_hash, header,
-            sizeof(header), &header_len)) {
+        crypto_sha256(secret, secret_len, secret_hash) != CRYPTO_OK) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
                "助记词或标签太长。");
@@ -6057,25 +6810,74 @@ static void satochip_maint_task(void *arg) {
       secure_memzero(header, sizeof(header));
       secure_memzero(secret, sizeof(secret));
       secure_memzero(secret_hash, sizeof(secret_hash));
+      secure_memzero(header_fingerprint, sizeof(header_fingerprint));
+      break;
+	    }
+	    if (!seedkeeper_fingerprint_from_mnemonic(mnemonic, passphrase,
+	                                              header_fingerprint))
+	      memcpy(header_fingerprint, secret_hash, sizeof(header_fingerprint));
+	    (void)seedkeeper_wallet_fingerprint_hex_from_mnemonic(mnemonic, passphrase,
+	                                                          wallet_fp);
+	    seedkeeper_label_with_wallet_fp(label, wallet_fp, label_with_fp);
+	    if (!seedkeeper_build_plain_header(
+	            SEEDKEEPER_TYPE_BIP39_MNEMONIC, 0x00,
+	            SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, label_with_fp,
+	            header_fingerprint, header, sizeof(header), &header_len)) {
+      s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
+      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+               "助记词或标签太长。");
+#ifndef SIMULATOR
+      SECURE_FREE_STRING(mnemonic_owned);
+#endif
+      secure_memzero(header, sizeof(header));
+      secure_memzero(secret, sizeof(secret));
+      secure_memzero(secret_hash, sizeof(secret_hash));
+      secure_memzero(header_fingerprint, sizeof(header_fingerprint));
       break;
     }
     s_satochip_maint_task_err = smartcard_seedkeeper_import_secret(
         s_satochip_maint_pin, header, header_len, secret, secret_len, 0, NULL, 0,
         NULL, 0, false, apdu, 30000);
-    satochip_format_apdu_result(s_satochip_maint_result,
-                                sizeof(s_satochip_maint_result), "写入助记词",
-                                apdu);
+	    satochip_format_seedkeeper_write_mnemonic_result(
+	        s_satochip_maint_result, sizeof(s_satochip_maint_result), apdu,
+	        wallet_fp);
 #ifndef SIMULATOR
     SECURE_FREE_STRING(mnemonic_owned);
 #endif
     secure_memzero(header, sizeof(header));
-    secure_memzero(secret, sizeof(secret));
-    secure_memzero(secret_hash, sizeof(secret_hash));
-    break;
+	    secure_memzero(secret, sizeof(secret));
+	    secure_memzero(secret_hash, sizeof(secret_hash));
+	    secure_memzero(header_fingerprint, sizeof(header_fingerprint));
+	    secure_memzero(wallet_fp, sizeof(wallet_fp));
+	    secure_memzero(label_with_fp, sizeof(label_with_fp));
+	    break;
   }
   case SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC:
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC: {
     uint16_t sid = 0;
+    bool has_sid_input = s_satochip_maint_text_a[0] != '\0';
+    if (!has_sid_input) {
+      smartcard_seedkeeper_header_list_t *list = heap_caps_calloc(
+          1, sizeof(*list), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+      if (!list)
+        list = calloc(1, sizeof(*list));
+      if (!list) {
+        s_satochip_maint_task_err = ESP_ERR_NO_MEM;
+        snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+                 "内存不足，无法读取列表。");
+        break;
+      }
+      s_satochip_maint_task_err = smartcard_seedkeeper_list_secret_headers(
+          s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, list, 30000);
+      satochip_format_seedkeeper_header_list_result(
+          list, s_satochip_maint_result, sizeof(s_satochip_maint_result));
+      satochip_seedkeeper_store_last_list(list, s_satochip_maint_mode);
+      if (s_satochip_maint_task_err == ESP_OK)
+        s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_LIST;
+      secure_memzero(list, sizeof(*list));
+      free(list);
+      break;
+    }
     if (!satochip_parse_u16_text(s_satochip_maint_text_a, &sid)) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
@@ -6089,12 +6891,86 @@ static void satochip_maint_task(void *arg) {
       break;
     }
 
+    const smartcard_seedkeeper_header_t *selected_header =
+        s_satochip_seedkeeper_selected_header_valid
+            ? &s_satochip_seedkeeper_selected_header
+            : satochip_seedkeeper_find_last_header(sid);
+
+    if (s_satochip_seedkeeper_item_op ==
+        SATOCHIP_SEEDKEEPER_ITEM_OP_DELETE) {
+      s_satochip_maint_task_err =
+          smartcard_seedkeeper_reset_secret(s_satochip_maint_pin, sid, apdu,
+                                            30000);
+      satochip_format_apdu_result(s_satochip_maint_result,
+                                  sizeof(s_satochip_maint_result),
+                                  "删除条目", apdu);
+      if (s_satochip_maint_task_err == ESP_OK && apdu->sw == 0x9000) {
+        s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_LIST;
+        s_satochip_seedkeeper_selected_sid = 0;
+        s_satochip_seedkeeper_selected_header_valid = false;
+        secure_memzero(&s_satochip_seedkeeper_selected_header,
+                       sizeof(s_satochip_seedkeeper_selected_header));
+        s_satochip_seedkeeper_last_list_valid = false;
+      }
+      break;
+    }
+
+    if (s_satochip_seedkeeper_item_op ==
+        SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE) {
+      if (!seedkeeper_header_is_password(selected_header)) {
+        s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
+        snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+                 "只能修改密码条目。");
+        break;
+      }
+      if (s_satochip_maint_text_c[0] == '\0') {
+        s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
+        snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+                 "请输入新密码。");
+        break;
+      }
+
+      const char *label =
+          s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "密码";
+      (void)seedkeeper_import_text_secret(
+          s_satochip_maint_pin, SEEDKEEPER_TYPE_PASSWORD, 0x00, label,
+          s_satochip_maint_text_c, false, "修改密码", apdu,
+          s_satochip_maint_result, sizeof(s_satochip_maint_result));
+      if (s_satochip_maint_task_err != ESP_OK || apdu->sw != 0x9000) {
+        break;
+      }
+
+      s_satochip_maint_task_err =
+          smartcard_seedkeeper_reset_secret(s_satochip_maint_pin, sid, apdu,
+                                            30000);
+      if (s_satochip_maint_task_err != ESP_OK || apdu->sw != 0x9000) {
+        satochip_format_apdu_result(
+            s_satochip_maint_result, sizeof(s_satochip_maint_result),
+            "修改密码：新密码已保存，旧条目删除失败", apdu);
+        break;
+      }
+      satochip_format_apdu_result(s_satochip_maint_result,
+                                  sizeof(s_satochip_maint_result), "修改密码",
+                                  apdu);
+      if (s_satochip_maint_task_err == ESP_OK && apdu->sw == 0x9000) {
+        s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_LIST;
+        s_satochip_seedkeeper_selected_sid = 0;
+        s_satochip_seedkeeper_selected_header_valid = false;
+        secure_memzero(&s_satochip_seedkeeper_selected_header,
+                       sizeof(s_satochip_seedkeeper_selected_header));
+        s_satochip_seedkeeper_last_list_valid = false;
+      }
+      break;
+    }
+
     s_satochip_maint_task_err = smartcard_seedkeeper_export_secret(
         s_satochip_maint_pin, sid, 0, false, apdu, 30000);
     bool loaded_ok = false;
     size_t slot_index = 0;
-    if (s_satochip_maint_task_err == ESP_OK &&
-        s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC) {
+    bool load_to_device =
+        s_satochip_seedkeeper_item_op == SATOCHIP_SEEDKEEPER_ITEM_OP_LOAD ||
+        s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC;
+    if (s_satochip_maint_task_err == ESP_OK && load_to_device) {
       char mnemonic[SEEDKEEPER_MNEMONIC_MAX_BYTES + 1];
       char passphrase[SEEDKEEPER_MNEMONIC_MAX_BYTES + 1];
       if (seedkeeper_extract_bip39_mnemonic(apdu, mnemonic, sizeof(mnemonic),
@@ -6112,14 +6988,16 @@ static void satochip_maint_task(void *arg) {
         secure_memzero(passphrase, sizeof(passphrase));
       }
     }
-    satochip_format_seedkeeper_mnemonic_result(
-        s_satochip_maint_result, sizeof(s_satochip_maint_result),
-        s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC
-            ? "加载助记词"
-            : "查看助记词",
-        apdu,
-        s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC,
-        loaded_ok, slot_index);
+    if (seedkeeper_header_is_password(selected_header) && !load_to_device) {
+      satochip_format_seedkeeper_password_result(
+          s_satochip_maint_result, sizeof(s_satochip_maint_result), "查看密码",
+          apdu);
+    } else {
+      satochip_format_seedkeeper_mnemonic_result(
+          s_satochip_maint_result, sizeof(s_satochip_maint_result),
+          load_to_device ? "导入本机" : "查看助记词", apdu, load_to_device,
+          loaded_ok, slot_index);
+    }
     break;
   }
   case SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD: {
@@ -6226,27 +7104,9 @@ static void satochip_maint_task(void *arg) {
     break;
   }
   case SATOCHIP_MAINT_SEEDKEEPER_RESET: {
-    uint16_t sid = 0;
-    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid)) {
-      s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
-      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "SID 无效。");
-      break;
-    }
-    if (sid == 0) {
-      s_satochip_maint_task_err =
-          smartcard_seedkeeper_reset_factory_signal(apdu, 30000);
-      satochip_format_apdu_result(s_satochip_maint_result,
-                                  sizeof(s_satochip_maint_result),
-                                  "SeedKeeper 出厂", apdu);
-    } else {
-      s_satochip_maint_task_err =
-          smartcard_seedkeeper_reset_secret(s_satochip_maint_pin, sid, apdu,
-                                            30000);
-      satochip_format_apdu_result(s_satochip_maint_result,
-                                  sizeof(s_satochip_maint_result),
-                                  "删除条目", apdu);
-    }
+    s_satochip_maint_task_err = ESP_ERR_NOT_SUPPORTED;
+    snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+             "SeedKeeper 重置请使用页面上的错PIN/错PUK按钮。");
     break;
   }
   case SATOCHIP_MAINT_SEEDKEEPER_GENERATE_MASTERSEED: {
@@ -6346,6 +7206,7 @@ static void satochip_maint_task(void *arg) {
   }
 
 satochip_maint_done:
+  satochip_maint_log_stack_watermark("done");
   if (apdu) {
     secure_memzero(apdu, sizeof(*apdu));
     free(apdu);
@@ -6371,12 +7232,17 @@ satochip_maint_done:
 }
 
 static void satochip_maint_finish_ui(void) {
+  bool seedkeeper_reset_step_done =
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP ||
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP;
   if (s_satochip_maint_progress_dialog) {
     lv_obj_del(s_satochip_maint_progress_dialog);
     s_satochip_maint_progress_dialog = NULL;
   }
   s_satochip_maint_task_handle = NULL;
   s_satochip_maint_task_with_caps = false;
+  if (seedkeeper_reset_step_done)
+    s_satochip_maint_mode = SATOCHIP_MAINT_SEEDKEEPER_RESET;
   (void)krux_shell_show_screen(s_current_screen_id);
 }
 
@@ -6399,16 +7265,45 @@ static void satochip_maint_start(void) {
     return;
   }
 
-  if (satochip_maint_mode_requires_pin(s_satochip_maint_mode)) {
-    if (!s_satochip_maint_input.textarea) {
-      dialog_show_error("页面未准备好，请返回重进。", NULL, 1600);
+  bool seedkeeper_lookup_mode =
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC ||
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC;
+  bool seedkeeper_reset_step_mode =
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP ||
+      s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP;
+  if (seedkeeper_reset_step_mode) {
+    if (s_satochip_maint_pin[0] == '\0') {
+      dialog_show_error("请输入错误值", NULL, 1600);
       return;
     }
-    satochip_maint_copy_text(s_satochip_maint_pin, sizeof(s_satochip_maint_pin),
-                             s_satochip_maint_input.textarea);
+  } else if (satochip_maint_mode_requires_pin(s_satochip_maint_mode)) {
+    if (seedkeeper_lookup_mode &&
+        s_satochip_seedkeeper_lookup_stage !=
+            SATOCHIP_SEEDKEEPER_LOOKUP_ENTER_PIN) {
+      snprintf(s_satochip_maint_pin, sizeof(s_satochip_maint_pin), "%s",
+               s_satochip_seedkeeper_cached_pin);
+      if (s_satochip_maint_pin[0] == '\0') {
+        dialog_show_error("请先读取列表", NULL, 1600);
+        return;
+      }
+    } else if (!s_satochip_maint_input.textarea) {
+      dialog_show_error("页面未准备好，请返回重进。", NULL, 1600);
+      return;
+    } else {
+      satochip_maint_copy_text(s_satochip_maint_pin,
+                               sizeof(s_satochip_maint_pin),
+                               s_satochip_maint_input.textarea);
+    }
     if (s_satochip_maint_pin[0] == '\0') {
       dialog_show_error("请输入 PIN", NULL, 1600);
       return;
+    }
+    if (seedkeeper_lookup_mode &&
+        s_satochip_seedkeeper_lookup_stage ==
+            SATOCHIP_SEEDKEEPER_LOOKUP_ENTER_PIN) {
+      snprintf(s_satochip_seedkeeper_cached_pin,
+               sizeof(s_satochip_seedkeeper_cached_pin), "%s",
+               s_satochip_maint_pin);
     }
   } else {
     s_satochip_maint_pin[0] = '\0';
@@ -6420,9 +7315,33 @@ static void satochip_maint_start(void) {
     satochip_maint_copy_text(s_satochip_maint_text_a,
                              sizeof(s_satochip_maint_text_a),
                              s_satochip_maint_extra_a);
-    satochip_maint_copy_text(s_satochip_maint_text_c,
-                             sizeof(s_satochip_maint_text_c),
+    satochip_maint_copy_text(s_satochip_maint_text_b,
+                             sizeof(s_satochip_maint_text_b),
                              s_satochip_maint_extra_b);
+    if (s_satochip_maint_text_a[0] == '\0' ||
+        s_satochip_maint_text_b[0] == '\0') {
+      dialog_show_error("请输入新 PIN", NULL, 1600);
+      return;
+    }
+    if (strcmp(s_satochip_maint_text_a, s_satochip_maint_text_b) != 0) {
+      dialog_show_error("两次新 PIN 不一致", NULL, 1800);
+      return;
+    }
+    snprintf(s_satochip_maint_text_c, sizeof(s_satochip_maint_text_c), "0");
+    break;
+  case SATOCHIP_MAINT_SETUP_PIN:
+  case SATOCHIP_MAINT_SEEDKEEPER_SETUP_PIN:
+    satochip_maint_copy_text(s_satochip_maint_text_a,
+                             sizeof(s_satochip_maint_text_a),
+                             s_satochip_maint_extra_a);
+    if (s_satochip_maint_text_a[0] == '\0') {
+      dialog_show_error("请再次输入 PIN", NULL, 1600);
+      return;
+    }
+    if (strcmp(s_satochip_maint_pin, s_satochip_maint_text_a) != 0) {
+      dialog_show_error("两次 PIN 不一致", NULL, 1800);
+      return;
+    }
     break;
   case SATOCHIP_MAINT_UNBLOCK_PIN:
     satochip_maint_copy_text(s_satochip_maint_text_a,
@@ -6440,6 +7359,14 @@ static void satochip_maint_start(void) {
     satochip_maint_copy_text(s_satochip_maint_text_a,
                              sizeof(s_satochip_maint_text_a),
                              s_satochip_maint_extra_a);
+    {
+      uint8_t policy = 0;
+      if (!satochip_parse_u8_text(s_satochip_maint_text_a, &policy) ||
+          policy > 2) {
+        dialog_show_error("策略只能输入 0/1/2", NULL, 1800);
+        return;
+      }
+    }
     break;
   case SATOCHIP_MAINT_FEATURE_POLICY:
     satochip_maint_copy_text(s_satochip_maint_text_a,
@@ -6448,6 +7375,16 @@ static void satochip_maint_start(void) {
     satochip_maint_copy_text(s_satochip_maint_text_b,
                              sizeof(s_satochip_maint_text_b),
                              s_satochip_maint_extra_b);
+    {
+      uint8_t feature_id = 0;
+      uint8_t policy = 0;
+      if (!satochip_parse_u8_text(s_satochip_maint_text_a, &feature_id) ||
+          !satochip_parse_u8_text(s_satochip_maint_text_b, &policy) ||
+          feature_id > 2 || policy > 2) {
+        dialog_show_error("功能和策略只能输入 0/1/2", NULL, 1800);
+        return;
+      }
+    }
     break;
   case SATOCHIP_MAINT_IMPORT_NDEF_AUTHENTIKEY:
   case SATOCHIP_MAINT_IMPORT_TRUSTED_PUBKEY:
@@ -6494,9 +7431,29 @@ static void satochip_maint_start(void) {
     break;
   case SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC:
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC:
-    satochip_maint_copy_text(s_satochip_maint_text_a,
-                             sizeof(s_satochip_maint_text_a),
-                             s_satochip_maint_extra_a);
+    if ((s_satochip_seedkeeper_lookup_stage ==
+             SATOCHIP_SEEDKEEPER_LOOKUP_ITEM ||
+         s_satochip_seedkeeper_lookup_stage ==
+             SATOCHIP_SEEDKEEPER_LOOKUP_EDIT) &&
+        s_satochip_seedkeeper_selected_sid != 0) {
+      snprintf(s_satochip_maint_text_a, sizeof(s_satochip_maint_text_a), "%u",
+               (unsigned)s_satochip_seedkeeper_selected_sid);
+    } else {
+      s_satochip_maint_text_a[0] = '\0';
+    }
+    if (s_satochip_seedkeeper_lookup_stage ==
+        SATOCHIP_SEEDKEEPER_LOOKUP_EDIT) {
+      satochip_maint_copy_text(s_satochip_maint_text_b,
+                               sizeof(s_satochip_maint_text_b),
+                               s_satochip_maint_extra_a);
+      satochip_maint_copy_text(s_satochip_maint_text_c,
+                               sizeof(s_satochip_maint_text_c),
+                               s_satochip_maint_input.textarea);
+      if (s_satochip_maint_text_c[0] == '\0') {
+        dialog_show_error("请输入新密码", NULL, 1600);
+        return;
+      }
+    }
     break;
   case SATOCHIP_MAINT_SEEDKEEPER_STATUS:
   case SATOCHIP_MAINT_SEEDKEEPER_FREE_SPACE:
@@ -6510,7 +7467,6 @@ static void satochip_maint_start(void) {
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR:
   case SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR:
   case SATOCHIP_MAINT_SEEDKEEPER_CLONE:
-  case SATOCHIP_MAINT_SEEDKEEPER_RESET:
   case SATOCHIP_MAINT_SEEDKEEPER_GENERATE_MASTERSEED:
   case SATOCHIP_MAINT_SEEDKEEPER_GENERATE_2FA_SECRET:
   case SATOCHIP_MAINT_SEEDKEEPER_DERIVE_MASTER_PASSWORD:
@@ -6527,12 +7483,16 @@ static void satochip_maint_start(void) {
     break;
   case SATOCHIP_MAINT_CERT_EXPORT:
   case SATOCHIP_MAINT_AUTHENTICITY:
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET:
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP:
+  case SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP:
   case SATOCHIP_MAINT_NONE:
   default:
     break;
   }
 
-  s_satochip_maint_result[0] = '\0';
+  satochip_maint_hide_inputs();
+  satochip_maint_result_clear();
   __atomic_store_n(&s_satochip_maint_task_done, false, __ATOMIC_RELEASE);
   s_satochip_maint_task_err = ESP_ERR_INVALID_STATE;
   s_satochip_maint_task_with_caps = false;
@@ -6563,12 +7523,45 @@ static void satochip_maint_start(void) {
     return;
   }
 
+  satochip_maint_input_cleanup();
   s_satochip_maint_poll_timer = lv_timer_create(satochip_maint_poll_cb, 100, NULL);
 }
 
 static void satochip_maint_start_event_cb(lv_event_t *event) {
   (void)event;
   satochip_maint_start();
+}
+
+static void satochip_seedkeeper_reset_start_step(
+    satochip_maint_mode_t step_mode, lv_obj_t *textarea) {
+  if (textarea) {
+    satochip_maint_copy_text(s_satochip_maint_pin,
+                             sizeof(s_satochip_maint_pin), textarea);
+  } else {
+    s_satochip_maint_pin[0] = '\0';
+  }
+  if (s_satochip_maint_pin[0] == '\0') {
+    dialog_show_error("请输入错误值", NULL, 1600);
+    return;
+  }
+  if (strlen(s_satochip_maint_pin) < 4) {
+    dialog_show_error("至少 4 位", NULL, 1600);
+    return;
+  }
+  s_satochip_maint_mode = step_mode;
+  satochip_maint_start();
+}
+
+static void satochip_seedkeeper_reset_pin_step_event_cb(lv_event_t *event) {
+  lv_obj_t *textarea = event ? (lv_obj_t *)lv_event_get_user_data(event) : NULL;
+  satochip_seedkeeper_reset_start_step(
+      SATOCHIP_MAINT_SEEDKEEPER_RESET_PIN_STEP, textarea);
+}
+
+static void satochip_seedkeeper_reset_puk_step_event_cb(lv_event_t *event) {
+  lv_obj_t *textarea = event ? (lv_obj_t *)lv_event_get_user_data(event) : NULL;
+  satochip_seedkeeper_reset_start_step(
+      SATOCHIP_MAINT_SEEDKEEPER_RESET_PUK_STEP, textarea);
 }
 
 static lv_obj_t *satochip_maint_create_result_panel(lv_obj_t *parent,
@@ -6591,6 +7584,8 @@ static lv_obj_t *satochip_maint_create_result_panel(lv_obj_t *parent,
     create_text(panel, s_satochip_maint_result, false, main_color());
   else
     create_text(panel, "等待", false, secondary_color());
+  if (s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_RESET)
+    return panel;
   create_action_button(panel,
                        s_satochip_maint_result[0] ? "重新执行" : "执行",
                        satochip_maint_start_event_cb, NULL, true);
@@ -6607,9 +7602,22 @@ static void create_satochip_change_pin_block(lv_obj_t *parent,
   create_text(panel, "新 PIN", false, highlight_color());
   satochip_maint_attach_extra_field(panel, NULL, "新 PIN", "", true, false, 64,
                                     &s_satochip_maint_extra_a);
-  create_text(panel, "PIN 编号", false, highlight_color());
-  satochip_maint_attach_extra_field(panel, NULL, "0", "0", false, false, 16,
+  create_text(panel, "确认新 PIN", false, highlight_color());
+  satochip_maint_attach_extra_field(panel, NULL, "再输一次", "", true, false, 64,
                                     &s_satochip_maint_extra_b);
+  satochip_maint_create_result_panel(parent, "执行结果");
+}
+
+static void create_satochip_setup_pin_block(lv_obj_t *parent,
+                                            const krux_feature_t *feature) {
+  satochip_maint_prepare(SATOCHIP_MAINT_SETUP_PIN);
+  lv_obj_t *panel =
+      create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
+  create_text(panel, feature ? feature->title : "设置PIN", true, main_color());
+  satochip_maint_attach_primary_input(panel, "新 PIN", true, false, 16, "");
+  create_text(panel, "确认 PIN", false, highlight_color());
+  satochip_maint_attach_extra_field(panel, NULL, "再输一次", "", true, false,
+                                    16, &s_satochip_maint_extra_a);
   satochip_maint_create_result_panel(parent, "执行结果");
 }
 
@@ -6623,9 +7631,46 @@ static void create_satochip_seedkeeper_change_pin_block(
   create_text(panel, "新 PIN", false, highlight_color());
   satochip_maint_attach_extra_field(panel, NULL, "新 PIN", "", true, false, 64,
                                     &s_satochip_maint_extra_a);
-  create_text(panel, "PIN 编号", false, highlight_color());
-  satochip_maint_attach_extra_field(panel, NULL, "0", "0", false, false, 16,
+  create_text(panel, "确认新 PIN", false, highlight_color());
+  satochip_maint_attach_extra_field(panel, NULL, "再输一次", "", true, false, 64,
                                     &s_satochip_maint_extra_b);
+  satochip_maint_create_result_panel(parent, "执行结果");
+}
+
+static void create_satochip_seedkeeper_setup_pin_block(
+    lv_obj_t *parent, const krux_feature_t *feature) {
+  satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_SETUP_PIN);
+  lv_obj_t *panel =
+      create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
+  create_text(panel, feature ? feature->title : "设置PIN", true, main_color());
+  satochip_maint_attach_primary_input(panel, "新 PIN", true, false, 16, "");
+  create_text(panel, "确认 PIN", false, highlight_color());
+  satochip_maint_attach_extra_field(panel, NULL, "再输一次", "", true, false, 16,
+                                    &s_satochip_maint_extra_a);
+  satochip_maint_create_result_panel(parent, "执行结果");
+}
+
+static void create_satochip_seedkeeper_reset_block(
+    lv_obj_t *parent, const krux_feature_t *feature) {
+  satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_RESET);
+  lv_obj_t *panel =
+      create_panel(parent, error_color(), max_i(14, theme_get_small_padding()));
+  create_text(panel, feature ? feature->title : "重置", true, error_color());
+  create_text(panel, "新版 SeedKeeper 要先锁 PIN，再锁 PUK。", false,
+              main_color());
+  create_text(panel, "错 PIN", false, highlight_color());
+  satochip_maint_attach_primary_input(panel, "故意输入错误 PIN", true, false, 16,
+                                      "0000");
+  lv_obj_t *wrong_pin = s_satochip_maint_input.textarea;
+  create_action_button(panel, "错PIN一步",
+                       satochip_seedkeeper_reset_pin_step_event_cb, wrong_pin,
+                       true);
+  lv_obj_t *wrong_puk = satochip_maint_attach_extra_field(
+      panel, "错 PUK", "PIN 锁定后再执行", "0000", true, false, 16, NULL);
+  create_action_button(panel, "错PUK一步",
+                       satochip_seedkeeper_reset_puk_step_event_cb, wrong_puk,
+                       true);
+  create_text(panel, "返回 FF00 就是空白卡。", false, secondary_color());
   satochip_maint_create_result_panel(parent, "执行结果");
 }
 
@@ -6659,8 +7704,9 @@ static void create_satochip_nfc_policy_block(lv_obj_t *parent,
   create_text(panel, feature ? feature->title : "NFC 策略", true,
               main_color());
   satochip_maint_attach_primary_input(panel, "PIN", true, false, 64, "");
-  satochip_maint_attach_extra_field(panel, "策略", "0-255", "0", false, false,
-                                    16, &s_satochip_maint_extra_a);
+  satochip_maint_attach_extra_field(panel, "策略", "0启用 1关闭 2永久禁用",
+                                    "0", false, false, 1,
+                                    &s_satochip_maint_extra_a);
   satochip_maint_create_result_panel(parent, "执行结果");
 }
 
@@ -6672,10 +7718,11 @@ static void create_satochip_feature_policy_block(lv_obj_t *parent,
   create_text(panel, feature ? feature->title : "功能策略", true,
               main_color());
   satochip_maint_attach_primary_input(panel, "PIN", true, false, 64, "");
-  satochip_maint_attach_extra_field(panel, "功能号", "0-255", "0", false,
+  satochip_maint_attach_extra_field(panel, "功能号", "0签名 1Nostr 2Liquid", "0", false,
                                     false, 16, &s_satochip_maint_extra_a);
-  satochip_maint_attach_extra_field(panel, "策略", "0-255", "0", false, false,
-                                    16, &s_satochip_maint_extra_b);
+  satochip_maint_attach_extra_field(panel, "策略", "0启用 1关闭 2永久禁用",
+                                    "0", false, false, 1,
+                                    &s_satochip_maint_extra_b);
   satochip_maint_create_result_panel(parent, "执行结果");
 }
 
@@ -6824,6 +7871,7 @@ static void create_satochip_reset_seed_block(lv_obj_t *parent,
   lv_obj_t *panel =
       create_panel(parent, error_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "重置种子", true, error_color());
+  create_text(panel, "重置后需重新设 PIN，再写入助记词。", false, main_color());
   satochip_maint_attach_primary_input(panel, "PIN", true, false, 64, "");
   satochip_maint_attach_extra_field(panel, "HMAC", "十六进制，可空", "",
                                     false, false, 128, &s_satochip_maint_extra_a);
@@ -6836,6 +7884,9 @@ static void create_satochip_reset_factory_block(lv_obj_t *parent,
   lv_obj_t *panel =
       create_panel(parent, error_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "出厂", true, error_color());
+  satochip_maint_attach_primary_input(panel, "卡 PIN", true, false, 16, "");
+  create_text(panel, "先拔插卡，再点执行。", false, main_color());
+  create_text(panel, "提示剩余次数后，重复拔插。", false, secondary_color());
   satochip_maint_create_result_panel(parent, "执行结果");
 }
 
@@ -6871,16 +7922,26 @@ static void create_satochip_seedkeeper_write_mnemonic_block(
   satochip_maint_create_result_panel(parent, "执行结果");
 }
 
+static void create_satochip_write_mnemonic_block(lv_obj_t *parent,
+                                                 const krux_feature_t *feature) {
+  satochip_maint_prepare(SATOCHIP_MAINT_SATOCHIP_WRITE_MNEMONIC);
+  lv_obj_t *panel =
+      create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
+  create_text(panel, feature ? feature->title : "写入 Satochip", true,
+              main_color());
+  create_text(panel, "写入当前助记词。卡内已有种子时，请先重置。",
+              false, secondary_color());
+  satochip_maint_attach_primary_input(panel, "卡 PIN", true, false, 64, "");
+  satochip_maint_create_result_panel(parent, "执行结果");
+}
+
 static void create_satochip_seedkeeper_view_mnemonic_block(
     lv_obj_t *parent, const krux_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "查看卡", true, main_color());
-  satochip_maint_attach_primary_input(panel, "卡 PIN", true, false, 64, "");
-  satochip_maint_attach_extra_field(panel, "SID", "必填", "", false, false, 16,
-                                    &s_satochip_maint_extra_a);
-  satochip_maint_create_result_panel(parent, "查看结果");
+  satochip_seedkeeper_render_lookup_content(panel);
 }
 
 static void create_satochip_seedkeeper_load_mnemonic_block(
@@ -6889,10 +7950,7 @@ static void create_satochip_seedkeeper_load_mnemonic_block(
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "卡导入", true, main_color());
-  satochip_maint_attach_primary_input(panel, "卡 PIN", true, false, 64, "");
-  satochip_maint_attach_extra_field(panel, "SID", "必填", "", false, false, 16,
-                                    &s_satochip_maint_extra_a);
-  satochip_maint_create_result_panel(parent, "加载结果");
+  satochip_seedkeeper_render_lookup_content(panel);
 }
 
 static void create_satochip_seedkeeper_save_password_block(
@@ -7058,7 +8116,7 @@ static void create_touch_probe_block(lv_obj_t *parent) {
   lv_obj_set_style_bg_opa(pad, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(pad, highlight_color(), 0);
   lv_obj_set_style_border_width(pad, 2, 0);
-  lv_obj_set_style_radius(pad, 18, 0);
+  lv_obj_set_style_radius(pad, 8, 0);
   lv_obj_add_flag(pad, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(pad, touch_probe_event_cb, LV_EVENT_PRESSED, result);
   lv_obj_add_event_cb(pad, touch_probe_event_cb, LV_EVENT_PRESSING, result);
@@ -7187,7 +8245,7 @@ static void create_qr_text_tool_block(lv_obj_t *parent) {
   lv_obj_set_style_bg_opa(s_qr_textarea, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(s_qr_textarea, highlight_color(), 0);
   lv_obj_set_style_border_width(s_qr_textarea, 2, 0);
-  lv_obj_set_style_radius(s_qr_textarea, 12, 0);
+  lv_obj_set_style_radius(s_qr_textarea, 8, 0);
 #ifndef SIMULATOR
   ui_textarea_enable_safe_keyboard_shortcuts(s_qr_textarea);
 #endif
@@ -7203,6 +8261,7 @@ static void create_qr_text_tool_block(lv_obj_t *parent) {
 #ifndef SIMULATOR
   ui_keyboard_apply_safe_text_map(keyboard);
 #endif
+  theme_apply_btnmatrix(keyboard);
   lv_obj_set_style_text_font(keyboard, theme_font_small(), LV_PART_ITEMS);
   lv_obj_add_event_cb(keyboard, qr_keyboard_event_cb, LV_EVENT_READY, NULL);
 
@@ -7351,6 +8410,11 @@ static bool create_special_detail_cards(lv_obj_t *parent,
     return true;
   }
 
+  if (strcmp(feature->id, "smartcard_satochip_setup_pin") == 0) {
+    create_satochip_setup_pin_block(parent, feature);
+    return true;
+  }
+
   if (strcmp(feature->id, "smartcard_satochip_unblock_pin") == 0) {
     create_satochip_unblock_pin_block(parent, feature);
     return true;
@@ -7427,6 +8491,11 @@ static bool create_special_detail_cards(lv_obj_t *parent,
     return true;
   }
 
+  if (strcmp(feature->id, "smartcard_satochip_write_mnemonic") == 0) {
+    create_satochip_write_mnemonic_block(parent, feature);
+    return true;
+  }
+
   if (strcmp(feature->id, "smartcard_seedkeeper_view_mnemonic") == 0) {
     create_satochip_seedkeeper_view_mnemonic_block(parent, feature);
     return true;
@@ -7462,15 +8531,18 @@ static bool create_special_detail_cards(lv_obj_t *parent,
     return true;
   }
 
+  if (strcmp(feature->id, "smartcard_seedkeeper_setup_pin") == 0) {
+    create_satochip_seedkeeper_setup_pin_block(parent, feature);
+    return true;
+  }
+
   if (strcmp(feature->id, "smartcard_seedkeeper_change_pin") == 0) {
     create_satochip_seedkeeper_change_pin_block(parent, feature);
     return true;
   }
 
   if (strcmp(feature->id, "smartcard_seedkeeper_reset") == 0) {
-    create_satochip_seedkeeper_stub_block(
-        parent, feature, SATOCHIP_MAINT_SEEDKEEPER_RESET, "卡 PIN", true,
-        "SID", "空=出厂", NULL, NULL);
+    create_satochip_seedkeeper_reset_block(parent, feature);
     return true;
   }
 
@@ -7828,13 +8900,14 @@ static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
   lv_obj_set_height(title_row, shell_is_wave_43_portrait() ? 54 : 60);
   style_krux_container(title_row, krux_canvas_color());
   lv_obj_set_style_pad_all(title_row, 0, 0);
-  lv_obj_set_style_pad_column(title_row, 8, 0);
+  lv_obj_set_style_pad_column(title_row, shell_is_wave_43_portrait() ? 16 : 18,
+                              0);
   lv_obj_set_flex_flow(title_row, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(title_row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER);
 
   lv_obj_t *back = lv_btn_create(title_row);
-  lv_obj_set_size(back, shell_is_wave_43_portrait() ? 92 : 100,
+  lv_obj_set_size(back, shell_is_wave_43_portrait() ? 84 : 96,
                   shell_is_wave_43_portrait() ? 52 : 54);
   lv_obj_set_style_bg_color(back, krux_card_color(), 0);
   lv_obj_set_style_bg_opa(back, LV_OPA_COVER, 0);
@@ -7861,7 +8934,7 @@ static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
 
   lv_obj_t *spacer = lv_obj_create(title_row);
-  lv_obj_set_size(spacer, shell_is_wave_43_portrait() ? 86 : 96,
+  lv_obj_set_size(spacer, shell_is_wave_43_portrait() ? 84 : 96,
                   shell_is_wave_43_portrait() ? 50 : 54);
   style_krux_container(spacer, krux_canvas_color());
   lv_obj_clear_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
@@ -7870,18 +8943,21 @@ static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
 
 static lv_obj_t *create_krux_list(lv_obj_t *root, bool center_items,
                                   bool grid_mode) {
+  bool home_grid = grid_mode && s_rendering_home_grid;
   lv_obj_t *list = lv_obj_create(root);
   lv_obj_set_width(list, LV_PCT(100));
   lv_obj_set_flex_grow(list, 1);
   style_krux_container(list, krux_canvas_color());
   lv_obj_set_style_pad_all(list, 0, 0);
+  if (grid_mode && !home_grid) {
+    lv_obj_set_style_pad_top(list, shell_is_wave_43_portrait() ? 22 : 20, 0);
+  }
   lv_obj_set_style_pad_row(list, grid_mode ? shell_menu_gap()
                                            : (shell_is_wave_43_portrait() ? 8 : 0),
                            0);
   lv_obj_set_style_pad_column(list, grid_mode ? shell_menu_gap() : 0, 0);
   lv_obj_set_flex_flow(list, grid_mode ? LV_FLEX_FLOW_ROW_WRAP
                                        : LV_FLEX_FLOW_COLUMN);
-  bool home_grid = grid_mode && s_rendering_home_grid;
   lv_obj_set_flex_align(list,
                         grid_mode ? LV_FLEX_ALIGN_START
                                   : (center_items ? LV_FLEX_ALIGN_CENTER
@@ -7925,8 +9001,8 @@ static lv_obj_t *create_krux_menu_button(lv_obj_t *parent, const char *label,
   lv_obj_set_style_bg_color(btn, krux_card_color(), LV_STATE_DEFAULT);
   lv_obj_set_style_bg_color(btn, krux_card_pressed_color(), LV_STATE_PRESSED);
   lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
-  lv_obj_set_style_radius(btn, 14, 0);
-  lv_obj_set_style_border_width(btn, 1, 0);
+  lv_obj_set_style_radius(btn, 8, 0);
+  lv_obj_set_style_border_width(btn, 2, 0);
   lv_obj_set_style_border_color(btn, highlight_color(), 0);
   lv_obj_set_style_shadow_width(btn, 0, 0);
   lv_obj_set_style_pad_left(btn, home_grid ? 14 : (s_menu_grid_mode ? 8
@@ -7999,6 +9075,7 @@ static bool krux_screen_has_override_menu(const char *id) {
                 strcmp(id, "addresses") == 0 ||
                 strcmp(id, "device_tests") == 0 ||
                 strcmp(id, "pi_mnemonic_tools") == 0 ||
+                strcmp(id, "mnemonic_write_smartcard") == 0 ||
                 strcmp(id, "pi_mnemonic_advanced") == 0 ||
                 strcmp(id, "pi_connect_wallet") == 0 ||
                 strcmp(id, "pi_self_check") == 0);
@@ -8055,9 +9132,6 @@ static size_t krux_override_menu_count(const char *id) {
   if (strcmp(id, "connect_tokenpocket") == 0)
     return sizeof(KRUX_CONNECT_TOKENPOCKET_MENU) /
            sizeof(KRUX_CONNECT_TOKENPOCKET_MENU[0]);
-  if (strcmp(id, "connect_address") == 0)
-    return sizeof(KRUX_CONNECT_ADDRESS_MENU) /
-           sizeof(KRUX_CONNECT_ADDRESS_MENU[0]);
   if (strcmp(id, "btc_wallet") == 0)
     return sizeof(KRUX_BTC_WALLET_MENU) / sizeof(KRUX_BTC_WALLET_MENU[0]);
   if (strcmp(id, "btc_mnemonic") == 0)
@@ -8101,6 +9175,9 @@ static size_t krux_override_menu_count(const char *id) {
            sizeof(KRUX_SMARTCARD_CERTIFICATE_MENU[0]);
   if (strcmp(id, "pi_mnemonic_tools") == 0)
     return sizeof(KRUX_PI_MNEMONIC_MENU) / sizeof(KRUX_PI_MNEMONIC_MENU[0]);
+  if (strcmp(id, "mnemonic_write_smartcard") == 0)
+    return sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU) /
+           sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU[0]);
   if (strcmp(id, "pi_mnemonic_advanced") == 0)
     return sizeof(KRUX_PI_MNEMONIC_ADVANCED_MENU) /
            sizeof(KRUX_PI_MNEMONIC_ADVANCED_MENU[0]);
@@ -8222,12 +9299,6 @@ static void create_krux_child_menu(lv_obj_t *list,
           sizeof(KRUX_CONNECT_TOKENPOCKET_MENU) /
               sizeof(KRUX_CONNECT_TOKENPOCKET_MENU[0])))
     return;
-  if (strcmp(feature->id, "connect_address") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_CONNECT_ADDRESS_MENU,
-          sizeof(KRUX_CONNECT_ADDRESS_MENU) /
-              sizeof(KRUX_CONNECT_ADDRESS_MENU[0])))
-    return;
   if (strcmp(feature->id, "btc_wallet") == 0 &&
       create_krux_override_menu(
           list, KRUX_BTC_WALLET_MENU,
@@ -8322,6 +9393,12 @@ static void create_krux_child_menu(lv_obj_t *list,
       create_krux_override_menu(
           list, KRUX_PI_MNEMONIC_MENU,
           sizeof(KRUX_PI_MNEMONIC_MENU) / sizeof(KRUX_PI_MNEMONIC_MENU[0])))
+    return;
+  if (strcmp(feature->id, "mnemonic_write_smartcard") == 0 &&
+      create_krux_override_menu(
+          list, KRUX_MNEMONIC_WRITE_SMARTCARD_MENU,
+          sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU) /
+              sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU[0])))
     return;
   if (strcmp(feature->id, "pi_mnemonic_advanced") == 0 &&
       create_krux_override_menu(
@@ -8460,6 +9537,11 @@ bool krux_shell_show_screen(const char *screen_id) {
     requested_id = "smartcard_satochip_seedkeeper_tools";
   if (!product_screen_is_visible(requested_id))
     return false;
+
+#ifdef SIMULATOR
+  if (strcmp(requested_id, "custom_derivation") == 0)
+    return simulator_launch_custom_derivation();
+#endif
 
 #ifndef SIMULATOR
   if (!s_allow_sensitive_render && target_requires_shell_gate(requested_id) &&

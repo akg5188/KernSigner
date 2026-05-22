@@ -58,7 +58,7 @@ ui_menu_t *ui_menu_create(lv_obj_t *parent, const char *title,
 
   menu->title_label = lv_label_create(menu->container);
   lv_label_set_text(menu->title_label, title);
-  lv_obj_set_width(menu->title_label, LV_PCT(88));
+  lv_obj_set_width(menu->title_label, LV_PCT(back_cb ? 50 : 88));
   lv_label_set_long_mode(menu->title_label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(menu->title_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(menu->title_label, theme_font_medium(), 0);
@@ -77,6 +77,12 @@ ui_menu_t *ui_menu_create(lv_obj_t *parent, const char *title,
                         wide ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER,
                         wide ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER);
   lv_obj_set_flex_grow(menu->list, 1);
+  if (back_cb) {
+    lv_obj_set_style_pad_top(
+        menu->list,
+        max_i(theme_get_small_padding() * 4, theme_get_corner_button_height()),
+        0);
+  }
   lv_obj_set_style_pad_gap(menu->list, max_i(10, theme_get_small_padding()), 0);
   lv_obj_set_style_pad_row(menu->list, max_i(10, theme_get_small_padding()), 0);
   lv_obj_set_style_pad_column(menu->list, max_i(10, theme_get_small_padding()), 0);
@@ -119,10 +125,11 @@ bool ui_menu_add_entry(ui_menu_t *menu, const char *name,
   lv_obj_add_event_cb(menu->buttons[idx], menu_button_event_cb,
                       LV_EVENT_CLICKED, menu);
   theme_apply_touch_button(menu->buttons[idx], false);
-  lv_obj_set_style_bg_color(menu->buttons[idx], panel_color(), 0);
-  lv_obj_set_style_bg_opa(menu->buttons[idx], LV_OPA_80, 0);
+  lv_obj_set_style_bg_color(menu->buttons[idx], bg_color(), 0);
+  lv_obj_set_style_bg_opa(menu->buttons[idx], LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(menu->buttons[idx], highlight_color(), 0);
-  lv_obj_set_style_border_width(menu->buttons[idx], 1, 0);
+  lv_obj_set_style_border_width(menu->buttons[idx], 2, 0);
+  lv_obj_set_style_radius(menu->buttons[idx], 8, 0);
 
   lv_obj_t *label = lv_label_create(menu->buttons[idx]);
   lv_label_set_text(label, name);
@@ -173,10 +180,11 @@ bool ui_menu_add_entry_with_action(ui_menu_t *menu, const char *name,
   lv_obj_add_event_cb(menu->buttons[idx], menu_button_event_cb,
                       LV_EVENT_CLICKED, menu);
   theme_apply_touch_button(menu->buttons[idx], false);
-  lv_obj_set_style_bg_color(menu->buttons[idx], panel_color(), 0);
-  lv_obj_set_style_bg_opa(menu->buttons[idx], LV_OPA_80, 0);
+  lv_obj_set_style_bg_color(menu->buttons[idx], bg_color(), 0);
+  lv_obj_set_style_bg_opa(menu->buttons[idx], LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(menu->buttons[idx], highlight_color(), 0);
-  lv_obj_set_style_border_width(menu->buttons[idx], 1, 0);
+  lv_obj_set_style_border_width(menu->buttons[idx], 2, 0);
+  lv_obj_set_style_radius(menu->buttons[idx], 8, 0);
 
   /* Label on the left */
   lv_obj_t *label = lv_label_create(menu->buttons[idx]);
@@ -194,10 +202,12 @@ bool ui_menu_add_entry_with_action(ui_menu_t *menu, const char *name,
   lv_obj_t *icon_btn = lv_btn_create(menu->buttons[idx]);
   lv_obj_set_size(icon_btn, theme_get_min_touch_size(),
                   max_i(50, theme_get_min_touch_size()));
-  lv_obj_set_style_bg_color(icon_btn, disabled_color(), 0);
+  lv_obj_set_style_bg_color(icon_btn, bg_color(), 0);
   lv_obj_set_style_bg_opa(icon_btn, LV_OPA_COVER, 0);
   lv_obj_set_style_shadow_width(icon_btn, 0, 0);
-  lv_obj_set_style_border_width(icon_btn, 0, 0);
+  lv_obj_set_style_border_color(icon_btn, highlight_color(), 0);
+  lv_obj_set_style_border_width(icon_btn, 2, 0);
+  lv_obj_set_style_radius(icon_btn, 8, 0);
   lv_obj_set_style_pad_hor(icon_btn, 0, 0);
   lv_obj_set_style_pad_ver(icon_btn, 4, 0);
   lv_obj_clear_flag(icon_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
@@ -227,10 +237,64 @@ bool ui_menu_set_entry_enabled(ui_menu_t *menu, int index, bool enabled) {
   /* Update label color to reflect enabled/disabled state */
   lv_obj_t *label = lv_obj_get_child(menu->buttons[index], 0);
   if (label) {
-    lv_obj_set_style_text_color(label,
-                                enabled ? main_color() : disabled_color(), 0);
+    lv_obj_set_style_text_color(label, main_color(), 0);
   }
   return true;
+}
+
+void ui_menu_apply_compact_grid(ui_menu_t *menu) {
+  if (!menu || !menu->list)
+    return;
+
+  bool wide = theme_get_screen_width() >= 420;
+  int row_gap = max_i(8, theme_get_small_padding());
+  int column_gap = max_i(10, theme_get_small_padding());
+
+  lv_obj_set_flex_flow(menu->list,
+                       wide ? LV_FLEX_FLOW_ROW_WRAP : LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(menu->list,
+                        wide ? LV_FLEX_ALIGN_CENTER : LV_FLEX_ALIGN_START,
+                        wide ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER,
+                        wide ? LV_FLEX_ALIGN_START : LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_top(
+      menu->list,
+      max_i(theme_get_corner_button_height() + theme_get_small_padding() * 2,
+            70),
+      0);
+  lv_obj_set_style_pad_bottom(menu->list, max_i(18, theme_get_small_padding() * 2),
+                              0);
+  lv_obj_set_style_pad_row(menu->list, row_gap, 0);
+  lv_obj_set_style_pad_column(menu->list, column_gap, 0);
+  lv_obj_set_style_pad_gap(menu->list, row_gap, 0);
+  lv_obj_set_scrollbar_mode(menu->list, LV_SCROLLBAR_MODE_AUTO);
+
+  for (int i = 0; i < menu->config.entry_count; i++) {
+    lv_obj_t *btn = menu->buttons[i];
+    if (!btn)
+      continue;
+
+    lv_obj_set_size(btn, wide ? LV_PCT(47) : LV_PCT(100),
+                    wide ? 86 : max_i(66, theme_get_min_touch_size()));
+    lv_obj_set_style_pad_all(btn, wide ? 8 : 10, 0);
+    lv_obj_set_style_pad_gap(btn, 2, 0);
+
+    lv_obj_t *label = lv_obj_get_child(btn, 0);
+    if (!label)
+      continue;
+
+    const char *text = lv_label_get_text(label);
+    bool long_mixed_label =
+        text && (strstr(text, "SeedKeeper") || strstr(text, "Satochip") ||
+                 strlen(text) > 15);
+    lv_obj_set_width(label, LV_PCT(96));
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_font(label,
+                               long_mixed_label ? theme_font_small()
+                                                : theme_font_medium(),
+                               0);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_center(label);
+  }
 }
 
 int ui_menu_get_selected(ui_menu_t *menu) {

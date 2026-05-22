@@ -16,6 +16,7 @@
 #define PRINT_QR_MIN_CHARS_PER_FRAME 80
 #define PRINT_QR_MAX_CHARS_PER_FRAME 260
 #define ANIMATION_INTERVAL_MS 250
+#define ANIMATION_INTERVAL_MIN_MS 80
 #define PROGRESS_BAR_HEIGHT 20
 #define PROGRESS_FRAME_PADD 2
 #define PROGRESS_BLOC_PAD 1
@@ -41,10 +42,13 @@ static char *qr_content_copy = NULL;
 static const char *qr_viewer_title = NULL;
 static lv_timer_t *message_timer = NULL;
 static lv_timer_t *animation_timer = NULL;
+static uint32_t animation_interval_ms = ANIMATION_INTERVAL_MS;
 
 static QRViewerPart *qr_parts = NULL;
 static int qr_parts_count = 0;
 static int current_part_index = 0;
+
+static void cleanup_qr_parts(void);
 
 static void back_button_cb(lv_event_t *e) {
   if (return_callback) {
@@ -181,6 +185,31 @@ static void split_content_into_parts(const char *content) {
   split_content_into_parts_with_limit(content, MAX_QR_CHARS_PER_FRAME);
 }
 
+static bool copy_prebuilt_parts(const char *const *frames, size_t frame_count) {
+  if (!frames || frame_count == 0 || frame_count > MAX_QR_PARTS)
+    return false;
+
+  qr_parts = calloc(frame_count, sizeof(QRViewerPart));
+  if (!qr_parts)
+    return false;
+
+  qr_parts_count = (int)frame_count;
+  for (size_t i = 0; i < frame_count; i++) {
+    const char *frame = frames[i];
+    if (!frame || frame[0] == '\0') {
+      cleanup_qr_parts();
+      return false;
+    }
+    qr_parts[i].len = strlen(frame);
+    qr_parts[i].data = strdup(frame);
+    if (!qr_parts[i].data) {
+      cleanup_qr_parts();
+      return false;
+    }
+  }
+  return true;
+}
+
 static void cleanup_qr_parts(void) {
   if (qr_parts) {
     for (int i = 0; i < qr_parts_count; i++) {
@@ -277,18 +306,20 @@ static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   if (qr_parts_count > 1) {
     create_progress_indicators(qr_parts_count);
     update_progress_indicator(0);
-    animation_timer =
-        lv_timer_create(animation_timer_cb, ANIMATION_INTERVAL_MS, NULL);
+    uint32_t interval = animation_interval_ms;
+    if (interval < ANIMATION_INTERVAL_MIN_MS)
+      interval = ANIMATION_INTERVAL_MIN_MS;
+    animation_timer = lv_timer_create(animation_timer_cb, interval, NULL);
   }
 
   if (title) {
     lv_obj_t *msgbox = lv_obj_create(qr_viewer_screen);
     lv_obj_set_size(msgbox, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(msgbox, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_bg_opa(msgbox, LV_OPA_80, 0);
+    lv_obj_set_style_bg_color(msgbox, bg_color(), 0);
+    lv_obj_set_style_bg_opa(msgbox, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(msgbox, 2, 0);
-    lv_obj_set_style_border_color(msgbox, main_color(), 0);
-    lv_obj_set_style_radius(msgbox, 10, 0);
+    lv_obj_set_style_border_color(msgbox, highlight_color(), 0);
+    lv_obj_set_style_radius(msgbox, 8, 0);
     lv_obj_set_style_pad_all(msgbox, 20, 0);
     lv_obj_add_flag(msgbox, LV_OBJ_FLAG_FLOATING);
     lv_obj_center(msgbox);
@@ -391,6 +422,36 @@ static bool setup_print_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   return true;
 }
 
+bool qr_viewer_page_create_frames(lv_obj_t *parent,
+                                  const char *const *qr_frames,
+                                  size_t frame_count, const char *title,
+                                  void (*return_cb)(void),
+                                  uint32_t interval_ms) {
+  if (!parent || !qr_frames || frame_count == 0) {
+    return false;
+  }
+  if (qr_viewer_screen || qr_content_copy || qr_parts)
+    qr_viewer_page_destroy();
+
+  return_callback = return_cb;
+  qr_viewer_title = title;
+  message_timer = NULL;
+  animation_timer = NULL;
+  page_label = NULL;
+  animation_interval_ms = interval_ms ? interval_ms : ANIMATION_INTERVAL_MS;
+
+  if (!copy_prebuilt_parts(qr_frames, frame_count)) {
+    return false;
+  }
+
+  if (!setup_qr_viewer_ui(parent, title)) {
+    cleanup_qr_parts();
+    animation_interval_ms = ANIMATION_INTERVAL_MS;
+    return false;
+  }
+  return true;
+}
+
 bool qr_viewer_page_create(lv_obj_t *parent, const char *qr_content,
                            const char *title, void (*return_cb)(void)) {
   if (!parent || !qr_content) {
@@ -403,6 +464,7 @@ bool qr_viewer_page_create(lv_obj_t *parent, const char *qr_content,
   qr_viewer_title = title;
   message_timer = NULL;
   animation_timer = NULL;
+  animation_interval_ms = ANIMATION_INTERVAL_MS;
 
   qr_content_copy = strdup(qr_content);
   if (!qr_content_copy) {
@@ -439,6 +501,7 @@ bool qr_viewer_page_create_print(lv_obj_t *parent, const char *qr_content,
   message_timer = NULL;
   animation_timer = NULL;
   page_label = NULL;
+  animation_interval_ms = ANIMATION_INTERVAL_MS;
 
   qr_content_copy = strdup(qr_content);
   if (!qr_content_copy) {
@@ -511,6 +574,7 @@ void qr_viewer_page_destroy(void) {
   page_label = NULL;
   qr_viewer_title = NULL;
   return_callback = NULL;
+  animation_interval_ms = ANIMATION_INTERVAL_MS;
 }
 
 bool qr_viewer_page_create_with_format(lv_obj_t *parent, int qr_format,

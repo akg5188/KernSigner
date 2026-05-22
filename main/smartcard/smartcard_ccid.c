@@ -37,6 +37,8 @@ esp_err_t smartcard_ccid_transmit_apdu(const uint8_t *apdu, size_t apdu_len,
   return ESP_ERR_NOT_SUPPORTED;
 }
 
+void smartcard_ccid_set_factory_reset_mode(bool enabled) { (void)enabled; }
+
 void smartcard_ccid_snapshot(smartcard_ccid_report_t *out) {
   if (out)
     *out = s_report;
@@ -222,6 +224,7 @@ typedef struct {
   bool host_installed;
   bool client_registered;
   bool probe_active;
+  bool factory_reset_mode;
   bool want_applet_identify;
   size_t apdu_step;
   bool custom_apdu_active;
@@ -256,6 +259,8 @@ typedef struct {
 static ccid_ctx_t s_ctx = {
     .seq = 1,
 };
+
+static void ccid_finish_factory_reset_ready(ccid_ctx_t *ctx);
 
 static bool transfer_status_is_ok(usb_transfer_status_t status) {
   return status == USB_TRANSFER_STATUS_COMPLETED ||
@@ -1260,6 +1265,11 @@ static void ccid_handle_power_on_completion(ccid_ctx_t *ctx) {
     return;
   }
 
+  if (ctx->factory_reset_mode) {
+    ccid_finish_factory_reset_ready(ctx);
+    return;
+  }
+
   ctx->bulk_stage = BULK_STAGE_WAIT_APDU_OUT;
   if (ccid_submit_apdu_step(ctx) != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_ATR_OK, true,
@@ -1443,6 +1453,14 @@ static void ccid_finish_with_generic_apdu(ccid_ctx_t *ctx,
   ctx->bulk_stage = BULK_STAGE_IDLE;
 }
 
+static void ccid_finish_factory_reset_ready(ccid_ctx_t *ctx) {
+  if (!ctx)
+    return;
+  ctx->bulk_stage = BULK_STAGE_IDLE;
+  report_setf(SMARTCARD_CCID_STATE_ATR_OK, true,
+              "恢复出厂模式已就绪。已暂停自动识别，请按页面提示执行。");
+}
+
 static void ccid_handle_set_parameters_completion(ccid_ctx_t *ctx) {
   usb_transfer_t *transfer = ctx->bulk_in_xfer;
   const uint8_t *buf = transfer->data_buffer;
@@ -1488,6 +1506,10 @@ static void ccid_handle_set_parameters_completion(ccid_ctx_t *ctx) {
 
   report_setf(SMARTCARD_CCID_STATE_ATR_OK, false,
               "ATR 已读取，T=1 参数已设置，继续识别 Satochip。");
+  if (ctx->factory_reset_mode) {
+    ccid_finish_factory_reset_ready(ctx);
+    return;
+  }
   ctx->bulk_stage = BULK_STAGE_WAIT_APDU_OUT;
   if (ccid_submit_apdu_step(ctx) != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_ATR_OK, true,
@@ -1845,6 +1867,15 @@ esp_err_t smartcard_ccid_probe(uint32_t timeout_ms) {
   report_setf(SMARTCARD_CCID_STATE_TIMEOUT, true,
               "检测超时：没有拿到完整结果。请确认外接供电、读卡器和卡片。");
   return ESP_ERR_TIMEOUT;
+}
+
+void smartcard_ccid_set_factory_reset_mode(bool enabled) {
+  if (s_ctx.lock)
+    xSemaphoreTake(s_ctx.lock, portMAX_DELAY);
+  s_ctx.factory_reset_mode = enabled;
+  if (s_ctx.lock)
+    xSemaphoreGive(s_ctx.lock);
+  ESP_LOGI(TAG, "factory reset mode: %u", enabled ? 1U : 0U);
 }
 
 esp_err_t smartcard_ccid_transmit_apdu(const uint8_t *apdu, size_t apdu_len,

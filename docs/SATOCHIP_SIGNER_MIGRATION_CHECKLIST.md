@@ -6,7 +6,7 @@
 
 - [satochip-signer 全量智能卡功能目录](SATOCHIP_SIGNER_FULL_FUNCTION_CATALOG_20260520.md)
 
-> 状态说明：这是迁移对照清单，不是生产放行报告。当前最新菜单和发布边界以 `docs/README_FIRST_DELIVERY.md`、`docs/SMARTCARD_MIGRATION_MATRIX_20260520.md`、`docs/SATOCHIP_COMMERCIAL_REVIEW_20260520.md` 和 `docs/RELEASE_POINTERS_AND_HISTORY.md` 为准。只要没有重新出包并更新验收截图，本文件中旧截图、旧入口或历史计划都不能当作当前可刷固件状态。
+> 状态说明：这是迁移对照清单，不是生产放行报告。当前最新菜单和发布边界以 `docs/README_FIRST_DELIVERY.md`、`docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md`、`docs/SMARTCARD_CAPABILITY_BOUNDARY.md` 和 `docs/RELEASE_POINTERS_AND_HISTORY.md` 为准。只要没有重新出包并更新验收截图，本文件中旧截图、旧入口或历史计划都不能当作当前可刷固件状态。
 
 本清单只对照：
 
@@ -43,11 +43,12 @@
 - `写卡 / 改 PIN / 重置`
 - `更完整的导入恢复链排版和导航`
 
-2026-05-20 更新：
+2026-05-22 更新：
 
 - ACR39U-NF 外接供电后已经识别，Satochip Web3 连接码和 OKX/Bitget Web3 签名已经跑通。
 - Kern 已新增 Satochip 按路径查看地址、BTC xpub/ypub/zpub/tpub/upub/vpub 读取流程。
-- 写卡、改 PIN、重置、SeedKeeper 管理仍按高风险功能处理，不能做假入口。
+- SeedKeeper 设置 PIN、改 PIN、写入助记词、查看/导入条目和新版重置流程已经进入测试卡验收范围。
+- 写卡、改 PIN、重置、SeedKeeper 管理仍按高风险测试卡功能处理，不能宣传为已审计生产能力。
 
 所以现在最准确的定位是：
 

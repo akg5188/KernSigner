@@ -1,6 +1,6 @@
 # Kern/Krux 真钱包功能版交付说明
 
-> 2026-05-20 智能卡商业评审更新：外接供电后 ACR39U-NF + Satochip 已跑通 Web3 连接码和常见 EVM 签名；Kern 已补路径地址与 BTC 观察公钥读取。写卡、改 PIN、重置、SeedKeeper 管理、Satochip BTC PSBT/消息签名和 TypedData 仍未作为交付能力开放。仍按测试助记词/测试资金验收，未通过生产安全门槛前不要放真钱。
+> 2026-05-22 智能卡商业评审更新：外接供电后 ACR39U-NF + Satochip/SeedKeeper 已跑通主线。Satochip 已可测 Web3 连接码、OKX/Bitget 常见 EVM 签名、路径地址与 BTC 观察公钥；SeedKeeper 已可测设置 PIN、改 PIN、写入助记词、查看/导入条目和重置。新版 SeedKeeper 重置走错 PIN/错 PUK 到 `FF00`，不是旧 `B0 FF`。Satochip BTC PSBT/消息签名和 TypedData 仍未作为交付能力开放。仍按测试助记词/测试资金验收，未通过生产安全门槛前不要放真钱。
 
 ## 交付定位
 
@@ -33,7 +33,8 @@
 - `docs/SMARTCARD_MIGRATION_MATRIX_20260520.md`：智能卡迁移状态、未开放功能、商业阻断项和后续开发顺序，避免把检测/观察公钥误当完整智能卡钱包。
 - `docs/MULTI_EXPERT_REVIEW_20260520_SMARTCARD.md`：本轮多专家智能卡复查、已修复项和商业交付判断。
 - `docs/COMMERCIAL_RELEASE_GATE.md`：商业生产版必须通过的安全门禁。
-- `docs/SMARTCARD_REAL_DEVICE_ACCEPTANCE.md`：Satochip 真机验收步骤。
+- `docs/SMARTCARD_REAL_DEVICE_ACCEPTANCE.md`：Satochip/SeedKeeper 真机验收步骤。
+- `docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md`：Satochip/SeedKeeper 实测操作手册。
 - `docs/SMARTCARD_TEST_VECTORS_AND_EVIDENCE.md`：智能卡连接码、签名和观察公钥证据模板。
 - `docs/SMARTCARD_HIDDEN_FEATURES_ACCEPTANCE.md`：确认未迁移智能卡高风险功能没有露出入口。
 - `docs/SMARTCARD_CAPABILITY_BOUNDARY.md`：已开放和必须隐藏的智能卡能力边界。
@@ -63,7 +64,7 @@
 - 不要输入真实资产助记词、私钥、SeedQR、PSBT 或钱包备份文件。
 - 当前只允许用测试助记词、测试 PSBT 和公开测试数据验收。
 - 智能卡已开放 Satochip Web3 连接/签名、路径地址和 BTC 观察公钥读取；仍需要用测试资金继续回归不同钱包和异常路径。
-- BIP85 扩展、打印机、智能卡写卡/改 PIN/重置、SeedKeeper 管理、Satochip BTC PSBT/消息签名、TypedData 等未接专项不放进真钱包主菜单，不冒充已完成。
+- BIP85 扩展、打印机、Satochip BTC PSBT/消息签名、TypedData 等未接专项不放进真钱包主菜单，不冒充已完成；智能卡写卡、改 PIN、重置、SeedKeeper 管理只按测试卡验收能力处理。
 
 ## 如果明早要重新刷
 

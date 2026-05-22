@@ -176,17 +176,11 @@ static void update_word_preview(void) {
     int bit = STACKBIT_CELL_MAP[i][1];
     bool active = (current_digits[digit] & (1 << bit)) != 0;
     lv_obj_set_style_bg_color(digit_buttons[i],
-                              active ? lv_color_hex(0xF59E0B)
-                                     : lv_color_hex(0x111827),
-                              0);
-    lv_obj_set_style_border_color(digit_buttons[i],
-                                  active ? lv_color_hex(0xFBBF24)
-                                         : lv_color_hex(0x2563EB),
-                                  0);
+                              active ? highlight_color() : bg_color(), 0);
+    lv_obj_set_style_border_color(digit_buttons[i], highlight_color(), 0);
     if (digit_labels[i]) {
       lv_obj_set_style_text_color(
-          digit_labels[i], active ? lv_color_hex(0x111827) : lv_color_white(),
-          0);
+          digit_labels[i], active ? bg_color() : main_color(), 0);
     }
   }
 }
@@ -275,11 +269,11 @@ static void create_label_cell(lv_obj_t *parent, const char *text, int width) {
 static void create_digit_button(lv_obj_t *parent, int value, int idx) {
   lv_obj_t *btn = lv_btn_create(parent);
   lv_obj_set_size(btn, 52, 38);
-  lv_obj_set_style_radius(btn, 10, 0);
-  lv_obj_set_style_bg_color(btn, lv_color_hex(0x111827), 0);
+  lv_obj_set_style_radius(btn, 8, 0);
+  lv_obj_set_style_bg_color(btn, bg_color(), 0);
   lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(btn, 2, 0);
-  lv_obj_set_style_border_color(btn, lv_color_hex(0x2563EB), 0);
+  lv_obj_set_style_border_color(btn, highlight_color(), 0);
   lv_obj_set_style_shadow_width(btn, 0, 0);
   lv_obj_add_event_cb(btn, digit_toggle_event, LV_EVENT_CLICKED,
                       (void *)(intptr_t)idx);
@@ -290,7 +284,7 @@ static void create_digit_button(lv_obj_t *parent, int value, int idx) {
   lv_obj_t *label = lv_label_create(btn);
   lv_label_set_text(label, text);
   lv_obj_set_style_text_font(label, theme_font_small(), 0);
-  lv_obj_set_style_text_color(label, lv_color_white(), 0);
+  lv_obj_set_style_text_color(label, main_color(), 0);
   lv_obj_center(label);
   digit_labels[idx] = label;
 }
@@ -310,11 +304,11 @@ static void render_word_editor(void) {
   word_card = lv_obj_create(page_screen);
   lv_obj_set_size(word_card, LV_PCT(90), 108);
   lv_obj_align(word_card, LV_ALIGN_TOP_MID, 0, 124);
-  lv_obj_set_style_bg_color(word_card, panel_color(), 0);
-  lv_obj_set_style_bg_opa(word_card, LV_OPA_90, 0);
+  lv_obj_set_style_bg_color(word_card, bg_color(), 0);
+  lv_obj_set_style_bg_opa(word_card, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(word_card, highlight_color(), 0);
-  lv_obj_set_style_border_width(word_card, 1, 0);
-  lv_obj_set_style_radius(word_card, 14, 0);
+  lv_obj_set_style_border_width(word_card, 2, 0);
+  lv_obj_set_style_radius(word_card, 8, 0);
   lv_obj_set_style_pad_all(word_card, theme_get_default_padding(), 0);
   lv_obj_set_flex_flow(word_card, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(word_card, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
@@ -333,11 +327,11 @@ static void render_word_editor(void) {
   digit_grid = lv_obj_create(page_screen);
   lv_obj_set_size(digit_grid, LV_PCT(92), 222);
   lv_obj_align(digit_grid, LV_ALIGN_TOP_MID, 0, 256);
-  lv_obj_set_style_bg_color(digit_grid, lv_color_hex(0x050505), 0);
+  lv_obj_set_style_bg_color(digit_grid, bg_color(), 0);
   lv_obj_set_style_bg_opa(digit_grid, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(digit_grid, lv_color_hex(0x1F2937), 0);
-  lv_obj_set_style_border_width(digit_grid, 1, 0);
-  lv_obj_set_style_radius(digit_grid, 16, 0);
+  lv_obj_set_style_border_color(digit_grid, highlight_color(), 0);
+  lv_obj_set_style_border_width(digit_grid, 2, 0);
+  lv_obj_set_style_radius(digit_grid, 8, 0);
   lv_obj_set_style_pad_all(digit_grid, 12, 0);
   lv_obj_set_style_pad_gap(digit_grid, 6, 0);
   lv_obj_set_flex_flow(digit_grid, LV_FLEX_FLOW_COLUMN);

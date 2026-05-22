@@ -185,11 +185,11 @@ static void create_dice_input(void) {
   lv_textarea_set_cursor_click_pos(rolls_textarea, true);
   lv_obj_set_style_text_color(rolls_textarea, main_color(), 0);
   lv_obj_set_style_text_font(rolls_textarea, theme_font_medium(), 0);
-  lv_obj_set_style_bg_color(rolls_textarea, panel_color(), 0);
+  lv_obj_set_style_bg_color(rolls_textarea, bg_color(), 0);
   lv_obj_set_style_bg_opa(rolls_textarea, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(rolls_textarea, highlight_color(), 0);
   lv_obj_set_style_border_width(rolls_textarea, 2, 0);
-  lv_obj_set_style_radius(rolls_textarea, 14, 0);
+  lv_obj_set_style_radius(rolls_textarea, 8, 0);
   lv_obj_set_style_pad_all(rolls_textarea, 12, 0);
   lv_obj_set_style_bg_color(rolls_textarea, highlight_color(),
                             LV_PART_CURSOR);

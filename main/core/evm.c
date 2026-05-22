@@ -20,7 +20,8 @@
 #define WEB3_ETH_COIN_TYPE 60
 #define WEB3_BTC_COIN_TYPE 0
 #define WEB3_MAINNET_NETWORK 0
-#define WEB3_OKX_FRAGMENT_LEN 160
+#define WEB3_OKX_FRAGMENT_LEN 200
+#define WEB3_OKX_DEVICE_VERSION "2.4.2"
 #define CRYPTO_HDKEY_TAG 303
 #define CRYPTO_KEYPATH_TAG 304
 #define CRYPTO_COIN_INFO_TAG 305
@@ -727,60 +728,73 @@ static bool web3_append_external_bitget_entries(
   return true;
 }
 
-static bool web3_append_okx_entries(cbor_value_t *array,
-                                    const uint8_t master_fingerprint[4]) {
-  web3_hdkey_entry_t standard;
-  memset(&standard, 0, sizeof(standard));
-  bool ok = web3_derive_entry("m/44'/60'/0'", "0/*", true, true, true,
-                              WEB3_ETH_COIN_TYPE, true,
-                              WEB3_KEYPATH_DEPTH_NONE,
-                              WEB3_KEYPATH_DEPTH_NONE, "account.standard",
-                              &standard);
-  if (!ok)
+static bool web3_append_derived_entry(cbor_value_t *array, const char *path,
+                                      const char *children_path,
+                                      bool include_chain_code,
+                                      bool include_children,
+                                      bool include_parent_fingerprint,
+                                      uint32_t coin_type, bool has_coin_type,
+                                      int origin_depth, int children_depth,
+                                      const char *note,
+                                      const uint8_t master_fingerprint[4]) {
+  web3_hdkey_entry_t entry;
+  if (!web3_derive_entry(path, children_path, include_chain_code,
+                         include_children, include_parent_fingerprint,
+                         coin_type, has_coin_type, origin_depth,
+                         children_depth, note, &entry))
     return false;
 
-  cbor_value_t *tagged_standard =
-      web3_tagged_hdkey(&standard, master_fingerprint);
-  web3_entry_clear(&standard);
-  if (!tagged_standard || !cbor_array_append(array, tagged_standard)) {
-    cbor_value_free(tagged_standard);
+  cbor_value_t *tagged = web3_tagged_hdkey(&entry, master_fingerprint);
+  web3_entry_clear(&entry);
+  if (!tagged || !cbor_array_append(array, tagged)) {
+    cbor_value_free(tagged);
     return false;
   }
-  tagged_standard = NULL;
+  return true;
+}
+
+static bool web3_append_okx_entries(cbor_value_t *array,
+                                    const uint8_t master_fingerprint[4]) {
+  if (!web3_append_derived_entry(array, "m/44'/60'/0'", NULL, true, false,
+                                 true, WEB3_ETH_COIN_TYPE, true,
+                                 WEB3_KEYPATH_DEPTH_AUTO,
+                                 WEB3_KEYPATH_DEPTH_NONE,
+                                 "account.standard", master_fingerprint))
+    return false;
 
   for (int i = 0; i < 10; i++) {
     char path[48];
     snprintf(path, sizeof(path), "m/44'/60'/%d'/0/0", i);
-    web3_hdkey_entry_t ledger;
-    if (!web3_derive_entry(path, NULL, false, false, false, 0, false,
-                           WEB3_KEYPATH_DEPTH_NONE,
-                           WEB3_KEYPATH_DEPTH_NONE,
-                           "account.ledger_live", &ledger))
+    if (!web3_append_derived_entry(array, path, NULL, false, false, false, 0,
+                                   false, WEB3_KEYPATH_DEPTH_NONE,
+                                   WEB3_KEYPATH_DEPTH_NONE,
+                                   "account.ledger_live",
+                                   master_fingerprint))
       return false;
-    cbor_value_t *tagged = web3_tagged_hdkey(&ledger, master_fingerprint);
-    web3_entry_clear(&ledger);
-    if (!tagged || !cbor_array_append(array, tagged)) {
-      cbor_value_free(tagged);
-      return false;
-    }
-    tagged = NULL;
   }
 
-  const char *btc_paths[] = {"m/49'/0'/0'", "m/84'/0'/0'"};
-  for (size_t i = 0; i < sizeof(btc_paths) / sizeof(btc_paths[0]); i++) {
-    web3_hdkey_entry_t btc;
-    if (!web3_derive_entry(btc_paths[i], NULL, true, false, true,
-                           WEB3_BTC_COIN_TYPE, true,
-                           WEB3_KEYPATH_DEPTH_AUTO,
-                           WEB3_KEYPATH_DEPTH_NONE, "", &btc))
+  const struct {
+    const char *path;
+    uint32_t coin_type;
+    bool has_coin_type;
+  } okx_paths[] = {
+      {"m/84'/0'/0'", WEB3_BTC_COIN_TYPE, true},
+      {"m/49'/0'/0'", WEB3_BTC_COIN_TYPE, true},
+      {"m/44'/0'/0'", WEB3_BTC_COIN_TYPE, true},
+      {"m/44'/195'/0'", 195, true},
+      {"m/49'/2'/0'", 2, true},
+      {"m/44'/5'/0'", 5, true},
+      {"m/44'/145'/0'", 145, true},
+      {"m/86'/0'/0'", WEB3_BTC_COIN_TYPE, true},
+  };
+  for (size_t i = 0; i < sizeof(okx_paths) / sizeof(okx_paths[0]); i++) {
+    if (!web3_append_derived_entry(array, okx_paths[i].path, NULL, true,
+                                   false, true, okx_paths[i].coin_type,
+                                   okx_paths[i].has_coin_type,
+                                   WEB3_KEYPATH_DEPTH_AUTO,
+                                   WEB3_KEYPATH_DEPTH_NONE, "",
+                                   master_fingerprint))
       return false;
-    cbor_value_t *tagged = web3_tagged_hdkey(&btc, master_fingerprint);
-    web3_entry_clear(&btc);
-    if (!tagged || !cbor_array_append(array, tagged)) {
-      cbor_value_free(tagged);
-      return false;
-    }
-    tagged = NULL;
   }
 
   return true;
@@ -915,7 +929,7 @@ static bool web3_build_multi_accounts(evm_web3_profile_t profile,
       !cbor_map_set(map, cbor_value_new_unsigned_int(4),
                     cbor_value_new_string(device_id)) ||
       !cbor_map_set(map, cbor_value_new_unsigned_int(5),
-                    cbor_value_new_string("1.0.4"))) {
+                    cbor_value_new_string(WEB3_OKX_DEVICE_VERSION))) {
     goto out;
   }
   ok = web3_encode_animated_ur("crypto-multi-accounts", map, bundle);
@@ -979,7 +993,7 @@ static bool web3_build_external_multi_accounts(
       !cbor_map_set(map, cbor_value_new_unsigned_int(4),
                     cbor_value_new_string(device_id)) ||
       !cbor_map_set(map, cbor_value_new_unsigned_int(5),
-                    cbor_value_new_string("1.0.4"))) {
+                    cbor_value_new_string(WEB3_OKX_DEVICE_VERSION))) {
     goto out;
   }
   ok = web3_encode_animated_ur("crypto-multi-accounts", map, bundle);

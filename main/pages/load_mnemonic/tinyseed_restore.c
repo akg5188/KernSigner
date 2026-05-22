@@ -174,13 +174,8 @@ static void update_word_preview(void) {
     lv_obj_t *btn = lv_obj_get_child(grid, i);
     bool enabled = (current_index & (uint16_t)COLUMN_WEIGHTS[i]) != 0;
     lv_obj_set_style_bg_color(btn,
-                              enabled ? lv_color_hex(0xF97316)
-                                      : lv_color_hex(0x111827),
-                              0);
-    lv_obj_set_style_border_color(btn,
-                                  enabled ? lv_color_hex(0xFDBA74)
-                                          : lv_color_hex(0x374151),
-                                  0);
+                              enabled ? highlight_color() : bg_color(), 0);
+    lv_obj_set_style_border_color(btn, highlight_color(), 0);
   }
 }
 
@@ -234,11 +229,11 @@ static void action_event(lv_event_t *e) {
 static lv_obj_t *create_weight_button(lv_obj_t *parent, int col, int size) {
   lv_obj_t *btn = lv_btn_create(parent);
   lv_obj_set_size(btn, size, size);
-  lv_obj_set_style_radius(btn, 10, 0);
-  lv_obj_set_style_bg_color(btn, lv_color_hex(0x111827), 0);
+  lv_obj_set_style_radius(btn, 8, 0);
+  lv_obj_set_style_bg_color(btn, bg_color(), 0);
   lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(btn, 2, 0);
-  lv_obj_set_style_border_color(btn, lv_color_hex(0x374151), 0);
+  lv_obj_set_style_border_color(btn, highlight_color(), 0);
   lv_obj_set_style_shadow_width(btn, 0, 0);
   lv_obj_add_event_cb(btn, toggle_weight_event, LV_EVENT_CLICKED,
                       (void *)(intptr_t)col);
@@ -248,7 +243,7 @@ static lv_obj_t *create_weight_button(lv_obj_t *parent, int col, int size) {
   lv_obj_t *label = lv_label_create(btn);
   lv_label_set_text(label, weight_label);
   lv_obj_set_style_text_font(label, theme_font_small(), 0);
-  lv_obj_set_style_text_color(label, lv_color_white(), 0);
+  lv_obj_set_style_text_color(label, main_color(), 0);
   lv_obj_center(label);
 
   return btn;
@@ -269,11 +264,11 @@ static void render_word_editor(void) {
   word_card = lv_obj_create(page_screen);
   lv_obj_set_size(word_card, LV_PCT(90), 108);
   lv_obj_align(word_card, LV_ALIGN_TOP_MID, 0, 124);
-  lv_obj_set_style_bg_color(word_card, panel_color(), 0);
-  lv_obj_set_style_bg_opa(word_card, LV_OPA_90, 0);
+  lv_obj_set_style_bg_color(word_card, bg_color(), 0);
+  lv_obj_set_style_bg_opa(word_card, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(word_card, highlight_color(), 0);
-  lv_obj_set_style_border_width(word_card, 1, 0);
-  lv_obj_set_style_radius(word_card, 14, 0);
+  lv_obj_set_style_border_width(word_card, 2, 0);
+  lv_obj_set_style_radius(word_card, 8, 0);
   lv_obj_set_style_pad_all(word_card, theme_get_default_padding(), 0);
   lv_obj_set_flex_flow(word_card, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(word_card, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
@@ -292,11 +287,11 @@ static void render_word_editor(void) {
   grid = lv_obj_create(page_screen);
   lv_obj_set_size(grid, LV_PCT(92), 222);
   lv_obj_align(grid, LV_ALIGN_TOP_MID, 0, 256);
-  lv_obj_set_style_bg_color(grid, lv_color_hex(0x050505), 0);
+  lv_obj_set_style_bg_color(grid, bg_color(), 0);
   lv_obj_set_style_bg_opa(grid, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(grid, lv_color_hex(0x1F2937), 0);
-  lv_obj_set_style_border_width(grid, 1, 0);
-  lv_obj_set_style_radius(grid, 16, 0);
+  lv_obj_set_style_border_color(grid, highlight_color(), 0);
+  lv_obj_set_style_border_width(grid, 2, 0);
+  lv_obj_set_style_radius(grid, 8, 0);
   lv_obj_set_style_pad_all(grid, 12, 0);
   lv_obj_set_style_pad_gap(grid, 8, 0);
   lv_obj_set_layout(grid, LV_LAYOUT_FLEX);

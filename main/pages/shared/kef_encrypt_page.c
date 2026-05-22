@@ -419,11 +419,11 @@ void kef_encrypt_page_create(lv_obj_t *parent, void (*return_cb)(void),
     if (!key_get_fingerprint_hex(fp_hex)) {
       SECURE_FREE_BUFFER(data_copy, data_copy_len);
       data_copy_len = 0;
-      dialog_show_error("读取指纹失败", return_cb, 0);
+      dialog_show_error("读取钱包指纹失败", return_cb, 0);
       return;
     }
     snprintf(kef_id, sizeof(kef_id), "%s", fp_hex);
-    snprintf(msg, sizeof(msg), "使用指纹 %s 作为备份名称？", fp_hex);
+    snprintf(msg, sizeof(msg), "使用钱包指纹 %s 作为备份名称？", fp_hex);
   }
 
   dialog_show_confirm(msg, id_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);

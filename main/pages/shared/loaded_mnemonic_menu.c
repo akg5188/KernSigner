@@ -18,6 +18,7 @@
 #include "mnemonic_editor.h"
 #include "mnemonic_tool_page.h"
 #include "sensitive_pin.h"
+#include "../krux_shell/krux_shell.h"
 
 #include <lvgl.h>
 #include <string.h>
@@ -180,6 +181,18 @@ static void launch_passphrase(void) {
   passphrase_page_show();
 }
 
+static void launch_seedkeeper_write(void) {
+  if (!krux_shell_show_screen("smartcard_seedkeeper_write_mnemonic")) {
+    dialog_show_error("页面不可用", loaded_mnemonic_menu_page_show, 0);
+  }
+}
+
+static void launch_satochip_write(void) {
+  if (!krux_shell_show_screen("smartcard_satochip_write_mnemonic")) {
+    dialog_show_error("页面不可用", loaded_mnemonic_menu_page_show, 0);
+  }
+}
+
 static void words_cb(void) {
   sensitive_pin_require(launch_words, loaded_mnemonic_menu_page_show);
 }
@@ -191,6 +204,8 @@ static void custom_derivation_cb(void) { sensitive_pin_require(launch_custom_der
 static void secondary_shift_cb(void) { sensitive_pin_require(launch_secondary_shift, loaded_mnemonic_menu_page_show); }
 static void bip85_cb(void) { sensitive_pin_require(launch_bip85, loaded_mnemonic_menu_page_show); }
 static void passphrase_cb(void) { sensitive_pin_require(launch_passphrase, loaded_mnemonic_menu_page_show); }
+static void seedkeeper_write_cb(void) { sensitive_pin_require(launch_seedkeeper_write, loaded_mnemonic_menu_page_show); }
+static void satochip_write_cb(void) { sensitive_pin_require(launch_satochip_write, loaded_mnemonic_menu_page_show); }
 
 static void back_cb(void) {
   if (return_callback)
@@ -219,12 +234,16 @@ void loaded_mnemonic_menu_page_create(lv_obj_t *parent, void (*return_cb)(void))
     ui_menu_add_entry(loaded_menu, "序号", words_cb);
     ui_menu_add_entry(loaded_menu, "原始熵", entropy_cb);
     ui_menu_add_entry(loaded_menu, "密码短语", passphrase_cb);
+    ui_menu_add_entry(loaded_menu, "写SeedKeeper", seedkeeper_write_cb);
+    ui_menu_add_entry(loaded_menu, "写Satochip", satochip_write_cb);
   }
   if (key_has_signing_key())
     ui_menu_add_entry(loaded_menu, "BIP85", bip85_cb);
   ui_menu_add_entry(loaded_menu, "助记词加密", secondary_shift_cb);
   if (key_can_backup_mnemonic())
     ui_menu_add_entry(loaded_menu, "备份导出", backup_cb);
+
+  ui_menu_apply_compact_grid(loaded_menu);
 }
 
 void loaded_mnemonic_menu_page_show(void) {

@@ -4,6 +4,8 @@
 
 本文件是后续继续迁移 `/home/ak/123/satochip-signer` 时的对照清单。目的不是宣传已经完成，而是防止以后把“能识别读卡器”误当成“完整智能卡钱包已经商业交付”。
 
+> 2026-05-22 状态覆盖：Satochip/SeedKeeper 主线已经继续推进。SeedKeeper 设置 PIN、改 PIN、写入助记词、查看/导入条目和新版重置流程已经进入测试卡验收范围；新版 SeedKeeper 重置使用错 PIN/错 PUK 到 `FF00`，旧 `B0 FF` 返回 `9C20` 不代表驱动坏。当前最新操作口径以 `docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md` 为准。本矩阵保留 2026-05-20 的历史迁移快照。
+
 本轮没有编译固件、没有复制 bin、没有刷机。
 
 ## 当前结论
@@ -21,7 +23,7 @@ Kern 当前只适合作为 Satochip Web3 测试资金验收版，不是商业真
 - Satochip 按路径查看 EVM/BTC 地址。
 - Satochip BTC xpub/ypub/zpub/tpub/upub/vpub 观察公钥。
 
-必须隐藏或拒绝：
+2026-05-20 当时必须隐藏或拒绝：
 
 - SeedKeeper 列表、导入、导出、删除、写入。
 - 写入助记词到 Satochip 或 SeedKeeper。

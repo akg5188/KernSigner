@@ -22,17 +22,9 @@ The current tree is a **test-funds validation build**, not an audited production
 
 ## Screenshots / 界面截图
 
-Common 480x800 UI screenshots are included for GitHub preview and beginner documentation. They are simulator reference images only and do not prove production readiness or real-funds safety.
-
-More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gallery/README.md)
-
-| 首页 | 连接钱包 | 助记词 | 智能卡 |
-| --- | --- | --- | --- |
-| <img src="docs/screens/gallery/v20260521_124238_001_home_top.png" width="160" alt="首页"> | <img src="docs/screens/gallery/v20260521_124238_002_pi_connect_wallet_top.png" width="160" alt="连接钱包"> | <img src="docs/screens/gallery/v20260521_124238_029_pi_mnemonic_tools_top.png" width="160" alt="助记词"> | <img src="docs/screens/gallery/v20260521_124238_030_smartcard_tools_top.png" width="160" alt="智能卡"> |
-
-| Satochip | SeedKeeper | 创建助记词 | 备份 |
-| --- | --- | --- | --- |
-| <img src="docs/screens/gallery/v20260521_124238_031_smartcard_satochip_tools_top.png" width="160" alt="Satochip"> | <img src="docs/screens/gallery/v20260521_124238_037_smartcard_satochip_seedkeeper_tools_top.png" width="160" alt="SeedKeeper"> | <img src="docs/screens/gallery/v20260521_124238_102_new_mnemonic_top.png" width="160" alt="创建助记词"> | <img src="docs/screens/gallery/v20260521_124238_115_backup_export_top.png" width="160" alt="备份"> |
+Old simulator screenshots were removed because the UI changed quickly during the
+smart-card and 4.3-inch layout work. New screenshots should be generated from
+the current simulator or real device before using images for promotion.
 
 ## What Works
 
@@ -40,7 +32,7 @@ More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gal
 - QR input/output: SeedQR, PSBT/message-signing paths, BBQR/cUR plumbing, text QR generation, and QR classification.
 - Mnemonic and backup tooling: manual word entry, numbered imports, grid/1248/Tinyseed/Stackbit-style restore paths, encrypted backup pages, and BIP39 checks.
 - Custom derivation: Bitcoin legacy, nested SegWit, native SegWit, Taproot, testnet variants, and EVM address display.
-- Satochip smart-card validation paths: USB CCID detection, ATR/status reads, Web3 connection/signing tests, path address display, and BTC watch-only public keys.
+- Satochip/SeedKeeper smart-card validation paths: USB CCID detection, ATR/status reads, Satochip Web3 connection/signing tests, path address display, BTC watch-only public keys, and SeedKeeper setup/write/view/reset maintenance flows for test cards.
 - Hardware tooling: display/touch setup, camera preview, storage browser, brightness control, device status, and real-device delivery checks.
 - Desktop simulator: runs the LVGL UI in an SDL2 window for UI review and automated screenshots.
 
@@ -59,8 +51,8 @@ More screenshots and captions: [docs/screens/gallery/README.md](docs/screens/gal
 | --- | --- | --- |
 | Bitcoin / BTC | 已接主流程 | 支持常见 BTC 地址、扩展公钥、观察钱包、PSBT/消息签名入口；包含 legacy、nested SegWit、native SegWit、Taproot 和 testnet 变体。 |
 | EVM / ETH 兼容链 | 已接测试主线 | 默认路径 `m/44'/60'/0'/0/0`，支持 EVM 地址显示、观察账户连接和常见 Web3 签名测试；复杂合约、TypedData/EIP-712 和完整交易可读解析仍未作为生产能力开放。 |
-| Satochip 智能卡 | 已接可测主线 | 支持外接供电读卡器下的状态读取、EVM 地址/连接码、Web3 测试签名、BTC 观察公钥读取。 |
-| SeedKeeper 智能卡 | 检测/只读验收 | 可做识别和部分只读检测；写卡、改 PIN、重置、SeedKeeper 管理等高风险功能未开放为交付能力。 |
+| Satochip 智能卡 | 已接可测主线 | 支持外接供电读卡器下的状态读取、设置/改 PIN、写入助记词、EVM 地址/连接码、Web3 测试签名、BTC 观察公钥读取、重置/出厂维护入口。 |
+| SeedKeeper 智能卡 | 已接可测维护主线 | 支持设置/改 PIN、写入助记词、查看卡内条目、导入本机、保存密码/描述符、重置。新版 SeedKeeper 重置必须用错 PIN/错 PUK 到 `FF00` 的流程。 |
 
 已写入或预留的 Web3/观察钱包入口：
 
@@ -123,6 +115,8 @@ ESP32-P4 OTG 口
 <img src="docs/screens/powered_otg_smartcard_setup.jpg" width="620" alt="ESP32-P4 smart-card reader powered OTG setup">
 
 不要把“电脑能识别读卡器”理解成“开发板直插也能给读卡器供电”。电脑 USB 口和 ESP32-P4 OTG Host 口的供电条件不是一回事。详细排障看 [智能卡供电和 OTG 排障](docs/TROUBLESHOOTING_SMARTCARD_POWER_OTG.md)。
+
+智能卡详细操作看 [Satochip / SeedKeeper 智能卡实测操作手册](docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md)。重点结论：Satochip 和 SeedKeeper 不是同一个东西；Satochip 主要用于签名，SeedKeeper 主要用于保存秘密；新版 SeedKeeper 恢复出厂不是旧 `B0 FF`，而是通过 `错PIN一步` 和 `错PUK一步` 直到返回 `FF00`。
 
 ## 3D Printed Case / 3D 打印外壳
 

@@ -67,7 +67,8 @@ void mnemonic_words_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   char fingerprint_text[32];
   char fingerprint_hex[9] = "--------";
   key_get_fingerprint_hex(fingerprint_hex);
-  snprintf(fingerprint_text, sizeof(fingerprint_text), "指纹 %s", fingerprint_hex);
+  snprintf(fingerprint_text, sizeof(fingerprint_text), "钱包指纹 %s",
+           fingerprint_hex);
 
   lv_obj_t *content = lv_obj_create(mnemonic_screen);
   lv_obj_set_size(content, LV_PCT(94), LV_PCT(80));

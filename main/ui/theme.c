@@ -14,17 +14,17 @@
 
 static int max_i(int a, int b) { return a > b ? a : b; }
 
-// Minimalist theme colors
+// Unified high-contrast theme colors
 #define COLOR_BG lv_color_hex(0x000000)       // Black background
-#define COLOR_PANEL lv_color_hex(0x1a1a1a)    // Dark gray panels
-#define COLOR_WHITE lv_color_hex(0xFFFFFF)    // White text/borders
-#define COLOR_GRAY lv_color_hex(0x888888)     // Gray info text
-#define COLOR_ORANGE lv_color_hex(0xff6600)   // Orange accent
-#define COLOR_DISABLED lv_color_hex(0x333333) // Gray disabled
-#define COLOR_ERROR lv_color_hex(0xFF0000)    // Red for errors
-#define COLOR_NO lv_color_hex(0xFF0000)       // Red for negative
-#define COLOR_YES lv_color_hex(0x00FF00)      // Green for positive
-#define COLOR_CYAN lv_color_hex(0x00FFFF)     // Cyan accent
+#define COLOR_PANEL COLOR_BG                  // Panels stay black
+#define COLOR_WHITE lv_color_hex(0xFFFFFF)    // White text
+#define COLOR_GRAY COLOR_WHITE                // Secondary text stays white
+#define COLOR_ORANGE lv_color_hex(0xff6600)   // Orange borders/accent
+#define COLOR_DISABLED COLOR_BG               // Disabled surfaces stay black
+#define COLOR_ERROR COLOR_ORANGE              // Unified warning accent
+#define COLOR_NO COLOR_ORANGE                 // Unified negative accent
+#define COLOR_YES COLOR_ORANGE                // Unified positive accent
+#define COLOR_CYAN COLOR_ORANGE               // Unified alternate accent
 
 // Mutable font copies with icon fallbacks
 static lv_font_t font_small;
@@ -85,7 +85,7 @@ void theme_init(void) {
     sz_button_spacing = 10;
     sz_default_padding = 18;
     sz_min_touch = 58;
-    sz_corner_btn_w = 80;
+    sz_corner_btn_w = 72;
     sz_corner_btn_h = 54;
     sz_small_padding = 8;
     sz_logo = 120;
@@ -95,7 +95,7 @@ void theme_init(void) {
     sz_button_spacing = scr_w / 36;    //  20 @ 720
     sz_default_padding = scr_w / 24;   //  30 @ 720
     sz_min_touch = scr_w / 8;          //  90 @ 720
-    sz_corner_btn_w = scr_w / 6;       // 120 @ 720
+    sz_corner_btn_w = scr_w / 7;       // 102 @ 720
     sz_corner_btn_h = scr_w / 8;       //  90 @ 720
     sz_small_padding = scr_w / 72;     //  10 @ 720
     sz_logo = scr_w * 5 / 18;          // 200 @ 720
@@ -183,11 +183,11 @@ void theme_apply_frame(lv_obj_t *target_frame) {
   if (!target_frame)
     return;
 
-  lv_obj_set_style_bg_color(target_frame, COLOR_PANEL, 0);
-  lv_obj_set_style_bg_opa(target_frame, LV_OPA_90, 0);
+  lv_obj_set_style_bg_color(target_frame, COLOR_BG, 0);
+  lv_obj_set_style_bg_opa(target_frame, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(target_frame, COLOR_ORANGE, 0);
-  lv_obj_set_style_border_width(target_frame, 1, 0);
-  lv_obj_set_style_radius(target_frame, 14, 0);
+  lv_obj_set_style_border_width(target_frame, 2, 0);
+  lv_obj_set_style_radius(target_frame, 8, 0);
   lv_obj_set_style_pad_all(target_frame, theme_get_default_padding(), 0);
   lv_obj_set_style_shadow_width(target_frame, 0, 0);
 }
@@ -227,30 +227,28 @@ void theme_apply_button_label(lv_obj_t *label, bool is_secondary) {
 }
 
 void theme_apply_touch_button(lv_obj_t *btn, bool is_primary) {
+  (void)is_primary;
   if (!btn)
     return;
 
-  // Soft panel buttons read clearly on the 480x800 glass without visual noise.
-  lv_obj_set_style_bg_color(btn, is_primary ? COLOR_PANEL : COLOR_BG,
-                            LV_STATE_DEFAULT);
-  lv_obj_set_style_bg_opa(btn, is_primary ? LV_OPA_90 : LV_OPA_50,
-                          LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_color(btn, COLOR_BG, LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_DEFAULT);
   lv_obj_set_style_text_color(btn, COLOR_WHITE, LV_STATE_DEFAULT);
-  lv_obj_set_style_border_color(btn, is_primary ? COLOR_ORANGE : COLOR_PANEL,
-                                LV_STATE_DEFAULT);
-  lv_obj_set_style_border_width(btn, 1, LV_STATE_DEFAULT);
-  lv_obj_set_style_radius(btn, 12, LV_STATE_DEFAULT);
+  lv_obj_set_style_border_color(btn, COLOR_ORANGE, LV_STATE_DEFAULT);
+  lv_obj_set_style_border_width(btn, 2, LV_STATE_DEFAULT);
+  lv_obj_set_style_radius(btn, 8, LV_STATE_DEFAULT);
   lv_obj_set_style_pad_all(btn, max_i(10, theme_get_small_padding() * 2),
                            LV_STATE_DEFAULT);
   lv_obj_set_style_shadow_width(btn, 0, LV_STATE_DEFAULT);
 
-  // Pressed state - orange background
   lv_obj_set_style_bg_color(btn, COLOR_ORANGE, LV_STATE_PRESSED);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_50, LV_STATE_PRESSED);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_PRESSED);
+  lv_obj_set_style_text_color(btn, COLOR_WHITE, LV_STATE_PRESSED);
 
-  // Disabled state
-  lv_obj_set_style_text_color(btn, COLOR_DISABLED, LV_STATE_DISABLED);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_STATE_DISABLED);
+  lv_obj_set_style_text_color(btn, COLOR_WHITE, LV_STATE_DISABLED);
+  lv_obj_set_style_bg_color(btn, COLOR_BG, LV_STATE_DISABLED);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_DISABLED);
+  lv_obj_set_style_border_color(btn, COLOR_ORANGE, LV_STATE_DISABLED);
 
   lv_obj_clear_flag(btn, LV_OBJ_FLAG_CLICK_FOCUSABLE);
 }
@@ -270,24 +268,32 @@ void theme_apply_btnmatrix(lv_obj_t *btnmatrix) {
   lv_obj_set_style_pad_column(btnmatrix, 6, 0);
 
   // Button items - normal state
-  lv_obj_set_style_bg_color(btnmatrix, COLOR_DISABLED, LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(btnmatrix, COLOR_BG, LV_PART_ITEMS);
+  lv_obj_set_style_bg_opa(btnmatrix, LV_OPA_COVER, LV_PART_ITEMS);
   lv_obj_set_style_text_color(btnmatrix, COLOR_WHITE, LV_PART_ITEMS);
   lv_obj_set_style_text_font(btnmatrix, theme_font_small(), LV_PART_ITEMS);
   lv_obj_set_style_radius(btnmatrix, 6, LV_PART_ITEMS);
-  lv_obj_set_style_border_width(btnmatrix, 0, LV_PART_ITEMS);
+  lv_obj_set_style_border_color(btnmatrix, COLOR_ORANGE, LV_PART_ITEMS);
+  lv_obj_set_style_border_width(btnmatrix, 1, LV_PART_ITEMS);
   lv_obj_set_style_shadow_width(btnmatrix, 0, LV_PART_ITEMS);
   lv_obj_set_style_outline_width(btnmatrix, 0, LV_PART_ITEMS);
 
   // Pressed state
   lv_obj_set_style_bg_color(btnmatrix, COLOR_ORANGE,
                             LV_PART_ITEMS | LV_STATE_PRESSED);
-  lv_obj_set_style_bg_color(btnmatrix, COLOR_ORANGE,
+  lv_obj_set_style_bg_color(btnmatrix, COLOR_BG,
                             LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_text_color(btnmatrix, COLOR_WHITE,
+                              LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_border_color(btnmatrix, COLOR_ORANGE,
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
 
   // Disabled state
-  lv_obj_set_style_bg_opa(btnmatrix, LV_OPA_TRANSP,
+  lv_obj_set_style_bg_color(btnmatrix, COLOR_BG,
+                            LV_PART_ITEMS | LV_STATE_DISABLED);
+  lv_obj_set_style_bg_opa(btnmatrix, LV_OPA_COVER,
                           LV_PART_ITEMS | LV_STATE_DISABLED);
-  lv_obj_set_style_text_color(btnmatrix, COLOR_DISABLED,
+  lv_obj_set_style_text_color(btnmatrix, COLOR_WHITE,
                               LV_PART_ITEMS | LV_STATE_DISABLED);
 
   // Enable click trigger for all buttons
@@ -328,7 +334,7 @@ lv_obj_t *theme_create_label(lv_obj_t *parent, const char *text,
 
 lv_obj_t *theme_create_page_title(lv_obj_t *parent, const char *text) {
   lv_obj_t *label = theme_create_label(parent, text ? text : "", false);
-  lv_obj_set_width(label, LV_PCT(72));
+  lv_obj_set_width(label, LV_PCT(theme_get_screen_width() <= 520 ? 50 : 56));
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_font(label, theme_font_medium(), 0);
@@ -377,8 +383,12 @@ lv_obj_t *theme_create_flex_column(lv_obj_t *parent) {
 static void dropdown_open_cb(lv_event_t *e) {
   lv_obj_t *list = lv_dropdown_get_list(lv_event_get_target(e));
   if (list) {
-    lv_obj_set_style_bg_color(list, COLOR_DISABLED, 0);
+    lv_obj_set_style_bg_color(list, COLOR_BG, 0);
+    lv_obj_set_style_bg_opa(list, LV_OPA_COVER, 0);
     lv_obj_set_style_text_color(list, COLOR_WHITE, 0);
+    lv_obj_set_style_border_color(list, COLOR_ORANGE, 0);
+    lv_obj_set_style_border_width(list, 2, 0);
+    lv_obj_set_style_radius(list, 8, 0);
     lv_obj_set_style_bg_color(list, COLOR_ORANGE,
                               LV_PART_SELECTED | LV_STATE_CHECKED);
     lv_obj_set_style_bg_color(list, COLOR_ORANGE,
@@ -393,10 +403,13 @@ lv_obj_t *theme_create_dropdown(lv_obj_t *parent, const char *options) {
   lv_obj_t *dd = lv_dropdown_create(parent);
   if (options)
     lv_dropdown_set_options(dd, options);
-  lv_obj_set_style_bg_color(dd, COLOR_DISABLED, 0);
+  lv_obj_set_style_bg_color(dd, COLOR_BG, 0);
+  lv_obj_set_style_bg_opa(dd, LV_OPA_COVER, 0);
   lv_obj_set_style_text_color(dd, COLOR_WHITE, 0);
   lv_obj_set_style_text_font(dd, theme_font_small(), 0);
   lv_obj_set_style_border_color(dd, COLOR_ORANGE, 0);
+  lv_obj_set_style_border_width(dd, 2, 0);
+  lv_obj_set_style_radius(dd, 8, 0);
   lv_dropdown_set_symbol(dd, "v");
   lv_obj_add_event_cb(dd, dropdown_open_cb, LV_EVENT_READY, NULL);
   return dd;

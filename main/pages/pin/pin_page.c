@@ -386,7 +386,7 @@ static void build_chrome(const char *title_text) {
     ui_create_back_button(page_screen, back_btn_cb);
   title_label = theme_create_page_title(page_screen, title_text);
   if (has_back) {
-    lv_obj_set_width(title_label, LV_PCT(60));
+    lv_obj_set_width(title_label, LV_PCT(50));
     lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0,
                  theme_get_default_padding());
   }

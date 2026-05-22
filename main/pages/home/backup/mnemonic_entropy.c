@@ -80,17 +80,17 @@ void mnemonic_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   char fingerprint_hex[9] = "--------";
   key_get_fingerprint_hex(fingerprint_hex);
   char fingerprint_text[32];
-  snprintf(fingerprint_text, sizeof(fingerprint_text), "指纹 %s",
+  snprintf(fingerprint_text, sizeof(fingerprint_text), "钱包指纹 %s",
            fingerprint_hex);
 
   lv_obj_t *card = lv_obj_create(entropy_screen);
   lv_obj_set_size(card, LV_PCT(92), LV_PCT(80));
   lv_obj_align(card, LV_ALIGN_BOTTOM_MID, 0, -theme_get_small_padding());
-  lv_obj_set_style_bg_color(card, panel_color(), 0);
-  lv_obj_set_style_bg_opa(card, LV_OPA_80, 0);
+  lv_obj_set_style_bg_color(card, bg_color(), 0);
+  lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(card, highlight_color(), 0);
-  lv_obj_set_style_border_width(card, 1, 0);
-  lv_obj_set_style_radius(card, 14, 0);
+  lv_obj_set_style_border_width(card, 2, 0);
+  lv_obj_set_style_radius(card, 8, 0);
   lv_obj_set_style_pad_all(card, theme_get_default_padding(), 0);
   lv_obj_set_style_pad_gap(card, theme_get_small_padding(), 0);
   lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);

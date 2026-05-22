@@ -65,6 +65,7 @@ esp_err_t smartcard_ccid_transmit_apdu(const uint8_t *apdu, size_t apdu_len,
                                        size_t response_cap,
                                        size_t *response_len, uint16_t *sw,
                                        uint32_t timeout_ms);
+void smartcard_ccid_set_factory_reset_mode(bool enabled);
 void smartcard_ccid_snapshot(smartcard_ccid_report_t *out);
 void smartcard_ccid_format_report(char *out, size_t out_len);
 const char *smartcard_ccid_state_name(smartcard_ccid_state_t state);

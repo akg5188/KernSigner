@@ -17,6 +17,49 @@ static void (*success_callback)(void) = NULL;
 static size_t displayed_slots[MNEMONIC_SLOT_CAPACITY];
 static size_t displayed_count = 0;
 
+static void style_slots_menu_layout(void) {
+  if (!slots_menu || !slots_menu->list)
+    return;
+
+  int top_gap = theme_get_corner_button_height();
+  if (top_gap < 56)
+    top_gap = 56;
+
+  lv_obj_set_flex_flow(slots_menu->list, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(slots_menu->list, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_top(slots_menu->list, top_gap, 0);
+  lv_obj_set_style_pad_row(slots_menu->list, 14, 0);
+}
+
+static void style_slot_button(int index, const mnemonic_slot_info_t *info,
+                              bool current, size_t slot_index) {
+  if (!slots_menu || index < 0 || index >= UI_MENU_MAX_ENTRIES ||
+      !slots_menu->buttons[index] || !info)
+    return;
+
+  lv_obj_t *btn = slots_menu->buttons[index];
+  lv_obj_set_width(btn, LV_PCT(theme_get_screen_width() <= 520 ? 72 : 58));
+  lv_obj_set_height(btn, 132);
+  lv_obj_set_style_pad_all(btn, 12, 0);
+  lv_obj_set_style_pad_gap(btn, 4, 0);
+
+  lv_obj_t *label = lv_obj_get_child(btn, 0);
+  if (!label)
+    return;
+
+  char text[96];
+  snprintf(text, sizeof(text), "%s助记词 %u\n钱包指纹 %s\n%u 词",
+           current ? "当前 " : "", (unsigned)(slot_index + 1),
+           info->fingerprint, (unsigned)info->word_count);
+  lv_label_set_text(label, text);
+  lv_obj_set_width(label, LV_PCT(96));
+  lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  lv_obj_set_style_text_font(label, theme_font_small(), 0);
+  lv_obj_center(label);
+}
+
 static void back_cb(void) {
   if (return_callback)
     return_callback();
@@ -54,6 +97,7 @@ void mnemonic_slots_page_create(lv_obj_t *parent, void (*return_cb)(void),
   slots_menu = ui_menu_create(slots_screen, "选择助记词", back_cb);
   if (!slots_menu)
     return;
+  style_slots_menu_layout();
 
   char current_fp[9] = {0};
   bool has_current = key_get_fingerprint_hex(current_fp);
@@ -65,13 +109,11 @@ void mnemonic_slots_page_create(lv_obj_t *parent, void (*return_cb)(void),
     if (displayed_count >= UI_MENU_MAX_ENTRIES)
       break;
 
-    char label[64];
     bool current = has_current && strcmp(current_fp, info.fingerprint) == 0;
-    snprintf(label, sizeof(label), "%s助记词%u  %s  %u词",
-             current ? "当前 " : "", (unsigned)(i + 1), info.fingerprint,
-             (unsigned)info.word_count);
+    int entry_index = slots_menu->config.entry_count;
     displayed_slots[displayed_count++] = i;
-    ui_menu_add_entry(slots_menu, label, select_slot_cb);
+    ui_menu_add_entry(slots_menu, "助记词", select_slot_cb);
+    style_slot_button(entry_index, &info, current, i);
   }
 
   if (displayed_count == 0) {

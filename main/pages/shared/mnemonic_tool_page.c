@@ -1072,11 +1072,11 @@ static const char *run_button_label(void) {
 static void style_run_button(lv_obj_t *btn) {
   if (!btn)
     return;
-  lv_obj_set_style_bg_color(btn, panel_color(), 0);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_90, 0);
+  lv_obj_set_style_bg_color(btn, bg_color(), 0);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(btn, highlight_color(), 0);
   lv_obj_set_style_border_width(btn, 2, 0);
-  lv_obj_set_style_radius(btn, 14, 0);
+  lv_obj_set_style_radius(btn, 8, 0);
   lv_obj_set_style_shadow_width(btn, 0, 0);
 }
 
@@ -1113,11 +1113,11 @@ static void create_text_input(void) {
     lv_textarea_set_cursor_click_pos(tool_textarea, true);
     lv_obj_set_style_text_font(tool_textarea, theme_font_medium(), 0);
     lv_obj_set_style_text_color(tool_textarea, main_color(), 0);
-    lv_obj_set_style_bg_color(tool_textarea, panel_color(), 0);
+    lv_obj_set_style_bg_color(tool_textarea, bg_color(), 0);
     lv_obj_set_style_bg_opa(tool_textarea, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(tool_textarea, highlight_color(), 0);
     lv_obj_set_style_border_width(tool_textarea, 2, 0);
-    lv_obj_set_style_radius(tool_textarea, 14, 0);
+    lv_obj_set_style_radius(tool_textarea, 8, 0);
     lv_obj_set_style_pad_all(tool_textarea, 12, 0);
     lv_obj_set_style_bg_color(tool_textarea, highlight_color(), LV_PART_CURSOR);
     lv_obj_set_style_bg_opa(tool_textarea, LV_OPA_COVER, LV_PART_CURSOR);
@@ -1161,6 +1161,12 @@ static void create_text_input(void) {
     lv_obj_set_width(input.textarea, LV_PCT(86));
     lv_obj_set_height(input.textarea, 92);
     lv_obj_align(input.textarea, LV_ALIGN_TOP_MID, 0, 112);
+    lv_obj_set_style_bg_color(input.textarea, bg_color(), 0);
+    lv_obj_set_style_bg_opa(input.textarea, LV_OPA_COVER, 0);
+    lv_obj_set_style_text_color(input.textarea, main_color(), 0);
+    lv_obj_set_style_border_color(input.textarea, highlight_color(), 0);
+    lv_obj_set_style_border_width(input.textarea, 2, 0);
+    lv_obj_set_style_radius(input.textarea, 8, 0);
     lv_obj_add_event_cb(input.textarea, input_focus_cb, LV_EVENT_FOCUSED, NULL);
     lv_obj_add_event_cb(input.textarea, input_focus_cb, LV_EVENT_CLICKED, NULL);
   }

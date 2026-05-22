@@ -53,7 +53,9 @@ set(SIM_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main_sim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/esp_idf_stubs/stubs.c
     ${APP_UI_DIR}/font_policy.c
+    ${APP_UI_DIR}/menu.c
     ${APP_UI_DIR}/theme.c
+    ${APP_UI_DIR}/word_selector.c
     ${APP_UI_DIR}/assets/kern_logo_lvgl.c
     ${APP_UI_DIR}/assets/kern_logo_font.c
     ${APP_UI_DIR}/assets/icons_16.c
@@ -142,6 +144,8 @@ set(APP_PAGES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../main/pages)
 set(APP_PAGE_SOURCES
     # Krux migration shell
     ${APP_PAGES_DIR}/krux_shell/krux_shell.c
+    ${APP_PAGES_DIR}/shared/custom_derivation_page.c
+    ${APP_PAGES_DIR}/shared/mnemonic_slots_page.c
 )
 
 # --- QR + k_quirc + cUR ---
@@ -201,6 +205,7 @@ target_include_directories(kern_simulator PRIVATE
     ${MBEDTLS_INCLUDE_DIRS}
     # Application source tree
     ${CMAKE_CURRENT_SOURCE_DIR}/../main                 # ui/theme.h, core/, utils/, pages/
+    ${CMAKE_CURRENT_SOURCE_DIR}/../components/libwally-core/upstream/include
     # Component headers (for kef.c -> bbqr/miniz, cUR, k_quirc, video)
     ${CMAKE_CURRENT_SOURCE_DIR}/../components
     ${CMAKE_CURRENT_SOURCE_DIR}/../components/bbqr/src

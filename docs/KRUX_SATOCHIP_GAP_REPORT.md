@@ -12,7 +12,7 @@
 
 当前 Kern 也不是 Krux + satochip-signer 的完整移植版：高级助记词工具、BIP85、钢板/点阵/1248、SeedKeeper 管理、Satochip 写卡/改 PIN/重置和 BTC PSBT/消息签名还没有完整 C 实现，不能作为真钱包正式功能宣称完成。Web3 观察钱包连接码、Satochip Web3 签名、USB CCID/APDU 基础、路径地址和 BTC 观察公钥已经接入可测范围。
 
-2026-05-20 更新：Satochip Web3 连接/签名、USB CCID 检测、路径地址和 BTC 观察公钥已回到可测主线；智能卡写卡、改 PIN、重置、SeedKeeper 管理、Satochip BTC PSBT/消息签名、TypedData 仍隐藏，不能作为已交付能力宣传。
+2026-05-22 更新：Satochip Web3 连接/签名、USB CCID 检测、路径地址和 BTC 观察公钥已回到可测主线；SeedKeeper 设置 PIN、改 PIN、写入助记词、查看/导入条目和重置已进入测试卡验收范围。Satochip BTC PSBT/消息签名、TypedData 仍不能作为已交付生产能力宣传。当前智能卡实测操作以 `docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md` 为准。
 
 ## 本轮检查范围
 

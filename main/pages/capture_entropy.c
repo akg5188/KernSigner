@@ -410,7 +410,7 @@ void capture_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   capture_screen = lv_obj_create(lv_screen_active());
   lv_obj_set_size(capture_screen, LV_PCT(100), LV_PCT(100));
-  lv_obj_set_style_bg_color(capture_screen, lv_color_hex(0x1e1e1e), 0);
+  lv_obj_set_style_bg_color(capture_screen, bg_color(), 0);
   lv_obj_set_style_bg_opa(capture_screen, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(capture_screen, 0, 0);
   lv_obj_set_style_pad_all(capture_screen, 0, 0);
@@ -435,7 +435,7 @@ void capture_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_bg_opa(camera_img, LV_OPA_COVER, 0);
 
   lv_obj_t *title = theme_create_page_title(capture_screen, "拍照生成随机熵");
-  lv_obj_set_width(title, LV_PCT(58));
+  lv_obj_set_width(title, LV_PCT(50));
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, theme_get_default_padding());
 
   lv_obj_t *instruction =

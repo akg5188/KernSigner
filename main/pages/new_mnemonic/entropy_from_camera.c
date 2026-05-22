@@ -92,7 +92,7 @@ static void show_hash_display(void) {
   char title_text[32];
   snprintf(title_text, sizeof(title_text), "%d 词 - 随机熵", total_words);
   title_label = theme_create_page_title(entropy_screen, title_text);
-  lv_obj_set_width(title_label, LV_PCT(58));
+  lv_obj_set_width(title_label, LV_PCT(50));
   lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, theme_get_default_padding());
 
   back_btn = ui_create_back_button(entropy_screen, hash_back_cb);

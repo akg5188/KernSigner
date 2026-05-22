@@ -144,7 +144,7 @@ void public_key_page_create_with_mode(lv_obj_t *parent, void (*return_cb)(void),
     if (export_is_bluewallet(current_export_mode)) {
       snprintf(subtitle, sizeof(subtitle), "用于观察钱包导入");
     } else {
-      snprintf(subtitle, sizeof(subtitle), "指纹 %s / 路径 %s", fingerprint_hex,
+      snprintf(subtitle, sizeof(subtitle), "钱包指纹 %s / 路径 %s", fingerprint_hex,
                derivation_compact);
     }
     lv_obj_t *subtitle_label =

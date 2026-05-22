@@ -1,8 +1,8 @@
 # 智能卡能力边界
 
-日期：2026-05-20
+日期：2026-05-22
 
-2026-05-21 补充：当前验证构建里可能看到 Satochip/SeedKeeper 维护菜单，包括改 PIN、PUK 解锁、策略、重置等入口。这些入口只按高风险测试维护能力处理，不等于商业生产版已完成安全验收。PIN/PUK 的新手操作说明以 `docs/SECURITY_PIN_GUIDE.zh-CN.md` 为准。
+2026-05-22 补充：当前验证构建里已经能看到并测试 Satochip/SeedKeeper 维护菜单，包括设置 PIN、改 PIN、PUK 解锁、策略、写入助记词、查看/导入 SeedKeeper 条目、重置等入口。这些入口只按测试卡和测试资金维护能力处理，不等于商业生产版已完成安全审计。PIN/PUK 的新手操作说明以 `docs/SECURITY_PIN_GUIDE.zh-CN.md` 和 `docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md` 为准。
 
 这份文件用于统一口径：哪些功能已经开放，哪些功能必须隐藏，哪些功能只是后续计划。
 
@@ -18,7 +18,10 @@
 - Satochip 按路径查看 EVM 地址。
 - Satochip 按完整 BTC 地址路径查看 BTC 地址。
 - BTC 观察公钥：`xpub`、`ypub`、`zpub`、`tpub`、`upub`、`vpub`。
-- 测试维护入口：Satochip/SeedKeeper 改 PIN、PUK 解锁、标签、策略、重置等可能在验证构建中可见。它们必须按高风险维护操作处理，不能当作小白默认功能或生产安全承诺。
+- 测试维护入口：Satochip/SeedKeeper 设置 PIN、改 PIN、PUK 解锁、标签、策略、重置等可能在验证构建中可见。它们必须按高风险维护操作处理，不能当作小白默认功能或生产安全承诺。
+- 写入助记词到 Satochip 或 SeedKeeper。
+- SeedKeeper 查看卡内条目、导入本机、删除条目、保存密码、保存描述符。
+- SeedKeeper 新版重置：不使用旧 `B0 FF`，而是错 PIN/错 PUK 到 `FF00`。
 
 ## 明确拒绝或隐藏
 
@@ -26,11 +29,8 @@
 - 2FA 卡签名。
 - Satochip BTC PSBT 签名。
 - Satochip BTC 消息签名。
-- SeedKeeper 列表、导入、导出、删除。
-- 写入助记词到 Satochip。
-- 写入助记词到 SeedKeeper。
 - 将 Satochip 或 SeedKeeper PIN 管理宣称为普通用户生产功能。
-- 重置卡片。
+- 将重置卡片宣称为无风险操作。
 - 卡片初始化、导入 seed、恢复卡片。
 - 卡片真伪证书检查。
 - Satocash / Satodime 整组功能。
@@ -52,5 +52,5 @@
 5. 加卡片真伪检查。
 6. 加 Satochip BTC PSBT 签名。
 7. 加 Satochip BTC 消息签名。
-8. 加 SeedKeeper 只读列表。
-9. 最后评估写卡、改 PIN、重置。
+8. 继续回归 SeedKeeper 列表、写入、导入、删除、密码和描述符。
+9. 最后评估这些维护能力是否能进入生产资金版。

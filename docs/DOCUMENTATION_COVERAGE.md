@@ -19,7 +19,7 @@ This file records what the current project documentation covers and where a read
 | Build, flash, and debug | [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md) | [FLASH_PRECHECK.md](FLASH_PRECHECK.md), [REPRODUCIBLE_BUILD.md](REPRODUCIBLE_BUILD.md) |
 | General troubleshooting | [TROUBLESHOOTING_GENERAL.zh-CN.md](TROUBLESHOOTING_GENERAL.zh-CN.md) | [REAL_DEVICE_ACCEPTANCE_CHECKLIST.md](REAL_DEVICE_ACCEPTANCE_CHECKLIST.md) |
 | Hardware and OTG | [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md) | [SMARTCARD_ADAPTER_TEST_WORKFLOW.md](SMARTCARD_ADAPTER_TEST_WORKFLOW.md) |
-| Smart-card boundaries | [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) | [SMARTCARD_CAPABILITY_BOUNDARY.md](SMARTCARD_CAPABILITY_BOUNDARY.md), [SMARTCARD_MIGRATION_MATRIX_20260520.md](SMARTCARD_MIGRATION_MATRIX_20260520.md) |
+| Smart-card operations | [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md), [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) | [SMARTCARD_CAPABILITY_BOUNDARY.md](SMARTCARD_CAPABILITY_BOUNDARY.md), [SMARTCARD_MIGRATION_MATRIX_20260520.md](SMARTCARD_MIGRATION_MATRIX_20260520.md) |
 | Smart-card troubleshooting | [TROUBLESHOOTING_SMARTCARD_POWER_OTG.md](TROUBLESHOOTING_SMARTCARD_POWER_OTG.md) | [SMARTCARD_REAL_DEVICE_ACCEPTANCE.md](SMARTCARD_REAL_DEVICE_ACCEPTANCE.md) |
 | Release and production gates | [README_FIRST_DELIVERY.md](README_FIRST_DELIVERY.md) | [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md), [RELEASE_POINTERS_AND_HISTORY.md](RELEASE_POINTERS_AND_HISTORY.md) |
 | Third-party notices | [THIRD_PARTY.md](THIRD_PARTY.md) | repository component licenses |
@@ -48,7 +48,7 @@ When changing code, update docs in the same pull or handoff if the change affect
 | `main/pages/pin/`, `main/core/pin.*` | [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) |
 | `main/pages/scan/`, `main/qr/`, Web3 wallet code | [连接钱包教程.zh-CN.md](连接钱包教程.zh-CN.md), [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md) |
 | `wallet/` Android app | [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md), [安卓构建环境准备.zh-CN.md](安卓构建环境准备.zh-CN.md), `wallet/docs/` |
-| `main/smartcard/`, Satochip or SeedKeeper pages | Smart-card docs and [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) |
+| `main/smartcard/`, Satochip or SeedKeeper pages | [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md), [TROUBLESHOOTING_SMARTCARD_POWER_OTG.md](TROUBLESHOOTING_SMARTCARD_POWER_OTG.md), [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) |
 | build scripts, `sdkconfig*`, release scripts | [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md), [FLASH_PRECHECK.md](FLASH_PRECHECK.md), [REPRODUCIBLE_BUILD.md](REPRODUCIBLE_BUILD.md) |
 | production security config | [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md), [secure-boot.md](secure-boot.md), [security-plan.md](security-plan.md) |
 

@@ -31,6 +31,9 @@ void ui_keyboard_apply_safe_text_map(lv_obj_t *keyboard);
 // keyboard inserts them before our keyboard callback gets control.
 void ui_textarea_enable_safe_keyboard_shortcuts(lv_obj_t *textarea);
 
+// Forces the textarea viewport/cursor redraw after on-screen cursor keys.
+void ui_textarea_keep_cursor_visible(lv_obj_t *textarea);
+
 // Creates back button at top-left.
 lv_obj_t *ui_create_back_button(lv_obj_t *parent, lv_event_cb_t event_cb);
 

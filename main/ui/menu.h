@@ -40,6 +40,7 @@ bool ui_menu_set_entry_enabled(ui_menu_t *menu, int index, bool enabled);
 int ui_menu_get_selected(ui_menu_t *menu);
 void ui_menu_show(ui_menu_t *menu);
 void ui_menu_hide(ui_menu_t *menu);
+void ui_menu_apply_compact_grid(ui_menu_t *menu);
 bool ui_menu_add_entry_with_action(ui_menu_t *menu, const char *name,
                                    ui_menu_callback_t callback,
                                    const char *action_icon,

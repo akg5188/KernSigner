@@ -254,6 +254,25 @@ static void ui_async_send_cancel(void *target) {
     (void)lv_obj_send_event(textarea, LV_EVENT_CANCEL, NULL);
 }
 
+void ui_textarea_keep_cursor_visible(lv_obj_t *textarea) {
+  if (!textarea || !lv_obj_is_valid(textarea))
+    return;
+
+  const char *text = lv_textarea_get_text(textarea);
+  uint32_t pos = lv_textarea_get_cursor_pos(textarea);
+  if (text && text[0]) {
+    if (pos > 0) {
+      lv_textarea_set_cursor_pos(textarea, (int32_t)pos - 1);
+      lv_textarea_set_cursor_pos(textarea, (int32_t)pos);
+    } else {
+      lv_textarea_set_cursor_pos(textarea, 1);
+      lv_textarea_set_cursor_pos(textarea, 0);
+    }
+  }
+  lv_obj_update_layout(textarea);
+  lv_obj_invalidate(textarea);
+}
+
 static void ui_safe_keyboard_event_cb(lv_event_t *e) {
   if (lv_event_get_code(e) != LV_EVENT_VALUE_CHANGED)
     return;
@@ -300,14 +319,19 @@ static void ui_safe_keyboard_event_cb(lv_event_t *e) {
       (void)lv_async_call(ui_async_send_ready, textarea);
   } else if (strcmp(txt, SAFE_KB_DEL) == 0) {
     lv_textarea_delete_char(textarea);
+    ui_textarea_keep_cursor_visible(textarea);
   } else if (strcmp(txt, SAFE_KB_LEFT) == 0) {
     lv_textarea_cursor_left(textarea);
+    ui_textarea_keep_cursor_visible(textarea);
   } else if (strcmp(txt, SAFE_KB_RIGHT) == 0) {
     lv_textarea_cursor_right(textarea);
+    ui_textarea_keep_cursor_visible(textarea);
   } else if (strcmp(txt, SAFE_KB_SPACE) == 0) {
     lv_textarea_add_char(textarea, ' ');
+    ui_textarea_keep_cursor_visible(textarea);
   } else {
     lv_textarea_add_text(textarea, txt);
+    ui_textarea_keep_cursor_visible(textarea);
   }
 }
 
@@ -322,12 +346,15 @@ static void ui_safe_textarea_insert_cb(lv_event_t *e) {
   lv_obj_t *textarea = lv_event_get_current_target(e);
   if (strcmp(txt, SAFE_KB_DEL) == 0) {
     lv_textarea_delete_char(textarea);
+    ui_textarea_keep_cursor_visible(textarea);
     lv_textarea_set_insert_replace(textarea, "");
   } else if (strcmp(txt, SAFE_KB_LEFT) == 0) {
     lv_textarea_cursor_left(textarea);
+    ui_textarea_keep_cursor_visible(textarea);
     lv_textarea_set_insert_replace(textarea, "");
   } else if (strcmp(txt, SAFE_KB_RIGHT) == 0) {
     lv_textarea_cursor_right(textarea);
+    ui_textarea_keep_cursor_visible(textarea);
     lv_textarea_set_insert_replace(textarea, "");
   } else if (strcmp(txt, SAFE_KB_SPACE) == 0) {
     lv_textarea_set_insert_replace(textarea, " ");
@@ -380,10 +407,10 @@ static lv_obj_t *create_top_left_corner_button(lv_obj_t *parent,
                   theme_get_corner_button_height());
   lv_obj_align(btn, LV_ALIGN_TOP_LEFT, pad, pad);
   lv_obj_set_style_bg_color(btn, bg_color(), 0);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_70, 0);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(btn, highlight_color(), 0);
-  lv_obj_set_style_border_width(btn, 1, 0);
-  lv_obj_set_style_radius(btn, 12, 0);
+  lv_obj_set_style_border_width(btn, 2, 0);
+  lv_obj_set_style_radius(btn, 8, 0);
   lv_obj_set_style_pad_all(btn, 4, 0);
   lv_obj_set_style_shadow_width(btn, 0, 0);
   lv_obj_add_flag(btn, LV_OBJ_FLAG_FLOATING);
@@ -429,10 +456,10 @@ static lv_obj_t *create_top_right_corner_button(lv_obj_t *parent,
                   theme_get_corner_button_height());
   lv_obj_align(btn, LV_ALIGN_TOP_RIGHT, -pad, pad);
   lv_obj_set_style_bg_color(btn, bg_color(), 0);
-  lv_obj_set_style_bg_opa(btn, LV_OPA_70, 0);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(btn, highlight_color(), 0);
-  lv_obj_set_style_border_width(btn, 1, 0);
-  lv_obj_set_style_radius(btn, 12, 0);
+  lv_obj_set_style_border_width(btn, 2, 0);
+  lv_obj_set_style_radius(btn, 8, 0);
   lv_obj_set_style_pad_all(btn, 4, 0);
   lv_obj_set_style_shadow_width(btn, 0, 0);
   lv_obj_add_flag(btn, LV_OBJ_FLAG_FLOATING);
@@ -524,11 +551,14 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
   if (ready_cb)
     lv_obj_add_event_cb(input->textarea, ready_cb, LV_EVENT_READY, NULL);
   lv_obj_set_style_text_font(input->textarea, theme_font_small(), 0);
-  lv_obj_set_style_bg_color(input->textarea, panel_color(), 0);
+  lv_obj_set_style_bg_color(input->textarea, bg_color(), 0);
+  lv_obj_set_style_bg_opa(input->textarea, LV_OPA_COVER, 0);
   lv_obj_set_style_text_color(input->textarea, main_color(), 0);
-  lv_obj_set_style_border_color(input->textarea, secondary_color(), 0);
-  lv_obj_set_style_border_width(input->textarea, 1, 0);
-  lv_obj_set_style_radius(input->textarea, 12, 0);
+  lv_obj_set_style_text_color(input->textarea, main_color(),
+                              LV_PART_TEXTAREA_PLACEHOLDER);
+  lv_obj_set_style_border_color(input->textarea, highlight_color(), 0);
+  lv_obj_set_style_border_width(input->textarea, 2, 0);
+  lv_obj_set_style_radius(input->textarea, 8, 0);
   lv_obj_set_style_pad_top(input->textarea, 14, 0);
   lv_obj_set_style_pad_bottom(input->textarea, 10, 0);
   lv_obj_set_style_pad_left(input->textarea, 12, 0);
@@ -539,19 +569,23 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
   /* Eye toggle (password mode only) */
   if (password_mode) {
     input->eye_btn = lv_btn_create(parent);
+    lv_obj_add_flag(input->eye_btn, LV_OBJ_FLAG_IGNORE_LAYOUT);
     lv_obj_set_size(input->eye_btn, theme_get_min_touch_size(),
                     theme_get_min_touch_size());
     lv_obj_align_to(input->eye_btn, input->textarea, LV_ALIGN_OUT_RIGHT_MID, 5,
                     0);
-    lv_obj_set_style_bg_opa(input->eye_btn, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_color(input->eye_btn, bg_color(), 0);
+    lv_obj_set_style_bg_opa(input->eye_btn, LV_OPA_COVER, 0);
     lv_obj_set_style_shadow_width(input->eye_btn, 0, 0);
-    lv_obj_set_style_border_width(input->eye_btn, 0, 0);
+    lv_obj_set_style_border_color(input->eye_btn, highlight_color(), 0);
+    lv_obj_set_style_border_width(input->eye_btn, 2, 0);
+    lv_obj_set_style_radius(input->eye_btn, 8, 0);
     lv_obj_add_event_cb(input->eye_btn, ui_text_input_eye_cb, LV_EVENT_CLICKED,
                         input);
 
     input->eye_label = lv_label_create(input->eye_btn);
     lv_label_set_text(input->eye_label, "显示");
-    lv_obj_set_style_text_color(input->eye_label, secondary_color(), 0);
+    lv_obj_set_style_text_color(input->eye_label, main_color(), 0);
     lv_obj_set_style_text_font(input->eye_label, theme_font_small(), 0);
     lv_obj_center(input->eye_label);
   } else {
@@ -595,16 +629,24 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
 #else
   lv_obj_set_style_pad_gap(input->keyboard, 6, 0);
 #endif
-  lv_obj_set_style_bg_color(input->keyboard, disabled_color(), LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(input->keyboard, bg_color(), LV_PART_ITEMS);
   lv_obj_set_style_text_color(input->keyboard, main_color(), LV_PART_ITEMS);
+  lv_obj_set_style_bg_color(input->keyboard, bg_color(),
+                            LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_text_color(input->keyboard, main_color(),
+                              LV_PART_ITEMS | LV_STATE_CHECKED);
   lv_obj_set_style_text_font(input->keyboard, theme_font_small(),
                              LV_PART_ITEMS);
-  lv_obj_set_style_border_width(input->keyboard, 0, LV_PART_ITEMS);
+  lv_obj_set_style_border_color(input->keyboard, highlight_color(),
+                                LV_PART_ITEMS);
+  lv_obj_set_style_border_color(input->keyboard, highlight_color(),
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
+  lv_obj_set_style_border_width(input->keyboard, 1, LV_PART_ITEMS);
+  lv_obj_set_style_border_width(input->keyboard, 1,
+                                LV_PART_ITEMS | LV_STATE_CHECKED);
   lv_obj_set_style_radius(input->keyboard, 6, LV_PART_ITEMS);
   lv_obj_set_style_bg_color(input->keyboard, highlight_color(),
                             LV_PART_ITEMS | LV_STATE_PRESSED);
-  lv_obj_set_style_bg_color(input->keyboard, highlight_color(),
-                            LV_PART_ITEMS | LV_STATE_CHECKED);
 }
 
 void ui_text_input_show(ui_text_input_t *input) {
@@ -640,7 +682,13 @@ void ui_text_input_destroy(ui_text_input_t *input) {
     lv_obj_del(input->keyboard);
     input->keyboard = NULL;
   }
-  input->textarea = NULL;
-  input->eye_btn = NULL;
+  if (input->eye_btn) {
+    lv_obj_del(input->eye_btn);
+    input->eye_btn = NULL;
+  }
+  if (input->textarea) {
+    lv_obj_del(input->textarea);
+    input->textarea = NULL;
+  }
   input->eye_label = NULL;
 }

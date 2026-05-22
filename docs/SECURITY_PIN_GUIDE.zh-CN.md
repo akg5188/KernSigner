@@ -6,6 +6,8 @@
 
 当前固件仍是测试资金验收版，不是已经审计的商业生产钱包。不要把真实大额资产只放在这台设备或这张智能卡里。
 
+智能卡完整操作流程另见 [Satochip / SeedKeeper 智能卡实测操作手册](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md)。
+
 ## 先看这 30 秒
 
 Kern 里有两类 PIN，不能混用。
@@ -242,6 +244,22 @@ SeedKeeper 卡片的改 PIN 入口类似：
 ```
 
 同样输入的是 SeedKeeper 卡片 PIN，不是开发板 PIN。
+
+新刷入或刚重置的 SeedKeeper 要先设置 PIN：
+
+```text
+智能卡工具 -> SeedKeeper -> 设置PIN
+```
+
+恢复出厂入口叫 `重置`：
+
+```text
+智能卡工具 -> SeedKeeper -> 重置
+```
+
+`重置` 会清空卡并回到未初始化状态，完成后再进 `设置PIN`。
+
+新版 SeedKeeper 的 `重置` 不是旧 `B0 FF` 拔插流程。正确做法是故意输入错误 PIN 到 PIN 锁定，再故意输入错误 PUK 到返回 `FF00`。菜单里的 `错PIN一步` 和 `错PUK一步` 就是为了这个流程。不要在重置页面输入真实 PIN 或真实 PUK。
 
 ## 智能卡 PUK 和解锁
 

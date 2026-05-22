@@ -176,14 +176,14 @@ static void show_account_overlay(void) {
   lv_obj_remove_style_all(account_overlay);
   lv_obj_set_size(account_overlay, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_bg_color(account_overlay, lv_color_black(), 0);
-  lv_obj_set_style_bg_opa(account_overlay, LV_OPA_50, 0);
+  lv_obj_set_style_bg_opa(account_overlay, LV_OPA_COVER, 0);
   lv_obj_add_flag(account_overlay, LV_OBJ_FLAG_CLICKABLE);
 
   lv_obj_t *modal = lv_obj_create(account_overlay);
   lv_obj_set_size(modal, LV_PCT(80), LV_PCT(80));
   lv_obj_center(modal);
   theme_apply_frame(modal);
-  lv_obj_set_style_bg_opa(modal, LV_OPA_90, 0);
+  lv_obj_set_style_bg_opa(modal, LV_OPA_COVER, 0);
   lv_obj_clear_flag(modal, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_flex_flow(modal, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(modal, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
@@ -255,10 +255,16 @@ static void policy_dropdown_cb(lv_event_t *e) {
   }
 }
 
-static void add_fingerprint_pair(lv_obj_t *parent, const char *fp_hex,
-                                 bool highlighted) {
+static lv_obj_t *add_fingerprint_pair(lv_obj_t *parent, const char *fp_hex,
+                                      bool highlighted) {
   lv_color_t color = highlighted ? highlight_color() : secondary_color();
-  ui_icon_text_row_create(parent, ICON_FINGERPRINT, fp_hex, color);
+  lv_obj_t *label = ui_icon_text_row_create(parent, ICON_FINGERPRINT, fp_hex,
+                                            color);
+  if (label) {
+    lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+  }
+  return label;
 }
 
 static void update_title_with_passphrase(const char *passphrase) {
@@ -270,7 +276,9 @@ static void update_title_with_passphrase(const char *passphrase) {
 
   // If no passphrase, show only base fingerprint (highlighted)
   if (!passphrase || passphrase[0] == '\0') {
-    add_fingerprint_pair(title_cont, base_fingerprint_hex, true);
+    lv_obj_t *fp = add_fingerprint_pair(title_cont, base_fingerprint_hex, true);
+    if (fp)
+      lv_obj_set_width(fp, LV_PCT(100));
     return;
   }
 
@@ -299,7 +307,10 @@ static void update_title_with_passphrase(const char *passphrase) {
   if (wally_hex_from_bytes(fingerprint, BIP32_KEY_FINGERPRINT_LEN,
                            &passphrase_fp_hex) == WALLY_OK) {
     // Base fingerprint (not highlighted)
-    add_fingerprint_pair(title_cont, base_fingerprint_hex, false);
+    lv_obj_t *base_fp =
+        add_fingerprint_pair(title_cont, base_fingerprint_hex, false);
+    if (base_fp)
+      lv_obj_set_width(base_fp, LV_PCT(44));
 
     // Arrow separator
     lv_obj_t *arrow = lv_label_create(title_cont);
@@ -308,7 +319,10 @@ static void update_title_with_passphrase(const char *passphrase) {
     lv_obj_set_style_text_color(arrow, secondary_color(), 0);
 
     // Passphrase fingerprint (highlighted)
-    add_fingerprint_pair(title_cont, passphrase_fp_hex, true);
+    lv_obj_t *pass_fp =
+        add_fingerprint_pair(title_cont, passphrase_fp_hex, true);
+    if (pass_fp)
+      lv_obj_set_width(pass_fp, LV_PCT(44));
 
     wally_free_string(passphrase_fp_hex);
   }
@@ -492,12 +506,17 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   // Header container for fingerprint and derivation (centered in top bar)
   lv_obj_t *header_cont = theme_create_flex_column(top);
+  lv_obj_set_width(header_cont, LV_PCT(50));
   lv_obj_set_style_pad_row(header_cont, 4, 0);
   lv_obj_align(header_cont, LV_ALIGN_CENTER, 0, 0);
 
   // Container for fingerprint pair(s)
   title_cont = theme_create_flex_row(header_cont);
+  lv_obj_set_width(title_cont, LV_PCT(100));
   lv_obj_set_style_pad_column(title_cont, 8, 0);
+  lv_obj_set_flex_flow(title_cont, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(title_cont, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
   // Add initial fingerprint, preserving the in-RAM passphrase marker if present.
   update_title_with_passphrase(stored_passphrase);
@@ -508,6 +527,11 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
                                 selected_network, selected_account);
   derivation_label = ui_icon_text_row_create(header_cont, ICON_DERIVATION,
                                              deriv_path, secondary_color());
+  if (derivation_label) {
+    lv_obj_set_width(derivation_label, LV_PCT(100));
+    lv_label_set_long_mode(derivation_label, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(derivation_label, LV_TEXT_ALIGN_CENTER, 0);
+  }
 
   // Content container below top bar
   lv_obj_t *content = lv_obj_create(wallet_settings_screen);

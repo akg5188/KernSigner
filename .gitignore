@@ -14,6 +14,7 @@ compile_commands.json
 release/
 _release/
 firmware/*.tmp
+firmware/**/build_*/
 
 # Local validation artifacts
 docs/logs/
