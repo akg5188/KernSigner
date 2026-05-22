@@ -21,18 +21,19 @@ object RelayQrCodec {
 
     data class RelayQrBundle(val payloads: List<String>, val isFragmented: Boolean)
 
-    fun buildRelayPayloads(requestPayload: String): RelayQrBundle {
+    fun buildRelayPayloads(requestPayload: String, targetChunkChars: Int = TARGET_CHUNK_CHARS): RelayQrBundle {
         val payload = requestPayload.trim()
         require(payload.isNotBlank()) { "请求为空" }
 
         val compressed = deflateUtf8(payload)
         val encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(compressed)
         val crc = crc32Decimal(encoded)
+        val targetChars = targetChunkChars.coerceIn(40, TARGET_CHUNK_CHARS)
         val chunkChars = when {
             encoded.length <= SINGLE_PAGE_THRESHOLD -> encoded.length
             else -> {
                 val perPage = ceil(encoded.length.toDouble() / MIN_FRAGMENT_COUNT).toInt()
-                min(TARGET_CHUNK_CHARS, perPage).coerceAtLeast(1)
+                min(targetChars, perPage).coerceAtLeast(1)
             }
         }
         val chunks = encoded.chunked(chunkChars)

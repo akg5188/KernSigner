@@ -36,6 +36,7 @@ class ContinuousQrScanActivity : BiometricGateActivity() {
     private lateinit var titleView: TextView
     private lateinit var statusView: TextView
     private val requestResolver = RequestQrPayloadResolver()
+    private val responseResolver = ResponseQrPayloadResolver()
     private var hasReturned = false
     private var lastText = ""
     private var lastReadAt = 0L
@@ -54,7 +55,7 @@ class ContinuousQrScanActivity : BiometricGateActivity() {
                 return@launch
             }
             if (scanMode == MODE_RESPONSE) {
-                returnPayload(decoded)
+                handleResponseScanText(decoded)
             } else {
                 handleRequestScanText(decoded)
             }
@@ -73,8 +74,8 @@ class ContinuousQrScanActivity : BiometricGateActivity() {
                 },
             ) { decodedText ->
                 if (scanMode == MODE_RESPONSE) {
-                    returnPayload(decodedText)
-                    false
+                    handleResponseScanText(decodedText)
+                    !hasReturned
                 } else {
                     handleRequestScanText(decodedText)
                     !hasReturned
@@ -199,7 +200,7 @@ class ContinuousQrScanActivity : BiometricGateActivity() {
         lastReadAt = now
 
         if (scanMode == MODE_RESPONSE) {
-            returnPayload(text)
+            handleResponseScanText(text)
         } else {
             handleRequestScanText(text)
         }
@@ -209,6 +210,13 @@ class ContinuousQrScanActivity : BiometricGateActivity() {
         when (val resolution = requestResolver.accept(text)) {
             is RequestQrResolution.Complete -> returnPayload(resolution.payload)
             is RequestQrResolution.Progress -> updateStatus(resolution.status)
+        }
+    }
+
+    private fun handleResponseScanText(text: String) {
+        when (val resolution = responseResolver.accept(text)) {
+            is ResponseQrResolution.Complete -> returnPayload(resolution.payload)
+            is ResponseQrResolution.Progress -> updateStatus(resolution.status)
         }
     }
 

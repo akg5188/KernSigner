@@ -65,7 +65,7 @@ Kern 当前关键文件：
 | Satochip GET_STATUS | `card_get_status` | 已接只读状态 | 可测 |
 | Secure Channel | `card_initiate_secure_channel` | 已接基础通道 | 需安全审计 |
 | Satochip PIN verify | `card_verify_PIN` | 已接连接/签名前 PIN | 可测，但需异常回归 |
-| Web3 连接码 | `ToolsTpWeb3ConnectRunView` | 已接 OKX/Bitget/MetaMask/Rabby/TokenPocket/通用地址 | 可测 |
+| Web3 连接码 | `ToolsTpWeb3ConnectRunView` | 已接 OKX/Bitget/MetaMask/Rabby/TokenPocket/Keystone | 可测 |
 | Web3 EVM 签名 | `_satochip_sign_evm_digest` | 已接 eth-sign-request/eth-signature | 测试资金可测 |
 | personalSign | `_sign_web3_eth_request_with_satochip` | 已接基础 digest | 需样本回归 |
 | TypedData | `signTypedData` 路径 | 当前拒签 | 正确隐藏 |
@@ -92,7 +92,7 @@ Kern 当前关键文件：
   - MetaMask
   - Rabby
   - TokenPocket
-  - 通用地址
+  - Keystone
 - 比特币钱包
   - 已加载助记词
     - BlueWallet zpub

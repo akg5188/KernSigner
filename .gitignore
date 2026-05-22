@@ -5,6 +5,7 @@ build_wave_4b/
 build_wave_43/
 build_wave_43_fresh/
 build_wave_5/
+tmp_*/
 sdkconfig
 sdkconfig.old
 managed_components/

@@ -366,6 +366,7 @@ static int run_button_interaction_checks(FILE *interaction_file) {
         {"pi_connect_wallet", "Rabby", "connect_rabby", NULL},
         {"pi_connect_wallet", "TokenPocket", "connect_tokenpocket", NULL},
         {"pi_connect_wallet", "派生地址", "custom_derivation", NULL},
+        {"pi_connect_wallet", "Keystone", "custom_derivation", NULL},
         {"pi_connect_wallet", "BTC", "btc_wallet", NULL},
         {"connect_okx", "助记词", "web3_okx_mnemonic", NULL},
         {"connect_okx", "智能卡", "web3_okx_satochip", NULL},

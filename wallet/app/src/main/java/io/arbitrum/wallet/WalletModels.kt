@@ -16,12 +16,14 @@ enum class PendingResponseType {
     IMPORT_WATCH_ADDRESS,
     IMPORT_WEB3_ACCOUNT,
     RETURN_WEB3_SIGNATURE,
+    RETURN_ELECTRUM_PSBT,
 }
 
 enum class PreparedQrKind {
     PI_REQUEST,
     WEB3_CONNECT,
     WEB3_SIGNATURE,
+    ELECTRUM_RESULT,
 }
 
 const val DEFAULT_EVM_DERIVATION_PATH = "m/44'/60'/0'/0/0"

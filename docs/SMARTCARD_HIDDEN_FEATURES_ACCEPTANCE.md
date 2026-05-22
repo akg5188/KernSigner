@@ -22,7 +22,7 @@
 
 应能看到：
 
-- `连接钱包 -> Web3钱包 -> OKX/Bitget/MetaMask/Rabby/TokenPocket/通用地址 -> 已加载助记词/智能卡账户`
+- `连接钱包 -> Web3钱包 -> OKX/Bitget/MetaMask/Rabby/TokenPocket/Keystone -> 已加载助记词/智能卡账户`
 - `连接钱包 -> 比特币钱包 -> 已加载助记词 -> BlueWallet zpub/xpub`
 - `连接钱包 -> 比特币钱包 -> 智能卡账户 -> BlueWallet zpub/xpub`
 - `扫码签名 -> 智能卡 -> 扫码 Web3`

@@ -138,7 +138,7 @@ class MainActivity : BiometricGateActivity() {
 
     private val responseQrLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
-        val text = result.data?.getStringExtra(QrScanActivity.EXTRA_QR_RESULT) ?: return@registerForActivityResult
+        val text = result.data?.getStringExtra(ContinuousQrScanActivity.EXTRA_QR_RESULT) ?: return@registerForActivityResult
         viewModel.onResponseScanResult(text)
     }
 
@@ -251,8 +251,8 @@ class MainActivity : BiometricGateActivity() {
     }
 
     private fun startResponseScan() {
-        val intent = Intent(this, QrScanActivity::class.java)
-            .putExtra(QrScanActivity.EXTRA_STATUS_TEXT, "请扫描树莓派签名结果二维码")
+        val intent = Intent(this, ContinuousQrScanActivity::class.java)
+            .putExtra(ContinuousQrScanActivity.EXTRA_SCAN_MODE, ContinuousQrScanActivity.MODE_RESPONSE)
         responseQrLauncher.launch(intent)
     }
 
@@ -297,14 +297,21 @@ class MainActivity : BiometricGateActivity() {
     }
 
     private suspend fun decodeResponsePayloadFromVideo(uri: Uri): String? {
+        val resolver = ResponseQrPayloadResolver()
         var payload: String? = null
         QrVideoDecoder.scanVideo(
             context = this,
             uri = uri,
             onProgress = null,
         ) { decodedText ->
-            payload = decodedText
-            false
+            when (val resolution = resolver.accept(decodedText)) {
+                is ResponseQrResolution.Complete -> {
+                    payload = resolution.payload
+                    false
+                }
+
+                is ResponseQrResolution.Progress -> true
+            }
         }
         return payload
     }
@@ -3261,6 +3268,7 @@ private fun PreparedRequestSection(
         PreparedQrKind.PI_REQUEST -> "动态中转"
         PreparedQrKind.WEB3_CONNECT -> "动态连接码"
         PreparedQrKind.WEB3_SIGNATURE -> "动态签名码"
+        PreparedQrKind.ELECTRUM_RESULT -> "Electrum 结果码"
     }
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(
@@ -3335,6 +3343,10 @@ private fun PreparedRequestSection(
                 }
 
                 PreparedQrKind.WEB3_SIGNATURE -> {
+                    Spacer(modifier = Modifier.height(0.dp))
+                }
+
+                PreparedQrKind.ELECTRUM_RESULT -> {
                     Spacer(modifier = Modifier.height(0.dp))
                 }
             }

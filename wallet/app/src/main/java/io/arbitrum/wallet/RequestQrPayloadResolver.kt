@@ -20,6 +20,10 @@ class RequestQrPayloadResolver {
             return RequestQrResolution.Complete(wcUri)
         }
 
+        if (ElectrumQrCodec.parsePsbt(text) != null) {
+            return RequestQrResolution.Complete(text)
+        }
+
         if (text.startsWith("ur:", ignoreCase = true)) {
             return handleUrRequestPart(text)
         }

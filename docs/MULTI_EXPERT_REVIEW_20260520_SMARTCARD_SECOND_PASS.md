@@ -13,7 +13,7 @@ Kern 已经跑通 Satochip Web3 主线，但仍不是完整的 `satochip-signer`
 - ACR39U-NF 外接供电读卡器检测
 - CCID / ATR / Satochip / SeedKeeper AID 识别
 - Satochip 只读状态
-- OKX / Bitget / MetaMask / Rabby / TokenPocket / 通用地址连接码
+- OKX / Bitget / MetaMask / Rabby / TokenPocket / Keystone 连接码
 - Satochip EVM 常见请求签名
 - Satochip personalSign 基础路径
 - Satochip 按路径查看 EVM / BTC 地址
@@ -36,7 +36,7 @@ Kern 已经跑通 Satochip Web3 主线，但仍不是完整的 `satochip-signer`
 
 - 顶层菜单收敛为 `扫码签名 / 连接钱包 / 助记词工具 / 智能卡工具 / 设置 / 固件自检`
 - 连接钱包第一层收敛为 `Web3钱包 / 比特币钱包`
-- 去掉主流程中的 `通用地址`、`自定义路径`、旧 `web3` 可见入口
+- 去掉主流程中的旧 `Keystone`、`自定义路径`、旧 `web3` 可见入口
 - 增加顶层 `智能卡工具`，并把 Satochip 只读 / Web3 子集单独归口
 - `扫码签名` 与 `生成连接码` 的入口分离，降低连接和签名混淆
 - 文档补充 `satochip-signer` 与 `Kern` 的能力边界，避免误把参考教程当成 Kern 商业交付证据

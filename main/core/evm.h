@@ -20,6 +20,7 @@ typedef enum {
   EVM_WEB3_PROFILE_METAMASK,
   EVM_WEB3_PROFILE_RABBY,
   EVM_WEB3_PROFILE_TOKENPOCKET,
+  EVM_WEB3_PROFILE_IMTOKEN,
 } evm_web3_profile_t;
 
 typedef struct {

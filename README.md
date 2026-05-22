@@ -40,6 +40,10 @@ The current tree is a **test-funds validation build**, not an audited production
 | --- | --- | --- | --- |
 | <img src="docs/screens/current_20260522_193505/krux/18_btc_wallet.png" width="180" alt="Bitcoin wallet menu"> | <img src="docs/screens/current_20260522_193505/krux/25_custom_derivation.png" width="180" alt="Custom derivation menu"> | <img src="docs/screens/current_20260522_193505/krux/29_smartcard_satochip_tools.png" width="180" alt="Satochip tools menu"> | <img src="docs/screens/current_20260522_193505/krux/54_smartcard_seedkeeper_status_page.png" width="180" alt="SeedKeeper status page"> |
 
+| 扫码签名 | BTC 签名来源 | EVM 转账确认 | EVM DApp 签名 |
+| --- | --- | --- | --- |
+| <img src="docs/screens/current_20260522_193505/krux/127_tools_qr_capture.png" width="180" alt="QR signing scanner entry"> | <img src="docs/screens/current_20260522_193505/krux/19_btc_mnemonic.png" width="180" alt="Bitcoin mnemonic signing source"> | <img src="docs/screens/current_20260522_193505/signing/web3_tx_confirm.png" width="180" alt="EVM transfer confirmation screen"> | <img src="docs/screens/current_20260522_193505/signing/web3_dapp_confirm.png" width="180" alt="EVM DApp signature confirmation screen"> |
+
 | 创建助记词 | 骰子熵 | 点阵备份 | 系统检测 |
 | --- | --- | --- | --- |
 | <img src="docs/screens/current_20260522_193505/krux/101_new_mnemonic.png" width="180" alt="Create mnemonic menu"> | <img src="docs/screens/current_20260522_193505/krux/102_new_dice_d6.png" width="180" alt="D6 dice entropy input"> | <img src="docs/screens/current_20260522_193505/krux/119_backup_grid.png" width="180" alt="Mnemonic punch grid backup"> | <img src="docs/screens/current_20260522_193505/krux/140_system_overview.png" width="180" alt="System overview page"> |
@@ -76,7 +80,8 @@ The current tree is a **test-funds validation build**, not an audited production
 
 - OKX Wallet：EVM 连接码和常见测试转账签名已跑通。
 - Bitget Wallet：EVM 连接码和常见测试转账签名已跑通。
-- MetaMask：有连接入口，仍需更多实扫回归。
+- imToken：电脑端连接码和 TypedData 签名回传已跑通，使用单账户 `crypto-hdkey` + `eth-signature`。
+- MetaMask：电脑端连接码和 TypedData 签名回传已跑通，使用单账户 `crypto-hdkey` + `eth-signature`。
 - Rabby：有连接入口，仍需更多实扫回归。
 - TokenPocket：有连接入口，特殊二维码格式仍需专项样本回归。
 - BlueWallet：BTC `xpub` / `zpub` 观察钱包路径可测，智能卡账户只读观察码可测。

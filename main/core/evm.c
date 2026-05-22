@@ -625,9 +625,8 @@ static bool web3_build_hdkey_page(evm_web3_qr_bundle_t *bundle,
                                   const uint8_t master_fingerprint[4]) {
   web3_hdkey_entry_t standard;
   if (!web3_derive_entry("m/44'/60'/0'", "0/*", true, true, true,
-                         WEB3_ETH_COIN_TYPE, true, WEB3_KEYPATH_DEPTH_NONE,
-                         WEB3_KEYPATH_DEPTH_NONE, "account.standard",
-                         &standard))
+                         WEB3_ETH_COIN_TYPE, true, WEB3_KEYPATH_DEPTH_AUTO, 0,
+                         "account.standard", &standard))
     return false;
 
   cbor_value_t *hdkey = web3_hdkey_value(&standard, master_fingerprint);
@@ -715,6 +714,8 @@ static bool web3_append_external_bitget_entries(
   for (size_t i = 0; i < account->btc_count &&
                      i < EVM_WEB3_MAX_EXTERNAL_BTC_KEYS;
        i++) {
+    if (strcmp(account->btc[i].path, "m/84'/0'/0'") != 0)
+      continue;
     web3_hdkey_entry_t btc;
     if (!web3_external_entry_from_account(&account->btc[i], &btc))
       continue;
@@ -1115,7 +1116,7 @@ bool evm_web3_build_connect_qr(evm_web3_profile_t profile,
   case EVM_WEB3_PROFILE_METAMASK:
     ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
     snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "MetaMask 静态连接码");
+             "MetaMask 账户连接码");
     break;
   case EVM_WEB3_PROFILE_RABBY:
     ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
@@ -1126,6 +1127,11 @@ bool evm_web3_build_connect_qr(evm_web3_profile_t profile,
     ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
     snprintf(bundle_out->summary, sizeof(bundle_out->summary),
              "TokenPocket 静态连接码");
+    break;
+  case EVM_WEB3_PROFILE_IMTOKEN:
+    ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
+             "imToken 静态连接码");
     break;
   case EVM_WEB3_PROFILE_ADDRESS:
   default:
@@ -1183,14 +1189,17 @@ bool evm_web3_build_external_connect_qr(
              (unsigned)bundle_out->page_count);
     break;
   case EVM_WEB3_PROFILE_METAMASK:
-    /* fallthrough */
   case EVM_WEB3_PROFILE_RABBY:
     /* fallthrough */
-  case EVM_WEB3_PROFILE_TOKENPOCKET: {
+  case EVM_WEB3_PROFILE_TOKENPOCKET:
+    /* fallthrough */
+  case EVM_WEB3_PROFILE_IMTOKEN: {
     web3_hdkey_entry_t standard;
     if (!web3_external_entry_from_account(&account->standard, &standard))
       ok = false;
     else {
+      standard.origin_depth = WEB3_KEYPATH_DEPTH_AUTO;
+      standard.children_depth = 0;
       cbor_value_t *hdkey = web3_hdkey_value(&standard, master_fingerprint);
       if (hdkey) {
         ok = web3_encode_single_ur("crypto-hdkey", hdkey,
@@ -1203,7 +1212,8 @@ bool evm_web3_build_external_connect_qr(
       bundle_out->animated = false;
     }
     snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "智能卡账户连接码");
+             profile == EVM_WEB3_PROFILE_IMTOKEN ? "imToken 智能卡连接码"
+                                                 : "智能卡账户连接码");
     break;
   }
   case EVM_WEB3_PROFILE_ADDRESS:

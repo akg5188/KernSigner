@@ -13,7 +13,7 @@ Kern 已经迁入 Satochip 智能卡 Web3 主线，但不是完整的 `satochip-
 - ACR39U-NF 外接供电读卡器检测。
 - CCID/APDU、ATR、Satochip/SeedKeeper AID 识别。
 - Satochip 只读状态。
-- OKX/Bitget/MetaMask/Rabby/TokenPocket/通用地址连接码。
+- OKX/Bitget/MetaMask/Rabby/TokenPocket/Keystone 连接码。
 - Satochip Web3 常见 EVM 请求签名。
 - personalSign 基础路径。
 - Satochip 路径地址。
@@ -83,7 +83,7 @@ Kern 已经迁入 Satochip 智能卡 Web3 主线，但不是完整的 `satochip-
 - 连接码页隐藏原始 payload，只显示扫描提示。
 - 动态二维码轮播从 900ms 调整到 1200ms。
 - 相机复用路径增加恢复保护，降低连续扫码黑屏风险。
-- 连接钱包入口已重排：`Web3钱包` 下选择 OKX/Bitget/MetaMask/Rabby/TokenPocket/通用地址，`比特币钱包` 下选择已加载助记词或智能卡账户。
+- 连接钱包入口已重排：`Web3钱包` 下选择 OKX/Bitget/MetaMask/Rabby/TokenPocket/Keystone，`比特币钱包` 下选择已加载助记词或智能卡账户。
 - 智能卡 BTC 连接钱包只开放 BlueWallet zpub/xpub；ypub/tpub/upub/vpub 继续留在智能卡观察公钥菜单。
 - 相机关闭超时返回 `ESP_ERR_TIMEOUT`，扫码页可走保守清理路径，减少错误释放资源。
 - 扫码页返回按钮在 Web3 智能卡签名任务运行中会提示等待，避免后台任务继续操作旧页面。

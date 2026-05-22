@@ -1009,7 +1009,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun onResponseScanResult(payload: String) {
-        val parsed = TpResponseParser.parse(payload)
+        val parsed = runCatching { TpResponseParser.parse(payload) }.getOrElse {
+            ParsedResponse(null, null, null, null, isError = true)
+        }
         if (
             parsed.isError ||
             (
@@ -1019,6 +1021,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     parsed.web3Account == null
                 )
         ) {
+            if (
+                _uiState.value.pendingResponseType == PendingResponseType.RETURN_ELECTRUM_PSBT &&
+                prepareElectrumSignedResult(payload)
+            ) {
+                return
+            }
             return setError("无法解析树莓派结果")
         }
 
@@ -1140,24 +1148,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
 
-                parsed.bitcoinTxHex != null -> {
-                    if (_uiState.value.preparedBitcoinAccountId == null) {
-                        return@launch setError("当前没有待广播的 BTC 请求")
-                    }
-                    _uiState.update {
-                        it.copy(
-                            signQrBitmap = null,
-                            signQrPages = emptyList(),
-                            signQrPageIndex = 0,
-                            preparedQrKind = PreparedQrKind.PI_REQUEST,
-                            pendingResponseType = null,
-                            pendingWeb3Request = null,
-                            pendingBroadcastBitcoinTxHex = parsed.bitcoinTxHex,
-                            error = "",
-                            info = "已收到 BTC 签名交易，请人工核对后再广播。",
-                            requestInput = "",
+                currentResponseType == PendingResponseType.RETURN_ELECTRUM_PSBT &&
+                    parsed.bitcoinTxHex != null -> {
+                    val base43 = ElectrumQrCodec.encodeBase43FromTransactionHex(parsed.bitcoinTxHex)
+                        ?: return@launch setError("Electrum 已签名交易编码失败")
+                    runCatching {
+                        showElectrumResultQr(
+                            base43 = base43,
+                            summary = "类型: 已签名交易\n大小: ${parsed.bitcoinTxHex.length / 2} bytes",
+                            infoMessage = "已转成 Electrum 可扫描的签名交易二维码。",
                         )
+                    }.onFailure { error ->
+                        setError("Electrum 签名交易二维码生成失败: ${error.message}")
                     }
+                }
+
+                parsed.bitcoinTxHex != null -> {
+                    if (!storePendingBitcoinBroadcast(parsed.bitcoinTxHex)) return@launch
                 }
 
                 parsed.rawTransaction != null -> {
@@ -1923,6 +1930,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleIncomingPayload(payload: String, focusTab: WalletTab) {
         val trimmedPayload = payload.trim()
+        ElectrumQrCodec.parsePsbt(trimmedPayload)?.let { psbt ->
+            viewModelScope.launch {
+                prepareElectrumPsbtRelay(psbt, focusTab)
+            }
+            return
+        }
+        val parsedResponse = runCatching { TpResponseParser.parse(trimmedPayload) }.getOrNull()
+        parsedResponse?.bitcoinTxHex?.let { txHex ->
+            storePendingBitcoinBroadcast(txHex)
+            return
+        }
         if (trimmedPayload.startsWith("ur:", ignoreCase = true)) {
             viewModelScope.launch {
                 prepareWeb3RelayRequestNow(trimmedPayload, focusTab)
@@ -2723,6 +2741,114 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             setError("解析请求失败: ${e.message}")
             false
         }
+    }
+
+    private suspend fun prepareElectrumPsbtRelay(psbt: ElectrumPsbtPayload, focusTab: WalletTab): Boolean {
+        return try {
+            val bundle = RelayQrCodec.buildRelayPayloads(psbt.base64, targetChunkChars = 72)
+            showPreparedQrPages(
+                title = "Electrum PSBT 待开发板签名",
+                summary = buildString {
+                    appendLine("来源: ${psbt.sourceLabel}")
+                    appendLine("PSBT: ${psbt.byteCount} bytes")
+                    appendLine("中转: ${bundle.payloads.size} 张低密度二维码")
+                }.trim(),
+                transferInfo = "",
+                dappInfo = "Electrum -> 安卓中转 -> 开发板扫码签名 -> 安卓转回 Electrum",
+                relayHint = if (bundle.payloads.size > 1) {
+                    "已转成 ${bundle.payloads.size} 张低密度二维码，请让开发板连续扫描。开发板签完后，用手机扫描开发板结果，再让 Electrum 扫手机。"
+                } else {
+                    "已转成 1 张低密度二维码，请让开发板扫描。开发板签完后，用手机扫描开发板结果，再让 Electrum 扫手机。"
+                },
+                pages = bundle.payloads,
+                preparedQrKind = PreparedQrKind.PI_REQUEST,
+                pendingResponseType = PendingResponseType.RETURN_ELECTRUM_PSBT,
+                focusTab = focusTab,
+                infoMessage = "已识别 Electrum PSBT，并转成开发板更容易扫描的低密度二维码。",
+            )
+            true
+        } catch (e: Exception) {
+            setError("Electrum PSBT 中转失败: ${e.message}")
+            false
+        }
+    }
+
+    private fun prepareElectrumSignedResult(payload: String): Boolean {
+        val psbtBase43 = ElectrumQrCodec.parsePsbt(payload)?.let { psbt ->
+            ElectrumQrCodec.encodeBase43FromPsbtBase64(psbt.base64)
+        }
+        if (psbtBase43 != null) {
+            viewModelScope.launch {
+                runCatching {
+                    showElectrumResultQr(
+                        base43 = psbtBase43,
+                        summary = "类型: 已签名 PSBT\n大小: ${ElectrumQrCodec.parsePsbt(payload)?.byteCount ?: 0} bytes",
+                        infoMessage = "已转成 Electrum 可扫描的已签名 PSBT 二维码。",
+                    )
+                }.onFailure { error ->
+                    setError("Electrum 已签名 PSBT 二维码生成失败: ${error.message}")
+                }
+            }
+            return true
+        }
+
+        val parsed = runCatching { TpResponseParser.parse(payload) }.getOrNull()
+        val txHex = parsed?.bitcoinTxHex ?: return false
+        val txBase43 = ElectrumQrCodec.encodeBase43FromTransactionHex(txHex) ?: return false
+        viewModelScope.launch {
+            runCatching {
+                showElectrumResultQr(
+                    base43 = txBase43,
+                    summary = "类型: 已签名交易\n大小: ${txHex.length / 2} bytes",
+                    infoMessage = "已转成 Electrum 可扫描的签名交易二维码。",
+                )
+            }.onFailure { error ->
+                setError("Electrum 签名交易二维码生成失败: ${error.message}")
+            }
+        }
+        return true
+    }
+
+    private suspend fun showElectrumResultQr(
+        base43: String,
+        summary: String,
+        infoMessage: String,
+    ) {
+        showPreparedQrPages(
+            title = "让 Electrum 扫描签名结果",
+            summary = summary,
+            transferInfo = "",
+            dappInfo = "安卓已把开发板结果转成 Electrum Base43 二维码。",
+            relayHint = "请回到 Electrum 的签名/广播流程，用 Electrum 扫描手机上的二维码。",
+            pages = listOf(base43),
+            preparedQrKind = PreparedQrKind.ELECTRUM_RESULT,
+            pendingResponseType = null,
+            focusTab = WalletTab.DISCOVER,
+            infoMessage = infoMessage,
+        )
+    }
+
+    private fun storePendingBitcoinBroadcast(txHex: String): Boolean {
+        if (_uiState.value.preparedBitcoinAccountId == null) {
+            setError("识别到 BTC 已签名交易，但当前没有待广播的 BTC 请求")
+            return false
+        }
+        _uiState.update {
+            it.copy(
+                signQrBitmap = null,
+                signQrPages = emptyList(),
+                signQrPageIndex = 0,
+                preparedQrKind = PreparedQrKind.PI_REQUEST,
+                pendingResponseType = null,
+                pendingWeb3Request = null,
+                pendingBroadcastBitcoinTxHex = txHex,
+                error = "",
+                info = "已收到 BTC 签名交易，请人工核对后再广播。",
+                requestInput = "",
+                activeTab = WalletTab.HOME,
+            )
+        }
+        return true
     }
 
     private fun currentWeb3BridgeAccount(

@@ -172,6 +172,8 @@ static const char *shell_alias_target_for_id(const char *id) {
     return "connect_rabby";
   if (strcmp(id, "web3_tokenpocket") == 0)
     return "connect_tokenpocket";
+  if (strcmp(id, "web3_imtoken") == 0)
+    return "connect_imtoken";
   if (strcmp(id, "connect_address") == 0 || strcmp(id, "web3_address") == 0)
     return "custom_derivation";
   return NULL;
@@ -196,7 +198,8 @@ static const char *shell_back_target_for_feature(const krux_feature_t *feature) 
 static bool krux_sign_wallet_group_id(const char *id) {
   return krux_id_is_any(id, "sign_okx", "sign_bitget") ||
          krux_id_is_any(id, "sign_metamask", "sign_rabby") ||
-         krux_id_is_any(id, "sign_tokenpocket", "sign_btc");
+         krux_id_is_any(id, "sign_tokenpocket", "sign_imtoken") ||
+         krux_id_is(id, "sign_btc");
 }
 
 static bool krux_sign_mnemonic_target_id(const char *id) {
@@ -204,7 +207,8 @@ static bool krux_sign_mnemonic_target_id(const char *id) {
          krux_id_is_any(id, "sign_metamask_mnemonic",
                         "sign_rabby_mnemonic") ||
          krux_id_is_any(id, "sign_tokenpocket_mnemonic",
-                        "sign_btc_mnemonic");
+                        "sign_imtoken_mnemonic") ||
+         krux_id_is(id, "sign_btc_mnemonic");
 }
 
 static bool krux_sign_satochip_target_id(const char *id) {
@@ -212,7 +216,8 @@ static bool krux_sign_satochip_target_id(const char *id) {
          krux_id_is_any(id, "sign_metamask_satochip",
                         "sign_rabby_satochip") ||
          krux_id_is_any(id, "sign_tokenpocket_satochip",
-                        "sign_btc_satochip");
+                        "sign_imtoken_satochip") ||
+         krux_id_is(id, "sign_btc_satochip");
 }
 
 static const krux_menu_override_t KRUX_HOME_MENU[] = {
@@ -276,13 +281,15 @@ static const krux_menu_override_t KRUX_PI_MNEMONIC_ADVANCED_MENU[] = {
 };
 
 static const krux_menu_override_t KRUX_PI_CONNECT_MENU[] = {
+    {"BTC", "btc_wallet"},
     {"OKX", "connect_okx"},
     {"Bitget", "connect_bitget"},
     {"MetaMask", "connect_metamask"},
     {"Rabby", "connect_rabby"},
     {"TokenPocket", "connect_tokenpocket"},
+    {"imToken", "connect_imtoken"},
     {"派生地址", "custom_derivation"},
-    {"BTC", "btc_wallet"},
+    {"Keystone", "custom_derivation"},
 };
 
 static const krux_menu_override_t KRUX_CONNECT_WEB3_MENU[] = {
@@ -291,6 +298,7 @@ static const krux_menu_override_t KRUX_CONNECT_WEB3_MENU[] = {
     {"MetaMask", "connect_metamask"},
     {"Rabby", "connect_rabby"},
     {"TokenPocket", "connect_tokenpocket"},
+    {"imToken", "connect_imtoken"},
 };
 
 static const krux_menu_override_t KRUX_CONNECT_OKX_MENU[] = {
@@ -316,6 +324,11 @@ static const krux_menu_override_t KRUX_CONNECT_RABBY_MENU[] = {
 static const krux_menu_override_t KRUX_CONNECT_TOKENPOCKET_MENU[] = {
     {"助记词", "web3_tokenpocket_mnemonic"},
     {"智能卡", "web3_tokenpocket_satochip"},
+};
+
+static const krux_menu_override_t KRUX_CONNECT_IMTOKEN_MENU[] = {
+    {"助记词", "web3_imtoken_mnemonic"},
+    {"智能卡", "web3_imtoken_satochip"},
 };
 
 static const krux_menu_override_t KRUX_BTC_WALLET_MENU[] = {
@@ -352,12 +365,13 @@ static const krux_menu_override_t KRUX_WALLET_MENU[] = {
 };
 
 static const krux_menu_override_t KRUX_SIGNING_MENU[] = {
+    {"BTC", "sign_btc"},
     {"OKX", "sign_okx"},
     {"Bitget", "sign_bitget"},
     {"MetaMask", "sign_metamask"},
     {"Rabby", "sign_rabby"},
     {"TokenPocket", "sign_tokenpocket"},
-    {"BTC", "sign_btc"},
+    {"imToken", "sign_imtoken"},
 };
 
 static const krux_menu_override_t KRUX_SIGN_OKX_MENU[] = {
@@ -383,6 +397,11 @@ static const krux_menu_override_t KRUX_SIGN_RABBY_MENU[] = {
 static const krux_menu_override_t KRUX_SIGN_TOKENPOCKET_MENU[] = {
     {"助记词", "sign_tokenpocket_mnemonic"},
     {"智能卡", "sign_tokenpocket_satochip"},
+};
+
+static const krux_menu_override_t KRUX_SIGN_IMTOKEN_MENU[] = {
+    {"助记词", "sign_imtoken_mnemonic"},
+    {"智能卡", "sign_imtoken_satochip"},
 };
 
 static const krux_menu_override_t KRUX_SIGN_BTC_MENU[] = {
@@ -684,6 +703,7 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "connect_metamask",
     "connect_rabby",
     "connect_tokenpocket",
+    "connect_imtoken",
     "web3_okx_mnemonic",
     "web3_okx_satochip",
     "web3_bitget_mnemonic",
@@ -694,6 +714,8 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "web3_rabby_satochip",
     "web3_tokenpocket_mnemonic",
     "web3_tokenpocket_satochip",
+    "web3_imtoken_mnemonic",
+    "web3_imtoken_satochip",
     "btc_wallet",
     "btc_mnemonic",
     "btc_satochip",
@@ -846,6 +868,7 @@ static bool product_screen_is_visible(const char *id) {
          !krux_id_is_any(id, "web3", "web3_okx") &&
          !krux_id_is_any(id, "web3_bitget", "web3_metamask") &&
          !krux_id_is_any(id, "web3_rabby", "web3_tokenpocket") &&
+         strcmp(id, "web3_imtoken") != 0 &&
          !krux_id_is_any(id, "web3_address", "web3_message_sign") &&
          strcmp(id, "web3_typed_data") != 0;
 }
@@ -1698,6 +1721,7 @@ static bool legacy_wallet_needs_mnemonic_slot_choice(const char *id) {
                 strcmp(id, "web3_metamask_mnemonic") == 0 ||
                 strcmp(id, "web3_rabby_mnemonic") == 0 ||
                 strcmp(id, "web3_tokenpocket_mnemonic") == 0 ||
+                strcmp(id, "web3_imtoken_mnemonic") == 0 ||
                 strcmp(id, "web3_address_mnemonic") == 0 ||
                 strcmp(id, "smartcard_satochip_write_mnemonic") == 0 ||
                 strcmp(id, "smartcard_seedkeeper_write_mnemonic") == 0 ||
@@ -2755,12 +2779,14 @@ static bool is_web3_wallet_choice(const char *id) {
                 strcmp(id, "web3_metamask") == 0 ||
                 strcmp(id, "web3_rabby") == 0 ||
                 strcmp(id, "web3_tokenpocket") == 0 ||
+                strcmp(id, "web3_imtoken") == 0 ||
                 strcmp(id, "web3_address") == 0 ||
                 strcmp(id, "web3_okx_mnemonic") == 0 ||
                 strcmp(id, "web3_bitget_mnemonic") == 0 ||
                 strcmp(id, "web3_metamask_mnemonic") == 0 ||
                 strcmp(id, "web3_rabby_mnemonic") == 0 ||
                 strcmp(id, "web3_tokenpocket_mnemonic") == 0 ||
+                strcmp(id, "web3_imtoken_mnemonic") == 0 ||
                 strcmp(id, "web3_address_mnemonic") == 0);
 }
 
@@ -2770,6 +2796,7 @@ static bool is_web3_satochip_choice(const char *id) {
                 strcmp(id, "web3_metamask_satochip") == 0 ||
                 strcmp(id, "web3_rabby_satochip") == 0 ||
                 strcmp(id, "web3_tokenpocket_satochip") == 0 ||
+                strcmp(id, "web3_imtoken_satochip") == 0 ||
                 strcmp(id, "web3_address_satochip") == 0);
 }
 
@@ -2782,7 +2809,8 @@ static bool is_connect_wallet_source_menu(const char *id) {
                 strcmp(id, "connect_bitget") == 0 ||
                 strcmp(id, "connect_metamask") == 0 ||
                 strcmp(id, "connect_rabby") == 0 ||
-                strcmp(id, "connect_tokenpocket") == 0);
+                strcmp(id, "connect_tokenpocket") == 0 ||
+                strcmp(id, "connect_imtoken") == 0);
 }
 
 static bool is_connect_wallet_group_menu(const char *id) {
@@ -2877,14 +2905,9 @@ static void web3_qr_event_cb(lv_event_t *event) {
     return;
   web3_qr_timer_stop();
   const char *const *frames = (const char *const *)s_web3_qr_bundle.pages;
-  bool shown = s_web3_qr_bundle.page_count > 1
-                   ? qr_viewer_page_create_frames(
-                         lv_screen_active(), frames,
-                         s_web3_qr_bundle.page_count, "连接钱包",
-                         web3_qr_return_cb, 170)
-                   : qr_viewer_page_create(lv_screen_active(),
-                                           s_web3_qr_bundle.pages[0],
-                                           "连接钱包", web3_qr_return_cb);
+  bool shown = qr_viewer_page_create_frames(
+      lv_screen_active(), frames, s_web3_qr_bundle.page_count, "连接钱包",
+      web3_qr_return_cb, 170);
   if (!shown) {
     dialog_show_error("连接码显示失败", NULL, 2000);
     return;
@@ -2916,6 +2939,10 @@ static evm_web3_profile_t web3_profile_for_feature(const char *id) {
       strcmp(id, "web3_tokenpocket_mnemonic") == 0 ||
       strcmp(id, "web3_tokenpocket_satochip") == 0)
     return EVM_WEB3_PROFILE_TOKENPOCKET;
+  if (strcmp(id, "web3_imtoken") == 0 ||
+      strcmp(id, "web3_imtoken_mnemonic") == 0 ||
+      strcmp(id, "web3_imtoken_satochip") == 0)
+    return EVM_WEB3_PROFILE_IMTOKEN;
   return EVM_WEB3_PROFILE_ADDRESS;
 }
 
@@ -2928,6 +2955,7 @@ static const char *web3_qr_kind(evm_web3_profile_t profile) {
   case EVM_WEB3_PROFILE_METAMASK:
   case EVM_WEB3_PROFILE_RABBY:
   case EVM_WEB3_PROFILE_TOKENPOCKET:
+  case EVM_WEB3_PROFILE_IMTOKEN:
     return "账户连接码";
   case EVM_WEB3_PROFILE_ADDRESS:
   default:
@@ -9110,6 +9138,8 @@ static size_t krux_override_menu_count(const char *id) {
   if (strcmp(id, "sign_tokenpocket") == 0)
     return sizeof(KRUX_SIGN_TOKENPOCKET_MENU) /
            sizeof(KRUX_SIGN_TOKENPOCKET_MENU[0]);
+  if (strcmp(id, "sign_imtoken") == 0)
+    return sizeof(KRUX_SIGN_IMTOKEN_MENU) / sizeof(KRUX_SIGN_IMTOKEN_MENU[0]);
   if (strcmp(id, "sign_btc") == 0)
     return sizeof(KRUX_SIGN_BTC_MENU) / sizeof(KRUX_SIGN_BTC_MENU[0]);
   if (strcmp(id, "satochip_btc_pubkeys") == 0)
@@ -9132,6 +9162,9 @@ static size_t krux_override_menu_count(const char *id) {
   if (strcmp(id, "connect_tokenpocket") == 0)
     return sizeof(KRUX_CONNECT_TOKENPOCKET_MENU) /
            sizeof(KRUX_CONNECT_TOKENPOCKET_MENU[0]);
+  if (strcmp(id, "connect_imtoken") == 0)
+    return sizeof(KRUX_CONNECT_IMTOKEN_MENU) /
+           sizeof(KRUX_CONNECT_IMTOKEN_MENU[0]);
   if (strcmp(id, "btc_wallet") == 0)
     return sizeof(KRUX_BTC_WALLET_MENU) / sizeof(KRUX_BTC_WALLET_MENU[0]);
   if (strcmp(id, "btc_mnemonic") == 0)
@@ -9254,6 +9287,11 @@ static void create_krux_child_menu(lv_obj_t *list,
           sizeof(KRUX_SIGN_TOKENPOCKET_MENU) /
               sizeof(KRUX_SIGN_TOKENPOCKET_MENU[0])))
     return;
+  if (strcmp(feature->id, "sign_imtoken") == 0 &&
+      create_krux_override_menu(
+          list, KRUX_SIGN_IMTOKEN_MENU,
+          sizeof(KRUX_SIGN_IMTOKEN_MENU) / sizeof(KRUX_SIGN_IMTOKEN_MENU[0])))
+    return;
   if (strcmp(feature->id, "sign_btc") == 0 &&
       create_krux_override_menu(
           list, KRUX_SIGN_BTC_MENU,
@@ -9298,6 +9336,11 @@ static void create_krux_child_menu(lv_obj_t *list,
           list, KRUX_CONNECT_TOKENPOCKET_MENU,
           sizeof(KRUX_CONNECT_TOKENPOCKET_MENU) /
               sizeof(KRUX_CONNECT_TOKENPOCKET_MENU[0])))
+    return;
+  if (strcmp(feature->id, "connect_imtoken") == 0 &&
+      create_krux_override_menu(list, KRUX_CONNECT_IMTOKEN_MENU,
+                                sizeof(KRUX_CONNECT_IMTOKEN_MENU) /
+                                    sizeof(KRUX_CONNECT_IMTOKEN_MENU[0])))
     return;
   if (strcmp(feature->id, "btc_wallet") == 0 &&
       create_krux_override_menu(

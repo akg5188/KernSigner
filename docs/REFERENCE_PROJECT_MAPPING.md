@@ -26,10 +26,11 @@
 
 ## 已迁移方向
 
-- Web3 钱包选择：OKX、Bitget、MetaMask、Rabby、TokenPocket、通用地址。
-- 连接码类型：OKX/Bitget 多账户码，MetaMask/Rabby/TokenPocket HDKey 码。
+- Web3 钱包选择：OKX、Bitget、MetaMask、Rabby、TokenPocket、Keystone。
+- 连接码类型：OKX/Bitget 多账户码，imToken/MetaMask/Rabby/TokenPocket HDKey 码。
 - Web3 请求：`eth-sign-request`、relay 包装、personalSign 基础路径。
 - 签名结果：`eth-signature`。
+- imToken / MetaMask 已有实测金标准：`docs/WEB3_IMTOKEN_METAMASK_PROVEN_FLOW.zh-CN.md`。
 - Satochip PIN 后签名。
 - 地址比对后才返回签名。
 - BTC 观察公钥读取。

@@ -30,7 +30,7 @@
 ## 已迁移到 Kern 的能力
 
 - `设备检查 -> 智能卡检测`：USB Host CCID、ATR、Satochip/SeedKeeper AID 识别、只读状态 APDU。
-- `连接钱包 -> Web3钱包 -> 钱包名 -> 智能卡账户`：OKX、Bitget、MetaMask、Rabby、TokenPocket、通用地址连接码。
+- `连接钱包 -> Web3钱包 -> 钱包名 -> 智能卡账户`：OKX、Bitget、MetaMask、Rabby、TokenPocket、Keystone 连接码。
 - `连接钱包 -> 比特币钱包 -> 智能卡账户`：BlueWallet zpub/xpub 只读观察码。
 - `扫码签名 -> 智能卡 -> 扫码 Web3`：识别 Web3 请求二维码，输入 Satochip PIN 后返回 `eth-signature` 二维码。
 - Satochip EVM 默认路径：`m/44'/60'/0'/0/0`。
