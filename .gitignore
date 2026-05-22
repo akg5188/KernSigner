@@ -20,6 +20,9 @@ firmware/**/build_*/
 docs/logs/
 docs/screens/delivery_*/
 docs/screens/*_202605*/
+!docs/screens/current_20260522_193505/
+!docs/screens/current_20260522_193505/**/
+docs/screens/current_20260522_193505/**/*.bmp
 
 # Simulator
 simulator/build*/

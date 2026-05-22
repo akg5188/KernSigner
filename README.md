@@ -22,9 +22,27 @@ The current tree is a **test-funds validation build**, not an audited production
 
 ## Screenshots / 界面截图
 
-Old simulator screenshots were removed because the UI changed quickly during the
-smart-card and 4.3-inch layout work. New screenshots should be generated from
-the current simulator or real device before using images for promotion.
+当前 GitHub 截图已经换成 KernSigner 最新界面，不再保留上游 Kern 原始截图。
+
+最新公开截图批次：[docs/screens/current_20260522_193505](docs/screens/current_20260522_193505)
+
+- PNG 截图：296 张，已入库用于 GitHub 浏览。
+- BMP 截图：本地重复导出文件，不上传，避免仓库过大。
+- 全量 Krux/KernSigner 页面：146 个。
+- 自动检查结果：缺字 0，smoke 失败 0，scroll 失败 0，截图生成失败 0。
+- 备注：模拟器交互检查里 `custom_derivation` 有 2 个导航预期不一致，不影响本批截图完整性。
+
+| 首页 | 连接钱包 | OKX 助记词 | OKX 智能卡 |
+| --- | --- | --- | --- |
+| <img src="docs/screens/current_20260522_193505/krux/01_home.png" width="180" alt="KernSigner home screen"> | <img src="docs/screens/current_20260522_193505/krux/02_pi_connect_wallet.png" width="180" alt="Connect wallet menu"> | <img src="docs/screens/current_20260522_193505/krux/08_web3_okx_mnemonic.png" width="180" alt="OKX mnemonic wallet flow"> | <img src="docs/screens/current_20260522_193505/krux/09_web3_okx_satochip.png" width="180" alt="OKX Satochip smart-card flow"> |
+
+| BTC 钱包 | 自定义派生 | Satochip | SeedKeeper |
+| --- | --- | --- | --- |
+| <img src="docs/screens/current_20260522_193505/krux/18_btc_wallet.png" width="180" alt="Bitcoin wallet menu"> | <img src="docs/screens/current_20260522_193505/krux/25_custom_derivation.png" width="180" alt="Custom derivation menu"> | <img src="docs/screens/current_20260522_193505/krux/29_smartcard_satochip_tools.png" width="180" alt="Satochip tools menu"> | <img src="docs/screens/current_20260522_193505/krux/54_smartcard_seedkeeper_status_page.png" width="180" alt="SeedKeeper status page"> |
+
+| 创建助记词 | 骰子熵 | 点阵备份 | 系统检测 |
+| --- | --- | --- | --- |
+| <img src="docs/screens/current_20260522_193505/krux/101_new_mnemonic.png" width="180" alt="Create mnemonic menu"> | <img src="docs/screens/current_20260522_193505/krux/102_new_dice_d6.png" width="180" alt="D6 dice entropy input"> | <img src="docs/screens/current_20260522_193505/krux/119_backup_grid.png" width="180" alt="Mnemonic punch grid backup"> | <img src="docs/screens/current_20260522_193505/krux/140_system_overview.png" width="180" alt="System overview page"> |
 
 ## What Works
 

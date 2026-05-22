@@ -17,7 +17,7 @@ The short version: the codebase contains real wallet functionality and real-devi
 - [THIRD_PARTY.md](THIRD_PARTY.md): third-party code, licenses, and attribution.
 - [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md): board details, OTG power rules, and smart-card cabling.
 - [连接钱包教程.zh-CN.md](连接钱包教程.zh-CN.md): beginner guide for connecting Web3 wallets, Bitcoin watch-only wallets, and signing QR/PSBT transactions.
-- `docs/screens/`: generated simulator screenshots and acceptance artifacts. Old gallery screenshots were removed after the UI changed; regenerate fresh screenshots before publishing UI previews.
+- [docs/screens/](screens/README.md): current KernSigner GitHub screenshots and acceptance artifacts. The old upstream Kern gallery has been removed; the public batch is `current_20260522_193505`.
 - [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md): Android relay app guide for high-density Web3 QR codes.
 - Android relay APK mirror: https://github.com/akg5188/satochip-signer/releases
 - [MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md](MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md): beginner guide for creating mnemonics and verifying them with the BIP39 tool.
