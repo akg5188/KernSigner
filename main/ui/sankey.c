@@ -224,6 +224,15 @@ void sankey_diagram_destroy(sankey_diagram_t *diagram) {
   free(diagram);
 }
 
+void sankey_diagram_destroy_after_parent_deleted(sankey_diagram_t *diagram) {
+  if (!diagram)
+    return;
+  diagram->canvas = NULL;
+  if (diagram->draw_buf)
+    lv_draw_buf_destroy(diagram->draw_buf);
+  free(diagram);
+}
+
 void sankey_diagram_set_inputs(sankey_diagram_t *diagram,
                                const uint64_t *amounts, size_t count) {
   if (!diagram || !amounts || count == 0)

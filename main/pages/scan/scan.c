@@ -5187,10 +5187,8 @@ void scan_page_destroy(void) {
     multisig_menu = NULL;
   }
 
-  if (tx_diagram) {
-    sankey_diagram_destroy(tx_diagram);
-    tx_diagram = NULL;
-  }
+  sankey_diagram_t *diagram_to_free = tx_diagram;
+  tx_diagram = NULL;
 
   psbt_info_container = NULL;
 
@@ -5198,6 +5196,8 @@ void scan_page_destroy(void) {
     lv_obj_del(scan_screen);
     scan_screen = NULL;
   }
+
+  sankey_diagram_destroy_after_parent_deleted(diagram_to_free);
 
   return_callback = NULL;
   web3_info_active = false;

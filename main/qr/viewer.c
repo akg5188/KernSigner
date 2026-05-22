@@ -280,6 +280,8 @@ static void print_prev_cb(lv_event_t *e) {
 }
 
 static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
+  const bool signed_tx_title = title && strcmp(title, "已签名交易") == 0;
+
   qr_viewer_screen = lv_obj_create(parent);
   lv_obj_set_size(qr_viewer_screen, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_bg_color(qr_viewer_screen, lv_color_hex(0xFFFFFF), 0);
@@ -293,6 +295,12 @@ static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   if (qr_parts_count > 1) {
     h -= PROGRESS_BAR_HEIGHT + 20;
   }
+  int32_t title_reserved_h = signed_tx_title ? 52 : 0;
+  if (title_reserved_h > 0 && h > title_reserved_h + 120) {
+    h -= title_reserved_h;
+  } else {
+    title_reserved_h = 0;
+  }
   int32_t qr_size = (w < h) ? w : h;
 
   qr_code_obj = lv_qrcode_create(qr_viewer_screen);
@@ -301,7 +309,11 @@ static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   }
   lv_qrcode_set_size(qr_code_obj, qr_size);
   qr_update_optimal(qr_code_obj, qr_parts[0].data, NULL);
-  lv_obj_center(qr_code_obj);
+  if (title_reserved_h > 0) {
+    lv_obj_align(qr_code_obj, LV_ALIGN_TOP_MID, 0, title_reserved_h);
+  } else {
+    lv_obj_center(qr_code_obj);
+  }
 
   if (qr_parts_count > 1) {
     create_progress_indicators(qr_parts_count);
@@ -320,12 +332,17 @@ static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
     lv_obj_set_style_border_width(msgbox, 2, 0);
     lv_obj_set_style_border_color(msgbox, highlight_color(), 0);
     lv_obj_set_style_radius(msgbox, 8, 0);
-    lv_obj_set_style_pad_all(msgbox, 20, 0);
+    lv_obj_set_style_pad_all(msgbox, signed_tx_title ? 8 : 20, 0);
     lv_obj_add_flag(msgbox, LV_OBJ_FLAG_FLOATING);
-    lv_obj_center(msgbox);
+    if (title_reserved_h > 0) {
+      lv_obj_align(msgbox, LV_ALIGN_TOP_MID, 0, 4);
+    } else {
+      lv_obj_center(msgbox);
+    }
 
     char message[128];
-    snprintf(message, sizeof(message), "%s\n点击返回", title);
+    snprintf(message, sizeof(message),
+             signed_tx_title ? "%s  点击返回" : "%s\n点击返回", title);
     lv_obj_t *msg_label = theme_create_label(msgbox, message, false);
     lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(msg_label, lv_color_hex(0xFFFFFF), 0);
