@@ -6,9 +6,13 @@ The short version: the codebase contains real wallet functionality and real-devi
 
 ## Start Here
 
+- [小白照抄完整使用手册.zh-CN.md](小白照抄完整使用手册.zh-CN.md): complete copy-and-follow guide from flashing to first signing, smart cards, relay app, and safe exit.
+- [功能菜单逐项索引.zh-CN.md](功能菜单逐项索引.zh-CN.md): screen-by-screen menu tree and function index.
+- [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md): symptom-first troubleshooting table for flashing, PIN, QR, wallet, smart-card, and Android issues.
 - [零基础第一次上手教程.zh-CN.md](零基础第一次上手教程.zh-CN.md): step-by-step first-use path for complete beginners.
 - [USER_QUICK_START.zh-CN.md](USER_QUICK_START.zh-CN.md): first-use guide for beginners.
 - [全功能操作总手册.zh-CN.md](全功能操作总手册.zh-CN.md): practical operation map for all current user-facing flows.
+- [多专家文档审阅汇总_20260522.zh-CN.md](多专家文档审阅汇总_20260522.zh-CN.md): multi-role documentation review summary and remaining boundaries.
 - [README_FIRST_DELIVERY.md](README_FIRST_DELIVERY.md): human-friendly delivery entry point.
 - [PROJECT_NOTICE.md](PROJECT_NOTICE.md): project-wide AI, learning-only, and no-funds notice.
 - [DELIVERY_STATUS.md](DELIVERY_STATUS.md): current deliverable scope, acceptance steps, and known boundaries.
@@ -29,6 +33,7 @@ The short version: the codebase contains real wallet functionality and real-devi
 
 - [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md): build, flash, debug, simulator, and delivery commands.
 - [安卓构建环境准备.zh-CN.md](安卓构建环境准备.zh-CN.md): Android SDK/JDK setup and APK build guide for `wallet/`.
+- [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md): beginner-friendly stop/check/collect troubleshooting workflow.
 - [TROUBLESHOOTING_GENERAL.zh-CN.md](TROUBLESHOOTING_GENERAL.zh-CN.md): general troubleshooting for display, touch, camera, QR, wallet, build, and flash issues.
 - [DOCUMENTATION_COVERAGE.md](DOCUMENTATION_COVERAGE.md): documentation coverage map and update rules.
 - [REPRODUCIBLE_BUILD.md](REPRODUCIBLE_BUILD.md): pinned local build inputs and included firmware rebuild notes.

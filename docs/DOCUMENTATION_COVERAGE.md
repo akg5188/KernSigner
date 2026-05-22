@@ -8,8 +8,8 @@ This file records what the current project documentation covers and where a read
 
 | Area | User-facing guide | Engineering / gate docs |
 | --- | --- | --- |
-| First-use flow | [零基础第一次上手教程.zh-CN.md](零基础第一次上手教程.zh-CN.md), [USER_QUICK_START.zh-CN.md](USER_QUICK_START.zh-CN.md) | [README_FIRST_DELIVERY.md](README_FIRST_DELIVERY.md), [DELIVERY_STATUS.md](DELIVERY_STATUS.md) |
-| Full operation map | [全功能操作总手册.zh-CN.md](全功能操作总手册.zh-CN.md) | [REAL_DEVICE_ACCEPTANCE_CHECKLIST.md](REAL_DEVICE_ACCEPTANCE_CHECKLIST.md) |
+| First-use flow | [小白照抄完整使用手册.zh-CN.md](小白照抄完整使用手册.zh-CN.md), [零基础第一次上手教程.zh-CN.md](零基础第一次上手教程.zh-CN.md), [USER_QUICK_START.zh-CN.md](USER_QUICK_START.zh-CN.md) | [README_FIRST_DELIVERY.md](README_FIRST_DELIVERY.md), [DELIVERY_STATUS.md](DELIVERY_STATUS.md) |
+| Full operation map | [全功能操作总手册.zh-CN.md](全功能操作总手册.zh-CN.md), [功能菜单逐项索引.zh-CN.md](功能菜单逐项索引.zh-CN.md) | [REAL_DEVICE_ACCEPTANCE_CHECKLIST.md](REAL_DEVICE_ACCEPTANCE_CHECKLIST.md) |
 | PIN and safety behavior | [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) | [security-plan.md](security-plan.md) |
 | Mnemonic creation and BIP39 verification | [MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md](MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md) | [REAL_DEVICE_ACCEPTANCE_CHECKLIST.md](REAL_DEVICE_ACCEPTANCE_CHECKLIST.md) |
 | Backup and recovery | [BACKUP_AND_RECOVERY_GUIDE.zh-CN.md](BACKUP_AND_RECOVERY_GUIDE.zh-CN.md) | [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md) |
@@ -17,17 +17,22 @@ This file records what the current project documentation covers and where a read
 | Android QR relay app | [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md) | `wallet/docs/` |
 | Android build environment | [安卓构建环境准备.zh-CN.md](安卓构建环境准备.zh-CN.md) | `wallet/README.md`, `wallet/docs/固定构建与验包流程.zh-CN.md` |
 | Build, flash, and debug | [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md) | [FLASH_PRECHECK.md](FLASH_PRECHECK.md), [REPRODUCIBLE_BUILD.md](REPRODUCIBLE_BUILD.md) |
-| General troubleshooting | [TROUBLESHOOTING_GENERAL.zh-CN.md](TROUBLESHOOTING_GENERAL.zh-CN.md) | [REAL_DEVICE_ACCEPTANCE_CHECKLIST.md](REAL_DEVICE_ACCEPTANCE_CHECKLIST.md) |
+| General troubleshooting | [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md), [TROUBLESHOOTING_GENERAL.zh-CN.md](TROUBLESHOOTING_GENERAL.zh-CN.md) | [REAL_DEVICE_ACCEPTANCE_CHECKLIST.md](REAL_DEVICE_ACCEPTANCE_CHECKLIST.md) |
 | Hardware and OTG | [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md) | [SMARTCARD_ADAPTER_TEST_WORKFLOW.md](SMARTCARD_ADAPTER_TEST_WORKFLOW.md) |
 | Smart-card operations | [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md), [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) | [SMARTCARD_CAPABILITY_BOUNDARY.md](SMARTCARD_CAPABILITY_BOUNDARY.md), [SMARTCARD_MIGRATION_MATRIX_20260520.md](SMARTCARD_MIGRATION_MATRIX_20260520.md) |
 | Smart-card troubleshooting | [TROUBLESHOOTING_SMARTCARD_POWER_OTG.md](TROUBLESHOOTING_SMARTCARD_POWER_OTG.md) | [SMARTCARD_REAL_DEVICE_ACCEPTANCE.md](SMARTCARD_REAL_DEVICE_ACCEPTANCE.md) |
 | Release and production gates | [README_FIRST_DELIVERY.md](README_FIRST_DELIVERY.md) | [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md), [RELEASE_POINTERS_AND_HISTORY.md](RELEASE_POINTERS_AND_HISTORY.md) |
 | Third-party notices | [THIRD_PARTY.md](THIRD_PARTY.md) | repository component licenses |
+| Multi-role documentation review | [多专家文档审阅汇总_20260522.zh-CN.md](多专家文档审阅汇总_20260522.zh-CN.md) | Review notes and module boundaries |
 
 ## What Was Missing Before This Pass
 
 The documentation already had many acceptance and smart-card audit notes, but it was harder for a new reader to complete common workflows end to end. This pass adds:
 
+- A copy-and-follow full user manual.
+- A screen menu and feature index.
+- A symptom-first troubleshooting manual.
+- A multi-expert documentation review summary.
 - A zero-background first-use path.
 - A full operation manual.
 - A first-use beginner path.

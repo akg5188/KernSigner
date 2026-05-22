@@ -329,6 +329,9 @@ esptool --chip esp32p4 --baud 460800 write-flash \
 
 - [Documentation index](docs/README.md)
 - [Prebuilt firmware flashing guide](firmware/wave_43/README.zh-CN.md)
+- [Copy-and-follow complete user manual](docs/小白照抄完整使用手册.zh-CN.md)
+- [Screen menu and feature index](docs/功能菜单逐项索引.zh-CN.md)
+- [Copy-and-follow troubleshooting manual](docs/故障排查照抄手册.zh-CN.md)
 - [Zero-background first-use guide](docs/零基础第一次上手教程.zh-CN.md)
 - [Beginner quick start](docs/USER_QUICK_START.zh-CN.md)
 - [Full operation manual](docs/全功能操作总手册.zh-CN.md)
