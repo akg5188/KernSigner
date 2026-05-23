@@ -18,7 +18,7 @@
 #include "mnemonic_editor.h"
 #include "mnemonic_tool_page.h"
 #include "sensitive_pin.h"
-#include "../krux_shell/krux_shell.h"
+#include "../signer_shell/signer_shell.h"
 
 #include <lvgl.h>
 #include <string.h>
@@ -182,13 +182,13 @@ static void launch_passphrase(void) {
 }
 
 static void launch_seedkeeper_write(void) {
-  if (!krux_shell_show_screen("smartcard_seedkeeper_write_mnemonic")) {
+  if (!signer_shell_show_screen("smartcard_seedkeeper_write_mnemonic")) {
     dialog_show_error("页面不可用", loaded_mnemonic_menu_page_show, 0);
   }
 }
 
 static void launch_satochip_write(void) {
-  if (!krux_shell_show_screen("smartcard_satochip_write_mnemonic")) {
+  if (!signer_shell_show_screen("smartcard_satochip_write_mnemonic")) {
     dialog_show_error("页面不可用", loaded_mnemonic_menu_page_show, 0);
   }
 }

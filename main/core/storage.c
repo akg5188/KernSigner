@@ -104,7 +104,7 @@ static esp_err_t base64_decode_alloc(const uint8_t *in, size_t in_len,
 
 typedef struct {
   const char *flash_prefix; /* "m_" or "d_" */
-  const char *sd_dir;       /* "/sdcard/kern/mnemonics" or ".../descriptors" */
+  const char *sd_dir;       /* "/sdcard/signer/mnemonics" or ".../descriptors" */
 } storage_item_config_t;
 
 static const storage_item_config_t mnemonic_config = {
@@ -221,7 +221,7 @@ static esp_err_t item_init_location(const storage_item_config_t *cfg,
     if (ret != ESP_OK)
       return ret;
   }
-  mkdir("/sdcard/kern", 0775);
+  mkdir("/sdcard/signer", 0775);
   mkdir(cfg->sd_dir, 0775);
   return ESP_OK;
 }

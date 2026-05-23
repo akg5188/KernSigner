@@ -10,7 +10,7 @@
 #include "../../ui/theme.h"
 #include "../scan/scan.h"
 #include "../settings/wallet_settings.h"
-#include "../krux_shell/krux_shell.h"
+#include "../signer_shell/signer_shell.h"
 #include "../shared/mnemonic_slots_page.h"
 #include "../shared/sensitive_pin.h"
 #include "addresses.h"
@@ -125,7 +125,7 @@ static void power_button_cb(lv_event_t *e) {
 static void home_button_cb(lv_event_t *e) {
   (void)e;
   home_page_hide();
-  (void)krux_shell_show_screen("home");
+  (void)signer_shell_show_screen("home");
 }
 
 // Helper to refresh home if settings were changed
@@ -212,7 +212,7 @@ void home_page_create(lv_obj_t *parent) {
   ui_menu_add_entry(main_menu, "地址", menu_addresses_entry_cb);
   ui_menu_add_entry(main_menu, "备份", menu_backup_entry_cb);
 
-  // Always provide a way back to the Krux shell home.
+  // Always provide a way back to the KernSigner shell home.
   home_button = ui_create_home_button(home_screen, home_button_cb);
 
   // Settings button at top-right

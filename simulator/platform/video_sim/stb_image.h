@@ -1,4 +1,4 @@
-/* stb_image.h — public domain image loader, vendored for Kern simulator */
+/* stb_image.h — public domain image loader, vendored for KernSigner simulator */
 /* Source: https://github.com/nothings/stb */
 /* stb_image - v2.30 - public domain image loader - http://nothings.org/stb
                                   no warranty implied; use at your own risk

@@ -1,7 +1,7 @@
-#include "krux_camera_preview.h"
+#include "signer_camera_preview.h"
 
 #include "core/settings.h"
-#include "krux_qr_decoder.h"
+#include "signer_qr_decoder.h"
 #include "ui/theme.h"
 
 #include <bsp/esp-bsp.h>
@@ -20,7 +20,7 @@
 
 #include "../../components/video/video.h"
 
-static const char *TAG = "KRUX_CAMERA";
+static const char *TAG = "SIGNER_CAMERA";
 
 static lv_obj_t *s_screen;
 static lv_obj_t *s_camera_img;
@@ -131,7 +131,7 @@ static bool looks_like_numeric_seed(const char *text, size_t len) {
 }
 
 static qr_payload_classification_t classify_qr_payload(
-    const krux_qr_decode_result_t *result) {
+    const signer_qr_decode_result_t *result) {
   qr_payload_classification_t cls = {
       .kind = QR_KIND_TEXT,
       .name = "普通文本二维码",
@@ -192,7 +192,7 @@ static qr_payload_classification_t classify_qr_payload(
 }
 
 static void format_qr_status(char *buf, size_t buf_len,
-                             const krux_qr_decode_result_t *result) {
+                             const signer_qr_decode_result_t *result) {
   if (!buf || buf_len == 0)
     return;
 
@@ -332,11 +332,11 @@ static void camera_frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index,
     return;
   }
 
-  krux_qr_decode_result_t qr_result = {0};
+  signer_qr_decode_result_t qr_result = {0};
   bool qr_checked = false;
   s_frame_counter++;
   if ((s_frame_counter % 30) == 0 && !s_qr_detected) {
-    qr_checked = krux_qr_decode_rgb565(back_buffer, s_preview_size,
+    qr_checked = signer_qr_decode_rgb565(back_buffer, s_preview_size,
                                        s_preview_size, &qr_result);
   }
 
@@ -488,7 +488,7 @@ static void stop_camera(void) {
   s_frame_counter = 0;
   s_qr_detected = false;
   s_ppa_failure_logged = false;
-  krux_qr_decoder_deinit();
+  signer_qr_decoder_deinit();
 }
 
 static lv_obj_t *create_label(lv_obj_t *parent, const char *text, bool medium,
@@ -507,17 +507,17 @@ static lv_obj_t *create_label(lv_obj_t *parent, const char *text, bool medium,
 
 static void close_event_cb(lv_event_t *event) {
   (void)event;
-  krux_camera_preview_close();
+  signer_camera_preview_close();
 }
 
-bool krux_camera_preview_open_ex(const char *title, const char *notice,
+bool signer_camera_preview_open_ex(const char *title, const char *notice,
                                  bool reveal_qr_payload) {
   if (s_screen) {
     if (s_streaming) {
       lv_obj_clear_flag(s_screen, LV_OBJ_FLAG_HIDDEN);
       return true;
     }
-    krux_camera_preview_close();
+    signer_camera_preview_close();
   }
 
   s_closing = false;
@@ -583,11 +583,11 @@ bool krux_camera_preview_open_ex(const char *title, const char *notice,
   return ok;
 }
 
-bool krux_camera_preview_open(const char *title, const char *notice) {
-  return krux_camera_preview_open_ex(title, notice, false);
+bool signer_camera_preview_open(const char *title, const char *notice) {
+  return signer_camera_preview_open_ex(title, notice, false);
 }
 
-void krux_camera_preview_close(void) {
+void signer_camera_preview_close(void) {
   if (!s_screen)
     return;
 
@@ -607,4 +607,4 @@ void krux_camera_preview_close(void) {
   s_closing = false;
 }
 
-bool krux_camera_preview_is_open(void) { return s_screen != NULL; }
+bool signer_camera_preview_is_open(void) { return s_screen != NULL; }

@@ -1,7 +1,7 @@
 // About Page
 
 #include "about.h"
-#include "../../ui/assets/kern_logo_lvgl.h"
+#include "../../ui/assets/signer_logo_lvgl.h"
 #include "../../ui/theme.h"
 #include <esp_app_desc.h>
 #include <lvgl.h>
@@ -53,7 +53,7 @@ void about_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
                         LV_FLEX_ALIGN_CENTER);
   lv_obj_clear_flag(body, LV_OBJ_FLAG_CLICKABLE);
 
-  kern_logo_with_text_inline(body);
+  signer_logo_with_text_inline(body);
 
   const esp_app_desc_t *app_desc = esp_app_get_description();
   char ver_text[48];
@@ -62,7 +62,7 @@ void about_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   lv_obj_t *qr = lv_qrcode_create(body);
   lv_qrcode_set_size(qr, scr_w * 25 / 72); // 250 @ 720
-  const char *data = "https://github.com/odudex/Kern";
+  const char *data = "https://github.com/akg5188/KernSigner";
   lv_qrcode_update(qr, data, strlen(data));
   lv_obj_set_style_border_color(qr, lv_color_white(), 0);
   lv_obj_set_style_border_width(qr, 10, 0);

@@ -61,7 +61,7 @@
 #include <wally_script.h>
 #include <wally_transaction.h>
 
-static const char *TAG = "KERN_SCAN";
+static const char *TAG = "KSIG_SCAN";
 
 typedef enum {
   OUTPUT_TYPE_SELF_TRANSFER,
@@ -5101,7 +5101,7 @@ void scan_simulator_show_web3_typed_review(void) {
       "\"type\":\"address\"}],\"Mail\":[{\"name\":\"from\","
       "\"type\":\"address\"},{\"name\":\"to\",\"type\":\"address\"},"
       "{\"name\":\"contents\",\"type\":\"string\"}]},"
-      "\"primaryType\":\"Mail\",\"domain\":{\"name\":\"Kern Test\","
+      "\"primaryType\":\"Mail\",\"domain\":{\"name\":\"KernSigner Test\","
       "\"version\":\"1\",\"chainId\":1,\"verifyingContract\":"
       "\"0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC\"},"
       "\"message\":{\"from\":\"0x1111111111111111111111111111111111111111\","

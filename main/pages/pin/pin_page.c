@@ -91,7 +91,7 @@ static lv_draw_buf_t *setup_identicon_draw_buf = NULL; // setup words page
 static lv_obj_t *words_label = NULL;
 static lv_obj_t *words_warning = NULL;
 static bool words_visible = false;
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
 // Compact display: persistent reveal dismissed by an explicit Continue press,
 // since the keyboard would otherwise occlude the identicon and words.
 static lv_obj_t *continue_btn = NULL;
@@ -131,7 +131,7 @@ static int pin_unlock_textarea_y(void) {
   int chrome_bottom =
       theme_get_small_padding() + theme_get_corner_button_height() +
       theme_get_small_padding();
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
   default_y = 80;
 #endif
   return default_y > chrome_bottom ? default_y : chrome_bottom;
@@ -206,7 +206,7 @@ static void clear_state(void) {
   words_label = NULL;
   words_warning = NULL;
   words_visible = false;
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
   continue_btn = NULL;
 #endif
   secure_memzero(keystroke_cache, sizeof(keystroke_cache));
@@ -478,7 +478,7 @@ static void reveal_restore_cb(lv_timer_t *timer) {
     lv_obj_clear_state(text_input.textarea, LV_STATE_DISABLED);
 }
 
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
 static void continue_btn_cb(lv_event_t *e) {
   (void)e;
   if (words_container)
@@ -529,7 +529,7 @@ static void pin_keystroke_cb(lv_event_t *e) {
         // Hide keyboard and disable textarea while the user verifies
         lv_obj_add_flag(text_input.keyboard, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_state(text_input.textarea, LV_STATE_DISABLED);
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
         if (!continue_btn) {
           continue_btn = theme_create_button(page_screen, "继续", true);
           lv_obj_set_size(continue_btn, LV_PCT(60), theme_get_button_height());

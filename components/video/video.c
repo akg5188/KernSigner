@@ -51,7 +51,7 @@ static esp_err_t ensure_sensor_sccb(void) {
 #define MAX_BUFFER_COUNT 6
 #define MIN_BUFFER_COUNT 2
 // QR decode and sensor control can briefly deepen the video callback stack.
-// 32KB matches Kern's dedicated QR decode task size and prevents stack guard
+// 32KB matches KernSigner's dedicated QR decode task size and prevents stack guard
 // panics when k_quirc scans preview frames.
 #define VIDEO_TASK_STACK_SIZE (32 * 1024)
 #define VIDEO_TASK_PRIORITY 3

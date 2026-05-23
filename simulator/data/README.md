@@ -65,7 +65,7 @@ following subdirectories on init:
 
 ```
 sim_data/sdcard/
-└── kern/
+└── signer/
     ├── mnemonics/      Mnemonic backup files
     └── descriptors/    Wallet descriptor files
 ```

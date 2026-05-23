@@ -20,7 +20,7 @@ static pthread_once_t s_lvgl_mutex_once = PTHREAD_ONCE_INIT;
 static pthread_t s_main_thread;
 static volatile bool s_main_thread_set = false;
 
-static int kern_mutex_timedlock(pthread_mutex_t *mutex, const struct timespec *abs_timeout) {
+static int signer_mutex_timedlock(pthread_mutex_t *mutex, const struct timespec *abs_timeout) {
 #if defined(__APPLE__)
     for (;;) {
         int ret = pthread_mutex_trylock(mutex);
@@ -92,7 +92,7 @@ bool lvgl_port_lock(uint32_t timeout_ms) {
         ts.tv_sec++;
         ts.tv_nsec -= 1000000000L;
     }
-    return kern_mutex_timedlock(&s_lvgl_mutex, &ts) == 0;
+    return signer_mutex_timedlock(&s_lvgl_mutex, &ts) == 0;
 }
 
 void lvgl_port_unlock(void) {
@@ -103,11 +103,11 @@ void lvgl_port_flush_ready(lv_display_t *disp) {
     (void)disp;
 }
 
-void kern_lv_refr_now_real(lv_display_t *disp);
+void signer_lv_refr_now_real(lv_display_t *disp);
 
 void lv_refr_now(lv_display_t *disp) {
     if (s_main_thread_set && pthread_equal(pthread_self(), s_main_thread)) {
-        kern_lv_refr_now_real(disp);
+        signer_lv_refr_now_real(disp);
     }
 }
 
@@ -116,7 +116,7 @@ void lv_refr_now(lv_display_t *disp) {
 lv_display_t *bsp_display_start(void) {
     lv_display_t *disp = lv_sdl_window_create(BSP_LCD_H_RES, BSP_LCD_V_RES);
     if (disp) {
-        lv_sdl_window_set_title(disp, "Kern Simulator");
+        lv_sdl_window_set_title(disp, "KernSigner Simulator");
     }
     (void)lv_sdl_mouse_create();
     return disp;

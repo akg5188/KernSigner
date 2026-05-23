@@ -27,7 +27,7 @@
 #define ESP_ERR_INVALID_RESPONSE ESP_ERR_INVALID_STATE
 #endif
 
-static const char *TAG = "KERN_SATOCHIP";
+static const char *TAG = "KSIG_SATOCHIP";
 
 static const uint8_t k_select_satochip_apdu[] = {
     0x00, 0xA4, 0x04, 0x00, 0x08, 0x53, 0x61, 0x74,

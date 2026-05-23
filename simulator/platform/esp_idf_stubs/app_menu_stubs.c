@@ -468,7 +468,7 @@ void scan_simulator_show_web3_typed_review(void) {
   sim_web3_add_field(card, "钱包", "Bitget", false);
   sim_web3_add_field(card, "类型", "DApp 结构化签名", false);
   sim_web3_add_field(card, "主要类型", "Mail", false);
-  sim_web3_add_field(card, "DApp", "Kern Test", true);
+  sim_web3_add_field(card, "DApp", "KernSigner Test", true);
   sim_web3_add_field(card, "链", "Ethereum (1)", false);
   sim_web3_add_field(card, "合约",
                      "0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC", true);
@@ -779,7 +779,7 @@ esp_err_t smartcard_seedkeeper_list_secret_headers(
     out->headers[0].export_rights = 0x01;
     memcpy(out->headers[0].fingerprint, "\x12\x34\x56\x78", 4);
     snprintf(out->headers[0].label, sizeof(out->headers[0].label),
-             "Kern 模拟助记词");
+             "KernSigner 模拟助记词");
     out->sw = 0x9000;
     fill_string(out->detail, sizeof(out->detail), "模拟器 SeedKeeper 列表");
   }
@@ -829,7 +829,7 @@ esp_err_t smartcard_seedkeeper_import_secret(
     out->response[4] = 0x56;
     out->response[5] = 0x78;
     fill_string(out->detail, sizeof(out->detail),
-                "导入成功：Kern 模拟助记词 SID=1 指纹=12345678。");
+                "导入成功：KernSigner 模拟助记词 SID=1 指纹=12345678。");
   }
   return ESP_OK;
 }
@@ -841,7 +841,7 @@ esp_err_t smartcard_seedkeeper_export_secret(
     static const char mnemonic[] =
         "abandon abandon abandon abandon abandon abandon abandon abandon "
         "abandon abandon abandon about";
-    const char label[] = "Kern 模拟助记词";
+    const char label[] = "KernSigner 模拟助记词";
     size_t label_len = strlen(label);
     size_t mnemonic_len = strlen(mnemonic);
     memset(out, 0, sizeof(*out));
@@ -873,7 +873,7 @@ esp_err_t smartcard_seedkeeper_export_secret(
     out->response[pos++] = 0x00;
     out->response_len = pos;
     fill_string(out->detail, sizeof(out->detail),
-                "导出完成：Kern 模拟助记词。");
+                "导出完成：KernSigner 模拟助记词。");
   }
   return ESP_OK;
 }

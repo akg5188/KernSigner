@@ -1,5 +1,5 @@
 /**
- * LVGL configuration for Kern Desktop Simulator
+ * LVGL configuration for KernSigner Desktop Simulator
  * Based on lv_conf_template.h for LVGL v9.3.0
  */
 

@@ -1,15 +1,15 @@
-# Kern Secure Boot Public Keys
+# KernSigner Secure Boot Public Keys
 
-This folder contains the **public** key material for Kern's Secure Boot v2 (ECDSA-P256). These files are safe to distribute, they contain no private key material.
+This folder contains the **public** key material for KernSigner Secure Boot v2 (ECDSA-P256). These files are safe to distribute, they contain no private key material.
 
 ## Contents
 
 | File | Description |
 |------|-------------|
-| `kern-sb-key0-pub.pem` | Public key 0 (primary signing key) |
-| `kern-sb-key1-pub.pem` | Public key 1 (backup/rotation key) |
-| `kern-sb-digest0.bin` | SHA-256 digest of public key 0 (32 bytes, burned into eFuse KEY0) |
-| `kern-sb-digest1.bin` | SHA-256 digest of public key 1 (32 bytes, burned into eFuse KEY1) |
+| `signer-sb-key0-pub.pem` | Public key 0 (primary signing key) |
+| `signer-sb-key1-pub.pem` | Public key 1 (backup/rotation key) |
+| `signer-sb-digest0.bin` | SHA-256 digest of public key 0 (32 bytes, burned into eFuse KEY0) |
+| `signer-sb-digest1.bin` | SHA-256 digest of public key 1 (32 bytes, burned into eFuse KEY1) |
 | `SHA256SUMS` | SHA-256 checksums of all files above |
 | `SHA256SUMS.sig` | GPG detached signature of `SHA256SUMS` |
 
@@ -39,8 +39,8 @@ sha256sum -c SHA256SUMS
 You can also compute the hex representation of the `.bin` digest files to compare against the expected values above:
 
 ```bash
-xxd -p kern-sb-digest0.bin | tr -d '\n' && echo
-xxd -p kern-sb-digest1.bin | tr -d '\n' && echo
+xxd -p signer-sb-digest0.bin | tr -d '\n' && echo
+xxd -p signer-sb-digest1.bin | tr -d '\n' && echo
 ```
 
 ## On-Device Secure Boot Activation

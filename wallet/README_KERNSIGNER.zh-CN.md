@@ -1,4 +1,4 @@
-# Kern 安卓中转 App
+# KernSigner 安卓中转 App
 
 这个目录是从树莓派项目复制过来的安卓中转钱包 App。
 
@@ -16,7 +16,7 @@
 
 ## 用途
 
-当 `OKX Wallet`、`Bitget Wallet`、`TokenPocket` 等钱包显示的签名二维码太小、太密，`ESP32-P4 Kern` 开发板扫不出来时，用这个安卓 App 做中转。
+当 `OKX Wallet`、`Bitget Wallet`、`TokenPocket` 等钱包显示的签名二维码太小、太密，`ESP32-P4 KernSigner` 开发板扫不出来时，用这个安卓 App 做中转。
 
 它会把高密度签名请求二维码转换成开发板更容易扫描的低密度二维码。
 
@@ -61,4 +61,4 @@ cd /home/ak/123/Kern/wallet
 
 它不保存助记词和私钥，只负责观察账户、二维码中转和联网广播辅助。
 
-真正签名在 `Kern` 开发板或智能卡里完成。
+真正签名在 `KernSigner` 开发板或智能卡里完成。

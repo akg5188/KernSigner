@@ -1,7 +1,7 @@
 # Simulator Platform Layer
 
 Hardware abstraction layer that replaces ESP32-P4 APIs with
-desktop-compatible implementations. This allows the full Kern
+desktop-compatible implementations. This allows the full KernSigner
 firmware UI and logic to run on Linux using SDL2 for display,
 POSIX threads for FreeRTOS primitives, and the local filesystem
 for storage.
@@ -10,7 +10,7 @@ for storage.
 
 ```
 ┌──────────────────────────────────────────────┐
-│          Kern Application Code               │
+│          KernSigner Application Code               │
 ├──────────────┬────────────┬──────────────────┤
 │  bsp_sim     │ esp_idf    │  sd_card_sim     │
 │  (display,   │ _stubs     │  (filesystem)    │
@@ -92,7 +92,7 @@ for core ESP32 APIs.
 | `stop/delete()`                | callbacks never fire              |
 | `esp_vfs_spiffs_register()`    | Creates dir at `conf->base_path`  |
 | `esp_app_get_description()`    | Version "sim-dev",                |
-|                                | project "kern_simulator"          |
+|                                | project "signer_simulator"          |
 | `ppa_do_scale_rotate_mirror()` | Simple `memcpy()` (no transform)  |
 
 #### freertos_sim.c - FreeRTOS on POSIX
@@ -179,8 +179,8 @@ Maps the SD card API to POSIX filesystem operations under
 
 **Auto-created on init:**
 ```
-sim_data/sdcard/kern/mnemonics/
-sim_data/sdcard/kern/descriptors/
+sim_data/sdcard/signer/mnemonics/
+sim_data/sdcard/signer/descriptors/
 ```
 
 | Function                   | Implementation                    |

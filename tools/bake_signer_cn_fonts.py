@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the small Chinese UI fonts used by the Krux migration shell.
+"""Generate the small Chinese UI fonts used by the KernSigner migration shell.
 
 LVGL's built-in CJK fonts are intentionally small subsets. This script bakes
 only the glyphs used by the current firmware UI, plus printable ASCII, so
@@ -13,7 +13,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = REPO_ROOT / "main/ui/assets"
 SOURCE_GLOBS = ("main/**/*.c", "main/**/*.h")
-GENERATED_FONT_PREFIX = "krux_cn_"
+GENERATED_FONT_PREFIX = "signer_cn_"
 LATIN_FONT = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
 CJK_FONT = Path("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf")
 FONT_SIZES = (20, 28)
@@ -47,7 +47,7 @@ def main() -> None:
     cjk_symbols = collect_cjk_symbols()
 
     for size in FONT_SIZES:
-        output = OUT_DIR / f"krux_cn_{size}.c"
+        output = OUT_DIR / f"signer_cn_{size}.c"
         subprocess.run(
             [
                 "npx",
@@ -70,7 +70,7 @@ def main() -> None:
                 "--lv-include",
                 "lvgl.h",
                 "--lv-font-name",
-                f"krux_cn_{size}",
+                f"signer_cn_{size}",
                 "-o",
                 str(output),
                 "--force-fast-kern-format",

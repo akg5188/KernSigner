@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-KERN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SIGNER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROBE_DIR="${CCID_PROBE_DIR:-/home/ak/123/seedsigner/esp32_p4_ccid_probe}"
-LOG_DIR="${CCID_LOG_DIR:-${KERN_DIR}/docs/logs}"
+LOG_DIR="${CCID_LOG_DIR:-${SIGNER_DIR}/docs/logs}"
 MODE="${1:-run}"
 
 if [[ ! -d "$PROBE_DIR" ]]; then

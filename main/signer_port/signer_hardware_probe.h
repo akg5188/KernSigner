@@ -1,5 +1,5 @@
-#ifndef KRUX_HARDWARE_PROBE_H
-#define KRUX_HARDWARE_PROBE_H
+#ifndef SIGNER_HARDWARE_PROBE_H
+#define SIGNER_HARDWARE_PROBE_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -18,10 +18,10 @@ typedef struct {
   const char *sd_capability;
   const char *camera_status;
   const char *usb_status;
-} krux_hardware_snapshot_t;
+} signer_hardware_snapshot_t;
 
-void krux_hardware_probe_snapshot(krux_hardware_snapshot_t *out);
-void krux_hardware_probe_format_snapshot(char *buf, size_t buf_len);
-esp_err_t krux_hardware_probe_storage_rw(char *detail, size_t detail_len);
+void signer_hardware_probe_snapshot(signer_hardware_snapshot_t *out);
+void signer_hardware_probe_format_snapshot(char *buf, size_t buf_len);
+esp_err_t signer_hardware_probe_storage_rw(char *detail, size_t detail_len);
 
-#endif // KRUX_HARDWARE_PROBE_H
+#endif // SIGNER_HARDWARE_PROBE_H

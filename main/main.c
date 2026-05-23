@@ -5,7 +5,7 @@
 #include "core/session.h"
 #include "core/wallet.h"
 #include "pages/pin/pin_page.h"
-#include "pages/krux_shell/krux_shell.h"
+#include "pages/signer_shell/signer_shell.h"
 #include "smartcard/smartcard_ccid.h"
 #include "ui/theme.h"
 #include <bsp/display.h>
@@ -19,13 +19,13 @@
 #include <lvgl.h>
 #include <nvs_flash.h>
 
-static const char *TAG = "KERN_MAIN";
+static const char *TAG = "KSIG_MAIN";
 static lv_obj_t *s_main_screen;
 
 static void show_pin_gate(void);
 
-#ifndef KERN_SMARTCARD_BOOT_PROBE
-#define KERN_SMARTCARD_BOOT_PROBE 0
+#ifndef KSIG_SMARTCARD_BOOT_PROBE
+#define KSIG_SMARTCARD_BOOT_PROBE 0
 #endif
 
 static void clear_sensitive_session(void) {
@@ -44,12 +44,12 @@ static void restart_after_boot_failure(const char *reason) {
   esp_restart();
 }
 
-static void start_krux_shell(void) {
+static void start_signer_shell(void) {
   if (!s_main_screen)
     s_main_screen = lv_screen_active();
 
   lv_obj_clean(s_main_screen);
-  krux_shell_create(s_main_screen);
+  signer_shell_create(s_main_screen);
 
   uint16_t timeout = pin_get_session_timeout();
   if (timeout > 0)
@@ -58,7 +58,7 @@ static void start_krux_shell(void) {
 
 static void pin_gate_complete(void) {
   pin_page_destroy();
-  start_krux_shell();
+  start_signer_shell();
 }
 
 static void pin_setup_cancelled(void) {
@@ -93,7 +93,7 @@ static void session_poweroff_handler(void) {
   esp_restart();
 }
 
-#if KERN_SMARTCARD_BOOT_PROBE
+#if KSIG_SMARTCARD_BOOT_PROBE
 static void smartcard_boot_probe_task(void *arg) {
   (void)arg;
 
@@ -177,10 +177,10 @@ void app_main(void) {
   start_locked_poweroff_guard();
   bsp_display_unlock();
 
-#if KERN_SMARTCARD_BOOT_PROBE
+#if KSIG_SMARTCARD_BOOT_PROBE
   BaseType_t probe_started =
       xTaskCreatePinnedToCore(smartcard_boot_probe_task,
-                              "kern_card_boot_probe", 6144, NULL, 3, NULL, 0);
+                              "ksig_card_boot_probe", 6144, NULL, 3, NULL, 0);
   if (probe_started != pdPASS) {
     ESP_LOGW(TAG, "SMARTCARD_BOOT_PROBE: task create failed");
   }

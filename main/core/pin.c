@@ -31,8 +31,8 @@ static const char *KEY_TIMEOUT = "timeout";
 static const char *KEY_HAS_EFUSE = "has_efuse";
 
 // Salt derivation tags
-static const char *HMAC_SALT_TAG = "C-Krux-PIN-salt-v1";
-static const char *FALLBACK_SALT_TAG = "C-Krux-fallback-salt-v1";
+static const char *HMAC_SALT_TAG = "C-KernSigner-PIN-salt-v1";
+static const char *FALLBACK_SALT_TAG = "C-KernSigner-fallback-salt-v1";
 
 static nvs_handle_t pin_nvs;
 static bool initialized = false;
@@ -72,7 +72,7 @@ static esp_err_t compute_device_salt(uint8_t salt_out[PIN_HASH_SIZE]) {
   if (err == ESP_OK)
     return ESP_OK;
 
-#ifdef CONFIG_KERN_PRODUCTION_REQUIRE_PIN_HMAC
+#ifdef CONFIG_KSIG_PRODUCTION_REQUIRE_PIN_HMAC
   ESP_LOGE(TAG, "HMAC peripheral unavailable in production PIN mode");
   return err;
 #endif

@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 28 px
  * Bpp: 4
- * Opts: --size 28 --bpp 4 --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --symbols  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ --font /usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf --symbols ±·×Σ—‘’“”→↔∈≈─、。《》【】一三上下不与专两严个中串临为主举久义之也书了二于互些交产亮人从他付代令以件任份会传伪似但位低体余作使例供保信修值做停储像充先光克入全八公六关其具兼内册再写冲准减凑几出击分切列创初删判别到制刷前剩割功加务动助包化匹区十千半协单占卡印危即卸厂压原参及反发取变口另只可右号合同名后吗否启命和哈响善器四回围固图在地址坊坐块型基堆填声处备复外多大太失头套好如妥始子孔字存安完定实审害容宽密察寸对导将小少尚尝就尺局层屏展属工左已币布希带帧常幕并序应底度建开异弃式引张弱弹强当录彩径待必志忘忙快态性总恢息意感成或战截户所手才扑打扣执扩扫找把抛护抽拆拍拒拔拟择拿持挂指按挑换据授排接控描提插搜摄摘摸撤操擦支收改放故效敏教数整文断新方旁无日旧时明易是显普智暂曝更替最有服望期未本机权条来松板构析枚果查标树校核根格案检概槽模次款止正此步段每比永求池没法注洗派流测浏消涉添清游源满点热焦然照熵父片版牌特状独现理生用由电画界留略疑登白百的盐盖目直相看真知短码础硬确示禁离私种秒秘称程稍稳空窗立端笔符第等策签算管类系索紧约级纹线组经结给络绝统继绪续维缓编缘缩缺网置翻联能脚自至致般良色节英范莓菜藏行表被要覆见观视览解触言计认议记设访证识词译试话询该语误说请读调象负败账费走超足距路跳转载较辑输边过运返还这进连述退送适选逐通道遗部都配采里重量金钟钢钥钮钱链销锁错长门闪闭问闲间阈阵阻附际限除险隆随隐隔集零需静非靠面页项须预频题额风首验骤骰高黑默！（），：；？ --format lvgl --lv-include lvgl.h --lv-font-name krux_cn_28 -o /home/ak/123/Kern/main/ui/assets/krux_cn_28.c --force-fast-kern-format --no-compress --no-prefilter
+ * Opts: --size 28 --bpp 4 --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --symbols  !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ --font /usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf --symbols ±·×Σ—‘’“”→↔∈≈─、。《》【】一三上下不与专两严个中串临为主举久义之也书了二于互些交产亮人从他付代令以件任份会传伪似但位低体余作使例供保信修值做停储像充先光克入全八公六关其具兼内册再写冲准减凑几出击分切列创初删判别到制刷前剩割功加务动助包化匹区十千半协单占卡印危即卸厂压原参及反发取变口另只可右号合同名后吗否启命和哈响善器四回围固图在地址坊坐块型基堆填声处备复外多大太失头套好如妥始子孔字存安完定实审害容宽密察寸对导将小少尚尝就尺局层屏展属工左已币布希带帧常幕并序应底度建开异弃式引张弱弹强当录彩径待必志忘忙快态性总恢息意感成或战截户所手才扑打扣执扩扫找把抛护抽拆拍拒拔拟择拿持挂指按挑换据授排接控描提插搜摄摘摸撤操擦支收改放故效敏教数整文断新方旁无日旧时明易是显普智暂曝更替最有服望期未本机权条来松板构析枚果查标树校核根格案检概槽模次款止正此步段每比永求池没法注洗派流测浏消涉添清游源满点热焦然照熵父片版牌特状独现理生用由电画界留略疑登白百的盐盖目直相看真知短码础硬确示禁离私种秒秘称程稍稳空窗立端笔符第等策签算管类系索紧约级纹线组经结给络绝统继绪续维缓编缘缩缺网置翻联能脚自至致般良色节英范莓菜藏行表被要覆见观视览解触言计认议记设访证识词译试话询该语误说请读调象负败账费走超足距路跳转载较辑输边过运返还这进连述退送适选逐通道遗部都配采里重量金钟钢钥钮钱链销锁错长门闪闭问闲间阈阵阻附际限除险隆随隐隔集零需静非靠面页项须预频题额风首验骤骰高黑默！（），：；？ --format lvgl --lv-include lvgl.h --lv-font-name signer_cn_28 -o /home/ak/123/Kern/main/ui/assets/signer_cn_28.c --force-fast-kern-format --no-compress --no-prefilter
  ******************************************************************************/
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
@@ -10,11 +10,11 @@
 #include "lvgl.h"
 #endif
 
-#ifndef KRUX_CN_28
-#define KRUX_CN_28 1
+#ifndef SIGNER_CN_28
+#define SIGNER_CN_28 1
 #endif
 
-#if KRUX_CN_28
+#if SIGNER_CN_28
 
 /*-----------------
  *    BITMAPS
@@ -29686,9 +29686,9 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
 
 /*Initialize a public general font descriptor*/
 #if LVGL_VERSION_MAJOR >= 8
-const lv_font_t krux_cn_28 = {
+const lv_font_t signer_cn_28 = {
 #else
-lv_font_t krux_cn_28 = {
+lv_font_t signer_cn_28 = {
 #endif
     .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,    /*Function pointer to get glyph's data*/
     .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,    /*Function pointer to get glyph's bitmap*/
@@ -29710,4 +29710,4 @@ lv_font_t krux_cn_28 = {
 
 
 
-#endif /*#if KRUX_CN_28*/
+#endif /*#if SIGNER_CN_28*/

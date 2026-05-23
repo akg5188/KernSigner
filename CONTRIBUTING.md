@@ -1,6 +1,6 @@
-# Contributing to Kern
+# Contributing to KernSigner
 
-Thank you for your interest in contributing to Kern! This document outlines the guidelines for contributing to the project.
+Thank you for your interest in contributing to KernSigner! This document outlines the guidelines for contributing to the project.
 
 ## Getting Started
 
@@ -19,7 +19,7 @@ Thank you for your interest in contributing to Kern! This document outlines the 
 
 ### Architecture
 
-Kern follows a strict layer separation:
+KernSigner follows a strict layer separation:
 
 - **`main/core/`** — Bitcoin logic. Must never depend on UI headers. Use callbacks for any user interaction.
 - **`main/pages/`** — UI pages with create/show/hide/destroy lifecycle.
@@ -81,7 +81,7 @@ Note: `cppcheck` does not understand secure memory wipe patterns (zeroing variab
 
 ### Security
 
-Kern is a Bitcoin signing firmware. Security is not optional.
+KernSigner is a Bitcoin signing firmware. Security is not optional.
 
 - Never introduce network or radio functionality. The air-gap is by design.
 - Use secure memory wipe (`WIPE` macros from `utils/`) for sensitive data.

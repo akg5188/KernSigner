@@ -1,5 +1,5 @@
 #include "screensaver.h"
-#include "ui/assets/kern_logo_lvgl.h"
+#include "ui/assets/signer_logo_lvgl.h"
 #include "ui/theme.h"
 #include <esp_random.h>
 
@@ -89,8 +89,8 @@ void screensaver_create(lv_obj_t *parent, screensaver_dismiss_cb_t cb) {
   lv_obj_set_size(scr_container, scr_w, scr_h);
   theme_apply_screen(scr_container);
 
-  // kern_logo_create children: [0]=outer ring, [1]=inner ring, [2]=core
-  logo = kern_logo_create(scr_container, 0, 0, logo_sz);
+  // signer_logo_create children: [0]=outer ring, [1]=inner ring, [2]=core
+  logo = signer_logo_create(scr_container, 0, 0, logo_sz);
   outer = lv_obj_get_child(logo, 0);
   inner = lv_obj_get_child(logo, 1);
   core = lv_obj_get_child(logo, 2);

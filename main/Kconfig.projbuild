@@ -1,25 +1,25 @@
-menu "Kern Configuration"
+menu "KernSigner Configuration"
 
-    choice KERN_BOARD
+    choice KSIG_BOARD
         prompt "Target board"
-        default KERN_BOARD_WAVE_4B
+        default KSIG_BOARD_WAVE_4B
         help
             Select the Waveshare ESP32-P4 board variant.
 
-        config KERN_BOARD_WAVE_4B
+        config KSIG_BOARD_WAVE_4B
             bool "Waveshare ESP32-P4-WiFi6-Touch-LCD-4B (720x720)"
 
-        config KERN_BOARD_WAVE_35
+        config KSIG_BOARD_WAVE_35
             bool "Waveshare ESP32-P4-WiFi6-Touch-LCD-3.5 (320x480)"
 
-        config KERN_BOARD_WAVE_5
+        config KSIG_BOARD_WAVE_5
             bool "Waveshare ESP32-P4-WiFi6-Touch-LCD-5 (720x1280 MIPI DSI)"
 
-        config KERN_BOARD_WAVE_43
+        config KSIG_BOARD_WAVE_43
             bool "Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 (480x800 MIPI DSI)"
     endchoice
 
-    config KERN_PRODUCTION_REQUIRE_PIN_HMAC
+    config KSIG_PRODUCTION_REQUIRE_PIN_HMAC
         bool "Production: require eFuse HMAC key for PIN salt"
         default n
         help

@@ -1,5 +1,5 @@
 /**
- * ESP-IDF stub implementations for Kern Desktop Simulator
+ * ESP-IDF stub implementations for KernSigner Desktop Simulator
  */
 
 #include "esp_err.h"
@@ -222,7 +222,7 @@ bool esp_spiffs_check(const char *partition_label) {
 const esp_app_desc_t *esp_app_get_description(void) {
     static const esp_app_desc_t s_desc = {
         .version      = "sim-dev",
-        .project_name = "kern_simulator",
+        .project_name = "signer_simulator",
         .time         = "sim-time",
         .date         = "sim-date",
         .idf_ver      = "v5.4-sim",

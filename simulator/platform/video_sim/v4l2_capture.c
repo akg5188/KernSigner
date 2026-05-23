@@ -1,5 +1,5 @@
 /**
- * V4L2 webcam capture for Kern Desktop Simulator.
+ * V4L2 webcam capture for KernSigner Desktop Simulator.
  *
  * Opens a V4L2 device, negotiates YUYV (preferred) or MJPEG format,
  * and provides frames converted to RGB565.

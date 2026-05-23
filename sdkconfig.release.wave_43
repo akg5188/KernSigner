@@ -766,14 +766,14 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# Kern Configuration
+# KernSigner Configuration
 #
-# CONFIG_KERN_BOARD_WAVE_4B is not set
-# CONFIG_KERN_BOARD_WAVE_35 is not set
-# CONFIG_KERN_BOARD_WAVE_5 is not set
-CONFIG_KERN_BOARD_WAVE_43=y
-# CONFIG_KERN_PRODUCTION_REQUIRE_PIN_HMAC is not set
-# end of Kern Configuration
+# CONFIG_KSIG_BOARD_WAVE_4B is not set
+# CONFIG_KSIG_BOARD_WAVE_35 is not set
+# CONFIG_KSIG_BOARD_WAVE_5 is not set
+CONFIG_KSIG_BOARD_WAVE_43=y
+# CONFIG_KSIG_PRODUCTION_REQUIRE_PIN_HMAC is not set
+# end of KernSigner Configuration
 
 #
 # Compiler options

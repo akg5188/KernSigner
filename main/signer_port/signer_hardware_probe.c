@@ -1,4 +1,4 @@
-#include "krux_hardware_probe.h"
+#include "signer_hardware_probe.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -28,7 +28,7 @@
 #define BSP_CAPS_SDCARD 0
 #endif
 
-void krux_hardware_probe_snapshot(krux_hardware_snapshot_t *out) {
+void signer_hardware_probe_snapshot(signer_hardware_snapshot_t *out) {
   if (!out)
     return;
 
@@ -43,7 +43,7 @@ void krux_hardware_probe_snapshot(krux_hardware_snapshot_t *out) {
   out->touch_status = BSP_CAPS_TOUCH ? "已支持" : "可检测";
   out->sd_capability = BSP_CAPS_SDCARD ? "已支持" : "可检测";
 
-#if defined(CONFIG_KERN_BOARD_WAVE_43)
+#if defined(CONFIG_KSIG_BOARD_WAVE_43)
   out->camera_status = "请进入相机检查";
   out->usb_status = "维护口，正式使用请断开";
 #else
@@ -52,12 +52,12 @@ void krux_hardware_probe_snapshot(krux_hardware_snapshot_t *out) {
 #endif
 }
 
-void krux_hardware_probe_format_snapshot(char *buf, size_t buf_len) {
+void signer_hardware_probe_format_snapshot(char *buf, size_t buf_len) {
   if (!buf || buf_len == 0)
     return;
 
-  krux_hardware_snapshot_t snap;
-  krux_hardware_probe_snapshot(&snap);
+  signer_hardware_snapshot_t snap;
+  signer_hardware_probe_snapshot(&snap);
 
   snprintf(buf, buf_len,
            "屏幕：%dx%d，显示%s，触摸%s\n"
@@ -73,7 +73,7 @@ void krux_hardware_probe_format_snapshot(char *buf, size_t buf_len) {
            snap.camera_status, snap.usb_status);
 }
 
-esp_err_t krux_hardware_probe_storage_rw(char *detail, size_t detail_len) {
+esp_err_t signer_hardware_probe_storage_rw(char *detail, size_t detail_len) {
   if (detail && detail_len > 0)
     detail[0] = '\0';
 
@@ -86,8 +86,8 @@ esp_err_t krux_hardware_probe_storage_rw(char *detail, size_t detail_len) {
     return ret;
   }
 
-  static const char payload[] = "kern-storage-check\n";
-  const char *path = SD_CARD_MOUNT_POINT "/kern_check.tmp";
+  static const char payload[] = "signer-storage-check\n";
+  const char *path = SD_CARD_MOUNT_POINT "/signer_check.tmp";
 
   ret = sd_card_write_file(path, (const uint8_t *)payload, strlen(payload));
   if (ret != ESP_OK) {

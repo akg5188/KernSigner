@@ -1,4 +1,4 @@
-#include "krux_qr_decoder.h"
+#include "signer_qr_decoder.h"
 
 #include <k_quirc.h>
 #include <stdbool.h>
@@ -124,16 +124,16 @@ static bool valid_utf8_text_prefix(const uint8_t *payload, size_t len,
   return true;
 }
 
-static void fill_result_text(krux_qr_decode_result_t *result,
+static void fill_result_text(signer_qr_decode_result_t *result,
                              const uint8_t *payload, size_t len) {
   size_t safe_len = 0;
   bool printable = valid_utf8_text_prefix(payload, len, &safe_len);
   size_t out = 0;
 
   if (printable) {
-    size_t limit = safe_len < (KRUX_QR_RESULT_TEXT_MAX - 1)
+    size_t limit = safe_len < (SIGNER_QR_RESULT_TEXT_MAX - 1)
                        ? safe_len
-                       : (KRUX_QR_RESULT_TEXT_MAX - 1);
+                       : (SIGNER_QR_RESULT_TEXT_MAX - 1);
     while (limit > 0 && limit < safe_len && (payload[limit] & 0xc0) == 0x80)
       limit--;
 
@@ -142,16 +142,16 @@ static void fill_result_text(krux_qr_decode_result_t *result,
       out = limit;
     }
   } else {
-    size_t limit = len < (KRUX_QR_RESULT_TEXT_MAX - 1)
+    size_t limit = len < (SIGNER_QR_RESULT_TEXT_MAX - 1)
                        ? len
-                       : (KRUX_QR_RESULT_TEXT_MAX - 1);
+                       : (SIGNER_QR_RESULT_TEXT_MAX - 1);
     for (size_t i = 0; i < limit; i++) {
       uint8_t ch = payload[i];
       result->text[out++] = (ch >= 0x20 && ch <= 0x7e) ? (char)ch : '.';
     }
   }
 
-  if (len >= KRUX_QR_RESULT_TEXT_MAX && out < KRUX_QR_RESULT_TEXT_MAX - 4) {
+  if (len >= SIGNER_QR_RESULT_TEXT_MAX && out < SIGNER_QR_RESULT_TEXT_MAX - 4) {
     result->text[out++] = '.';
     result->text[out++] = '.';
     result->text[out++] = '.';
@@ -160,9 +160,9 @@ static void fill_result_text(krux_qr_decode_result_t *result,
   result->printable = printable;
 }
 
-bool krux_qr_decode_rgb565(const uint8_t *rgb565_data, uint32_t width,
+bool signer_qr_decode_rgb565(const uint8_t *rgb565_data, uint32_t width,
                            uint32_t height,
-                           krux_qr_decode_result_t *result) {
+                           signer_qr_decode_result_t *result) {
   if (result)
     memset(result, 0, sizeof(*result));
 
@@ -191,7 +191,7 @@ bool krux_qr_decode_rgb565(const uint8_t *rgb565_data, uint32_t width,
   return true;
 }
 
-void krux_qr_decoder_deinit(void) {
+void signer_qr_decoder_deinit(void) {
   if (s_decoder) {
     k_quirc_destroy(s_decoder);
     s_decoder = NULL;

@@ -2,7 +2,7 @@
  * Base43 encoding/decoding
  *
  * Charset: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$*+-./:"
- * Compatible with Krux's base43 implementation for QR code transport.
+ * Compatible with KernSigner's base43 implementation for QR code transport.
  *
  * The algorithm treats input as a big-endian number in the given base
  * and converts between bases (43 <-> 256). Leading zero-characters in

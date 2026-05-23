@@ -2,7 +2,7 @@
  * Size: 100 px
  * Bpp: 4
  * Opts: --bpp 4 --size 100 --no-compress --stride 1 --align 1 --font
- *Montserrat-Medium.ttf --symbols KERN --format lvgl -o kern_logo_100.c
+ *Montserrat-Medium.ttf --symbols SIGNER --format lvgl -o signer_logo_100.c
  ******************************************************************************/
 
 #ifdef __has_include
@@ -19,11 +19,11 @@
 #include "lvgl/lvgl.h"
 #endif
 
-#ifndef KERN_LOGO_100
-#define KERN_LOGO_100 1
+#ifndef SIGNER_LOGO_100
+#define SIGNER_LOGO_100 1
 #endif
 
-#if KERN_LOGO_100
+#if SIGNER_LOGO_100
 
 /*-----------------
  *    BITMAPS
@@ -736,9 +736,9 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
 
 /*Initialize a public general font descriptor*/
 #if LVGL_VERSION_MAJOR >= 8
-const lv_font_t kern_logo_100 = {
+const lv_font_t signer_logo_100 = {
 #else
-lv_font_t kern_logo_100 = {
+lv_font_t signer_logo_100 = {
 #endif
     .get_glyph_dsc =
         lv_font_get_glyph_dsc_fmt_txt, /*Function pointer to get glyph's data*/
@@ -762,4 +762,4 @@ lv_font_t kern_logo_100 = {
     .user_data = NULL,
 };
 
-#endif /*#if KERN_LOGO_100*/
+#endif /*#if SIGNER_LOGO_100*/

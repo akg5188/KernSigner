@@ -72,7 +72,7 @@ static const lv_buttonmatrix_ctrl_t safe_kb_ctrl_spec_map[] = {
     LV_BUTTONMATRIX_CTRL_CHECKED | 2, 6, LV_BUTTONMATRIX_CTRL_CHECKED | 2,
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2};
 
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
 // Compact keyboard maps for small (320x480) displays.
 // Trade fewer keys per row for wider touch targets.
 
@@ -530,7 +530,7 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
   lv_obj_set_size(input->textarea, password_mode ? LV_PCT(78) : LV_PCT(90),
                   max_i(72, theme_get_min_touch_size()));
   int32_t ta_y = theme_get_screen_height() * 17 / 100;
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
   // Taller keyboard on small displays; pull the textarea up so it stays
   // visible.
   ta_y = 80;
@@ -600,7 +600,7 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
 
   /* Keyboard on active screen */
   input->keyboard = lv_keyboard_create(lv_screen_active());
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
   // Small display: taller keyboard, fewer keys per row, wider gaps.
   lv_obj_set_size(input->keyboard, LV_HOR_RES, LV_VER_RES * 70 / 100);
 #else
@@ -611,7 +611,7 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
   lv_keyboard_set_mode(input->keyboard, LV_KEYBOARD_MODE_TEXT_LOWER);
   ui_keyboard_apply_safe_text_map(input->keyboard);
 
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
   lv_keyboard_set_map(input->keyboard, LV_KEYBOARD_MODE_TEXT_LOWER,
                       compact_kb_map_lc, compact_kb_ctrl_lc_map);
   lv_keyboard_set_map(input->keyboard, LV_KEYBOARD_MODE_TEXT_UPPER,
@@ -624,7 +624,7 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
   lv_obj_set_style_bg_color(input->keyboard, lv_color_black(), 0);
   lv_obj_set_style_border_width(input->keyboard, 0, 0);
   lv_obj_set_style_pad_all(input->keyboard, 4, 0);
-#ifdef CONFIG_KERN_BOARD_WAVE_35
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
   lv_obj_set_style_pad_gap(input->keyboard, 8, 0);
 #else
   lv_obj_set_style_pad_gap(input->keyboard, 6, 0);

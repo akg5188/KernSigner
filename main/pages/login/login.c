@@ -8,7 +8,7 @@
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
 #include <bsp/pmic.h>
-#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
+#if defined(DEV_TOOLS_ENABLED) && defined(KSIG_SHOW_DEV_TOOLS)
 #include "../dev_tools/dev_menu.h"
 #endif
 #include "../load_mnemonic/load_menu.h"
@@ -41,7 +41,7 @@ static void return_from_load_menu_cb(void) { login_page_show(); }
 
 static void return_from_new_mnemonic_menu_cb(void) { login_page_show(); }
 
-#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
+#if defined(DEV_TOOLS_ENABLED) && defined(KSIG_SHOW_DEV_TOOLS)
 static void return_from_dev_menu_cb(void) { login_page_show(); }
 #endif
 
@@ -64,7 +64,7 @@ static void settings_cb(void) {
   login_settings_page_show();
 }
 
-#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
+#if defined(DEV_TOOLS_ENABLED) && defined(KSIG_SHOW_DEV_TOOLS)
 static void dev_tools_cb(void) {
   login_page_hide();
   dev_menu_page_create(lv_screen_active(), return_from_dev_menu_cb);
@@ -85,7 +85,7 @@ void login_page_create(lv_obj_t *parent) {
   ui_menu_add_entry(login_menu, "导入", load_mnemonic_cb);
   ui_menu_add_entry(login_menu, "创建", new_mnemonic_cb);
   ui_menu_add_entry(login_menu, "设置", settings_cb);
-#if defined(DEV_TOOLS_ENABLED) && defined(KERN_SHOW_DEV_TOOLS)
+#if defined(DEV_TOOLS_ENABLED) && defined(KSIG_SHOW_DEV_TOOLS)
   (void)dev_tools_cb;
 #endif
   ui_menu_add_entry(login_menu, "关于", about_cb);

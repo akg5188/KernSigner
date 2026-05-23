@@ -1,11 +1,11 @@
 /**
- * Kern Logo - Minimal "Essential Point" Design
+ * KernSigner Logo - Minimal "Essential Point" Design
  * Creates a core point with subtle rings representing the "kernel/core"
  * concept.
  */
 
 #include "../theme.h"
-#include "kern_logo_font.h"
+#include "signer_logo_font.h"
 #include "lvgl.h"
 
 #define INNER_RING_PCT 63
@@ -42,7 +42,7 @@ static lv_obj_t *create_circle(lv_obj_t *parent, int32_t diameter,
 }
 
 static lv_obj_t *create_label(lv_obj_t *parent, int32_t logo_size) {
-  const lv_font_t *font = &kern_logo_100;
+  const lv_font_t *font = &signer_logo_100;
   int32_t target_h = logo_size * INNER_RING_PCT / 120;
   int32_t scale = scale_for_height(lv_font_get_line_height(font), target_h);
 
@@ -52,7 +52,7 @@ static lv_obj_t *create_label(lv_obj_t *parent, int32_t logo_size) {
   lv_obj_add_flag(label_box, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
 
   lv_obj_t *label = lv_label_create(label_box);
-  lv_label_set_text(label, "KERN");
+  lv_label_set_text(label, "SIGNER");
   lv_obj_set_style_text_font(label, font, 0);
   lv_obj_set_style_text_color(label, main_color(), 0);
   lv_obj_set_style_text_letter_space(label, -1, 0);
@@ -97,7 +97,7 @@ static void start_fade_anim(lv_obj_t *obj, uint32_t duration, uint32_t delay) {
 }
 
 /** Create logo symbol only */
-lv_obj_t *kern_logo_create(lv_obj_t *parent, int32_t x, int32_t y,
+lv_obj_t *signer_logo_create(lv_obj_t *parent, int32_t x, int32_t y,
                            int32_t size) {
   lv_obj_t *c = lv_obj_create(parent);
   lv_obj_remove_style_all(c);
@@ -114,18 +114,18 @@ lv_obj_t *kern_logo_create(lv_obj_t *parent, int32_t x, int32_t y,
 }
 
 /** Create logo with text, horizontally centered at top */
-lv_obj_t *kern_logo_with_text(lv_obj_t *parent, int32_t x, int32_t y) {
+lv_obj_t *signer_logo_with_text(lv_obj_t *parent, int32_t x, int32_t y) {
   int32_t sz = theme_get_logo_size() * 160 / 200;
   lv_obj_t *c =
       create_flex_container(parent, LV_ALIGN_TOP_MID, sz * TEXT_GAP_PCT / 100);
   lv_obj_align(c, LV_ALIGN_TOP_MID, x, y);
-  kern_logo_create(c, 0, 0, sz);
+  signer_logo_create(c, 0, 0, sz);
   create_label(c, sz);
   return c;
 }
 
 /** Create logo with text as a flex-friendly child (no forced alignment) */
-lv_obj_t *kern_logo_with_text_inline(lv_obj_t *parent) {
+lv_obj_t *signer_logo_with_text_inline(lv_obj_t *parent) {
   int32_t sz = theme_get_logo_size() * 160 / 200;
   lv_obj_t *c = lv_obj_create(parent);
   lv_obj_remove_style_all(c);
@@ -135,13 +135,13 @@ lv_obj_t *kern_logo_with_text_inline(lv_obj_t *parent) {
   lv_obj_set_flex_align(c, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_column(c, sz * TEXT_GAP_PCT / 100, 0);
-  kern_logo_create(c, 0, 0, sz);
+  signer_logo_create(c, 0, 0, sz);
   create_label(c, sz);
   return c;
 }
 
 /** Animated logo with text for boot screen, vertically centered */
-void kern_logo_animated(lv_obj_t *parent) {
+void signer_logo_animated(lv_obj_t *parent) {
   int32_t size = theme_get_logo_size();
   int32_t t = LV_MAX(size / 80, 1);
 

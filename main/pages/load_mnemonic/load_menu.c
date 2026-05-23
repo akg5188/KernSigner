@@ -82,7 +82,7 @@ static void return_from_qr_scanner_cb(void) {
     bool is_kef = kef_is_envelope(envelope, envelope_len);
 
     if (!is_kef) {
-      /* Try base43 decode (Krux encodes KEF envelopes as base43 for QR) */
+      /* Try base43 decode (KernSigner encodes KEF envelopes as base43 for QR) */
       size_t decoded_len = 0;
       if (base43_decode(scanned_content, content_len, &decoded, &decoded_len) &&
           kef_is_envelope(decoded, decoded_len)) {

@@ -83,9 +83,9 @@ esp_err_t sd_card_init(void) {
     if (s_mounted) return ESP_OK;
     const char *root = sdcard_root();
     char path[512];
-    snprintf(path, sizeof(path), "%s/kern/mnemonics", root);
+    snprintf(path, sizeof(path), "%s/signer/mnemonics", root);
     mkdir_p(path);
-    snprintf(path, sizeof(path), "%s/kern/descriptors", root);
+    snprintf(path, sizeof(path), "%s/signer/descriptors", root);
     mkdir_p(path);
     s_mounted = true;
     ESP_LOGI(TAG, "SD card simulator initialized at %s", root);

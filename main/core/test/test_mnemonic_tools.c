@@ -158,7 +158,7 @@ static void test_entropy_source_vectors(void) {
                         "00000000000000000000000000000000"
                         "00000000000000000000000000000000"));
 
-  test_generated_eq("D20 Krux text hash",
+  test_generated_eq("D20 KernSigner text hash",
                     mnemonic_tools_from_sha256_text(
                         "1-2-3-4-5-6-7-8-9-10-11-12-13-14-15-16-17-18-19-20-"
                         "1-2-3-4-5-6-7-8-9-10",

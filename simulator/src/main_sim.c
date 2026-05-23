@@ -1,5 +1,5 @@
 /**
- * Kern Desktop Simulator — Entry Point
+ * KernSigner Desktop Simulator — Entry Point
  *
  * Mirrors the initialization sequence from main/main.c but uses
  * SDL2 for display and mouse input instead of ESP32-P4 hardware.
@@ -12,10 +12,10 @@
 #include "ui/theme.h"
 #include "ui/word_selector.h"
 #include "core/settings.h"
-#include "pages/krux_shell/krux_shell.h"
+#include "pages/signer_shell/signer_shell.h"
 #include "pages/scan/scan.h"
 #include "pages/shared/mnemonic_slots_page.h"
-#include "krux_port/krux_feature_catalog.h"
+#include "signer_port/signer_feature_catalog.h"
 #include "esp_lvgl_port.h"
 #include <nvs_flash.h>
 #include <esp_err.h>
@@ -286,7 +286,7 @@ static int record_button_navigation_check(FILE *interaction_file,
                                           const char *button_label,
                                           const char *expected_id,
                                           const char *expected_text) {
-    if (!krux_shell_show_screen(start_id)) {
+    if (!signer_shell_show_screen(start_id)) {
         if (interaction_file) {
             write_tsv_field(interaction_file, start_id);
             fputc('\t', interaction_file);
@@ -302,7 +302,7 @@ static int record_button_navigation_check(FILE *interaction_file,
 
     run_lvgl_frames(3);
     bool clicked = click_button_with_label(button_label);
-    const char *actual_id = krux_shell_current_screen_id();
+    const char *actual_id = signer_shell_current_screen_id();
     bool action_only = expected_id && strcmp(expected_id, "*action*") == 0;
     bool matched_id = clicked && actual_id && expected_id && !action_only &&
                       strcmp(actual_id, expected_id) == 0;
@@ -428,16 +428,16 @@ static int run_button_interaction_checks(FILE *interaction_file) {
                                                    checks[i].expected_text);
     }
 
-    for (size_t i = 0; i < krux_shell_screen_count(); i++) {
-        const char *id = krux_shell_screen_id_at(i);
-        const krux_feature_t *feature = krux_feature_find(id);
+    for (size_t i = 0; i < signer_shell_screen_count(); i++) {
+        const char *id = signer_shell_screen_id_at(i);
+        const signer_feature_t *feature = signer_feature_find(id);
         if (!feature || !feature->parent_id)
             continue;
 
         failures += record_button_navigation_check(interaction_file, feature->id,
                                                    "返回", feature->parent_id,
                                                    NULL);
-        const krux_feature_t *parent = krux_feature_find(feature->parent_id);
+        const signer_feature_t *parent = signer_feature_find(feature->parent_id);
         if (strcmp(feature->parent_id, "home") != 0 && parent &&
             parent->parent_id && strcmp(parent->parent_id, "home") != 0) {
             failures += record_button_navigation_check(interaction_file,
@@ -446,7 +446,7 @@ static int run_button_interaction_checks(FILE *interaction_file) {
         }
     }
 
-    (void)krux_shell_show_screen("home");
+    (void)signer_shell_show_screen("home");
     run_lvgl_frames(3);
     return failures;
 }
@@ -586,7 +586,7 @@ static void simulator_capture_current_page(const char *dir, FILE *manifest,
 static void simulator_capture_load_punch_grid_children(
     const char *dir, FILE *manifest, FILE *glyph_file, FILE *smoke_file,
     FILE *scroll_file, size_t *next_index, int *failures) {
-    if (!krux_shell_show_screen("load_punch_grid"))
+    if (!signer_shell_show_screen("load_punch_grid"))
         return;
 
     run_lvgl_frames(3);
@@ -595,42 +595,42 @@ static void simulator_capture_load_punch_grid_children(
                                    "load_punch_grid_menu", "点阵和1248导入",
                                    failures);
 
-    if (krux_shell_show_screen("load_punch_grid")) {
+    if (signer_shell_show_screen("load_punch_grid")) {
         run_lvgl_frames(3);
         if (click_button_with_label("点阵板恢复")) {
             simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                            scroll_file, (*next_index)++,
                                            "load_tinyseed_restore",
                                            "点阵板恢复", failures);
-            (void)krux_shell_show_screen("load_punch_grid");
+            (void)signer_shell_show_screen("load_punch_grid");
             run_lvgl_frames(3);
         } else {
             (*failures)++;
         }
     }
 
-    if (krux_shell_show_screen("load_punch_grid")) {
+    if (signer_shell_show_screen("load_punch_grid")) {
         run_lvgl_frames(3);
         if (click_button_with_label("1248恢复")) {
             simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                            scroll_file, (*next_index)++,
                                            "load_stackbit_restore", "1248恢复",
                                            failures);
-            (void)krux_shell_show_screen("load_punch_grid");
+            (void)signer_shell_show_screen("load_punch_grid");
             run_lvgl_frames(3);
         } else {
             (*failures)++;
         }
     }
 
-    (void)krux_shell_show_screen("home");
+    (void)signer_shell_show_screen("home");
     run_lvgl_frames(3);
 }
 
 static void simulator_capture_backup_export_children(
     const char *dir, FILE *manifest, FILE *glyph_file, FILE *smoke_file,
     FILE *scroll_file, size_t *next_index, int *failures) {
-    if (!krux_shell_show_screen("backup_export"))
+    if (!signer_shell_show_screen("backup_export"))
         return;
 
     run_lvgl_frames(3);
@@ -638,20 +638,20 @@ static void simulator_capture_backup_export_children(
         simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                        scroll_file, (*next_index)++,
                                        "backup_kef", "加密备份文件", failures);
-        (void)krux_shell_show_screen("backup_export");
+        (void)signer_shell_show_screen("backup_export");
         run_lvgl_frames(3);
     } else {
         (*failures)++;
     }
 
-    (void)krux_shell_show_screen("home");
+    (void)signer_shell_show_screen("home");
     run_lvgl_frames(3);
 }
 
 static void simulator_capture_custom_derivation_children(
     const char *dir, FILE *manifest, FILE *glyph_file, FILE *smoke_file,
     FILE *scroll_file, size_t *next_index, int *failures) {
-    if (!krux_shell_show_screen("custom_derivation"))
+    if (!signer_shell_show_screen("custom_derivation"))
         return;
 
     run_lvgl_frames(3);
@@ -664,7 +664,7 @@ static void simulator_capture_custom_derivation_children(
         (*failures)++;
     }
 
-    if (krux_shell_show_screen("custom_derivation")) {
+    if (signer_shell_show_screen("custom_derivation")) {
         run_lvgl_frames(3);
         if (click_button_with_label("智能卡")) {
             simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
@@ -676,7 +676,7 @@ static void simulator_capture_custom_derivation_children(
         }
     }
 
-    (void)krux_shell_show_screen("home");
+    (void)signer_shell_show_screen("home");
     run_lvgl_frames(3);
 }
 
@@ -689,7 +689,7 @@ static int capture_custom_derivation_screens(const char *dir) {
     int failures = 0;
     char path[512];
 
-    if (!krux_shell_show_screen("custom_derivation")) {
+    if (!signer_shell_show_screen("custom_derivation")) {
         fprintf(stderr, "missing custom_derivation screen\n");
         return 1;
     }
@@ -697,7 +697,7 @@ static int capture_custom_derivation_screens(const char *dir) {
     snprintf(path, sizeof(path), "%s/custom_derivation_source.bmp", dir);
     failures += write_screen_bmp(path);
 
-    if (!krux_shell_show_screen("custom_derivation") ||
+    if (!signer_shell_show_screen("custom_derivation") ||
         !click_button_with_label("助记词")) {
         fprintf(stderr, "missing custom_derivation mnemonic detail\n");
         failures++;
@@ -714,7 +714,7 @@ static int capture_custom_derivation_screens(const char *dir) {
         }
     }
 
-    if (!krux_shell_show_screen("custom_derivation") ||
+    if (!signer_shell_show_screen("custom_derivation") ||
         !click_button_with_label("智能卡")) {
         fprintf(stderr, "missing custom_derivation smartcard detail\n");
         failures++;
@@ -802,7 +802,7 @@ static int capture_loaded_mnemonic_menu_screen(const char *dir) {
     return failures;
 }
 
-static int capture_krux_shell_screens(const char *dir) {
+static int capture_signer_shell_screens(const char *dir) {
     if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
         perror(dir);
         return 1;
@@ -865,9 +865,9 @@ static int capture_krux_shell_screens(const char *dir) {
             "start_id\tbutton_label\texpected_id\texpected_text\tactual_id\tstatus\n");
 
     int failures = 0;
-    for (size_t i = 0; i < krux_shell_screen_count(); i++) {
-        const char *id = krux_shell_screen_id_at(i);
-        const char *title = krux_shell_screen_title_at(i);
+    for (size_t i = 0; i < signer_shell_screen_count(); i++) {
+        const char *id = signer_shell_screen_id_at(i);
+        const char *title = signer_shell_screen_title_at(i);
         if (id && (strcmp(id, "load_tinyseed_restore") == 0 ||
                    strcmp(id, "load_stackbit_restore") == 0)) {
             continue;
@@ -878,7 +878,7 @@ static int capture_krux_shell_screens(const char *dir) {
                  id ? id : "missing");
         snprintf(path, sizeof(path), "%s/%s", dir, filename);
 
-        if (!krux_shell_show_screen(id)) {
+        if (!signer_shell_show_screen(id)) {
             fprintf(stderr, "missing screen: %s\n", id ? id : "(null)");
             fprintf(manifest, "%zu\t%s\t%s\t%s\t%d\t%d\tmissing\t0\n",
                     i + 1, id ? id : "", title ? title : "", filename,
@@ -954,7 +954,7 @@ static int capture_krux_shell_screens(const char *dir) {
                 capture_status, missing_glyphs);
     }
 
-    size_t extra_index = krux_shell_screen_count() + 1;
+    size_t extra_index = signer_shell_screen_count() + 1;
     simulator_capture_load_punch_grid_children(
         dir, manifest, glyph_file, smoke_file, scroll_file, &extra_index,
         &failures);
@@ -1016,14 +1016,14 @@ static int capture_web3_review_screens(const char *dir) {
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [OPTIONS]\n\n", prog);
-    printf("Kern Desktop Simulator\n\n");
+    printf("KernSigner Desktop Simulator\n\n");
     printf("Options:\n");
     printf("  -q, --qr-image <path>   Load QR image for camera simulation\n");
     printf("  -Q, --qr-dir <path>     Load QR images from directory\n");
     printf("  -d, --data-dir <path>   Data directory (default: simulator/sim_data/)\n");
     printf("  -W, --width <N>         Display width in pixels (default: %d)\n", SIM_LCD_H_RES);
     printf("  -H, --height <N>        Display height in pixels (default: %d)\n", SIM_LCD_V_RES);
-    printf("  -S, --screenshot-dir <path>  Capture every Krux shell screen to BMP\n");
+    printf("  -S, --screenshot-dir <path>  Capture every KernSigner shell screen to BMP\n");
     printf("  -C, --custom-derivation-dir <path>  Capture derivation source/detail BMPs\n");
     printf("  -M, --mnemonic-slots-dir <path> Capture mnemonic slot picker BMP\n");
     printf("  -L, --loaded-menu-dir <path> Capture loaded mnemonic menu BMP\n");
@@ -1050,7 +1050,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr,
         "\n"
         "  \x1b[1;31m================================================================\x1b[0m\n"
-        "  \x1b[1;31m  Kern SIMULATOR - developer build, DO NOT USE WITH REAL FUNDS\x1b[0m\n"
+        "  \x1b[1;31m  KernSigner SIMULATOR - developer build, DO NOT USE WITH REAL FUNDS\x1b[0m\n"
         "  \x1b[1;31m================================================================\x1b[0m\n"
         "\n");
 
@@ -1143,7 +1143,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("Kern Simulator starting (%dx%d)\n", sim_width, sim_height);
+    printf("KernSigner Simulator starting (%dx%d)\n", sim_width, sim_height);
 
     /* Initialize LVGL */
     lv_init();
@@ -1155,7 +1155,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    lv_sdl_window_set_title(disp, "Kern Simulator");
+    lv_sdl_window_set_title(disp, "KernSigner Simulator");
 
     /* Create SDL2 mouse input */
     lv_indev_t *mouse = lv_sdl_mouse_create();
@@ -1190,9 +1190,9 @@ int main(int argc, char *argv[]) {
     /* Initialize PMIC (simulated battery on wave_35; no-op on wave_4b) */
     bsp_pmic_init();
 
-    /* Kern is the desktop BSP shim; startup mirrors hardware and enters the
-     * Krux migration shell directly instead of the old wallet/login flow. */
-    krux_shell_create(scr);
+    /* KernSigner is the desktop BSP shim; startup mirrors hardware and enters the
+     * KernSigner migration shell directly instead of the old wallet/login flow. */
+    signer_shell_create(scr);
     if (custom_derivation_dir)
         return capture_custom_derivation_screens(custom_derivation_dir);
     if (mnemonic_slots_dir)
@@ -1204,7 +1204,7 @@ int main(int argc, char *argv[]) {
     if (web3_review_dir)
         return capture_web3_review_screens(web3_review_dir);
     if (screenshot_dir)
-        return capture_krux_shell_screens(screenshot_dir);
+        return capture_signer_shell_screens(screenshot_dir);
 
     /* -----------------------------------------------------------------------
      * Main loop

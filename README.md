@@ -14,7 +14,7 @@ KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, 
 
 It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for the Waveshare ESP32-P4 4.3-inch touch-screen device.
 
-**Project identity:** KernSigner is a heavily modified derivative built from the upstream Kern codebase. It is not the official Kern project, not an official Kern firmware release, and should not be confused with upstream Kern.
+**Project identity:** KernSigner is a heavily modified derivative built from the upstream Kern codebase. It is not the official Kern project, not an official Kern firmware release, and should not be confused with upstream KernSigner.
 
 One of the most important upstream references here is [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner); its wallet flow, UX patterns, and smart-card-adjacent thinking influenced a large part of the project structure.
 
@@ -24,13 +24,13 @@ The current tree is a **test-funds validation build**, not an audited production
 
 ## Screenshots / 界面截图
 
-当前 GitHub 截图已经换成 KernSigner 最新界面，不再保留上游 Kern 原始截图。
+当前 GitHub 截图已经换成 KernSigner 最新界面，不再保留上游 KernSigner 原始截图。
 
 最新公开截图批次：[docs/screens/current_20260522_193505](docs/screens/current_20260522_193505)
 
 - PNG 截图：296 张，已入库用于 GitHub 浏览。
 - BMP 截图：本地重复导出文件，不上传，避免仓库过大。
-- 全量 Krux/KernSigner 页面：146 个。
+- 全量 KernSigner 页面：146 个。
 - 自动检查结果：缺字 0，smoke 失败 0，scroll 失败 0，截图生成失败 0。
 - 备注：模拟器交互检查里 `custom_derivation` 有 2 个导航预期不一致，不影响本批截图完整性。
 
@@ -121,7 +121,7 @@ Other Waveshare ESP32-P4 display boards are not supported by this project unless
 
 An OV5647 camera module is required for camera and QR workflows.
 
-ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board includes an ESP32-C6 companion chip, but Kern's signer model treats the firmware as an offline, QR-first device.
+ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board includes an ESP32-C6 companion chip, but KernSigner's signer model treats the firmware as an offline, QR-first device.
 
 ## Approximate Hardware Cost / 基础硬件成本
 
@@ -173,7 +173,7 @@ main/pages/         LVGL page flows and wallet screens
 main/ui/            Reusable UI widgets, theme, icons, fonts, and navigation
 main/qr/            QR parser, scanner, encoder, and viewer
 main/smartcard/     USB CCID and Satochip integration
-main/krux_port/     Krux-style shell, hardware probes, and service adapters
+main/signer_port/     KernSigner-style shell, hardware probes, and service adapters
 components/         ESP-IDF components and third-party libraries
 simulator/          SDL2 desktop simulator
 scripts/            Format, test, CI, and release helpers
@@ -274,16 +274,16 @@ The simulator renders the LVGL UI in an SDL2 window:
 cd simulator
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -- -j"$(nproc)"
-./build/kern_simulator
+./build/signer_simulator
 ```
 
 Useful options:
 
 ```bash
-./build/kern_simulator --width 480 --height 800
-./build/kern_simulator --qr-image path/to/qr.png
-./build/kern_simulator --qr-dir path/to/qr-images
-./build/kern_simulator --data-dir /tmp/kern-sim-data
+./build/signer_simulator --width 480 --height 800
+./build/signer_simulator --qr-image path/to/qr.png
+./build/signer_simulator --qr-dir path/to/qr-images
+./build/signer_simulator --data-dir /tmp/ksigner-sim-data
 ```
 
 See [simulator/README.md](simulator/README.md) for webcam support and platform notes.
@@ -312,9 +312,9 @@ Run the local CI bundle used by commit-history checks:
 Run the delivery and production checks used by the current validation workflow:
 
 ```bash
-tools/kern_delivery.sh check
-tools/kern_delivery.sh final
-tools/kern_delivery.sh prodcheck
+tools/signer_delivery.sh check
+tools/signer_delivery.sh final
+tools/signer_delivery.sh prodcheck
 ```
 
 `prodcheck` is expected to fail on normal development builds until production security options and release provenance are deliberately enabled.
@@ -376,7 +376,7 @@ esptool --chip esp32p4 --baud 460800 write-flash \
 
 KernSigner is strongly inspired by [Kern](https://github.com/odudex/Kern), [Krux](https://github.com/selfcustody/krux), [Blockstream Jade](https://github.com/Blockstream/Jade), [SeedSigner](https://github.com/SeedSigner/seedsigner), [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner), [Specter-DIY](https://github.com/cryptoadvance/specter-diy), [Toporin/Satochip](https://github.com/Toporin), and `satochip-signer` smart-card reference material.
 
-Kern uses [libwally-core](https://github.com/ElementsProject/libwally-core/) for Bitcoin primitives.
+This project uses [libwally-core](https://github.com/ElementsProject/libwally-core/) for Bitcoin primitives.
 
 ## License
 

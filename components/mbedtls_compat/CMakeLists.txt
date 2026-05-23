@@ -1,6 +1,6 @@
 # Compatibility shims for mbedTLS v4 (ESP-IDF 6.x).
 #
-# The Krux migration shell currently builds on ESP-IDF 5.5.x for ESP32-P4,
+# The KernSigner migration shell currently builds on ESP-IDF 5.5.x for ESP32-P4,
 # where mbedtls/private/*.h does not exist. Keep this component visible so
 # libwally can depend on it later, but only compile the shim on IDF 6+.
 if(DEFINED IDF_VERSION_MAJOR AND IDF_VERSION_MAJOR LESS 6)

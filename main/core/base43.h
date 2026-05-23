@@ -2,7 +2,7 @@
  * Base43 encoding/decoding
  *
  * Uses the charset "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ$*+-./:".
- * This is a subset of QR code Alphanumeric mode, used by Krux for
+ * This is a subset of QR code Alphanumeric mode, used by KernSigner for
  * efficient KEF-encrypted mnemonic QR codes.
  */
 

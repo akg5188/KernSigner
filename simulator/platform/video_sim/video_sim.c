@@ -1,5 +1,5 @@
 /**
- * Video simulator for Kern Desktop Simulator.
+ * Video simulator for KernSigner Desktop Simulator.
  *
  * Loads a QR image from disk via stb_image, converts it to RGB565,
  * and delivers frames at ~30fps via the registered frame callback.

@@ -9,8 +9,8 @@
 #if !defined(ICONS_36) || ICONS_36
 #include "assets/icons_36.h"
 #endif
-#include "assets/krux_cn_20.h"
-#include "assets/krux_cn_28.h"
+#include "assets/signer_cn_20.h"
+#include "assets/signer_cn_28.h"
 
 static int max_i(int a, int b) { return a > b ? a : b; }
 
@@ -49,26 +49,26 @@ typedef struct {
 } theme_font_pair_t;
 
 static theme_font_pair_t font_pair_for_size(uint16_t size) {
-  // The LVGL built-in CJK font is a limited subset. Use the generated Krux
+  // The LVGL built-in CJK font is a limited subset. Use the generated KernSigner
   // Chinese UI subset first so visible Chinese text does not render as boxes.
   switch (size) {
 #if !defined(ICONS_16) || ICONS_16
   case 16:
-    return (theme_font_pair_t){&krux_cn_20, &icons_16};
+    return (theme_font_pair_t){&signer_cn_20, &icons_16};
 #endif
 #if !defined(ICONS_24) || ICONS_24
   case 24:
-    return (theme_font_pair_t){&krux_cn_28, &icons_24};
+    return (theme_font_pair_t){&signer_cn_28, &icons_24};
 #endif
 #if !defined(ICONS_36) || ICONS_36
   case 36:
-    return (theme_font_pair_t){&krux_cn_28, &icons_36};
+    return (theme_font_pair_t){&signer_cn_28, &icons_36};
 #endif
   default:
 #if !defined(ICONS_24) || ICONS_24
-    return (theme_font_pair_t){&krux_cn_28, &icons_24};
+    return (theme_font_pair_t){&signer_cn_28, &icons_24};
 #else
-    return (theme_font_pair_t){&krux_cn_20, NULL};
+    return (theme_font_pair_t){&signer_cn_20, NULL};
 #endif
   }
 }

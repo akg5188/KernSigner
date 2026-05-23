@@ -1,4 +1,4 @@
-if(CONFIG_KERN_BOARD_WAVE_5)
+if(CONFIG_KSIG_BOARD_WAVE_5)
     idf_component_register(
         SRCS "wave_5.c" "esp_lcd_hx8394.c"
         INCLUDE_DIRS "include"

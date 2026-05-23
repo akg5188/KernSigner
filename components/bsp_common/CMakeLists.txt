@@ -3,7 +3,7 @@
 
 set(srcs "")
 # Boards without a dedicated PMIC chip get the no-op stub.
-if(NOT CONFIG_KERN_BOARD_WAVE_35)
+if(NOT CONFIG_KSIG_BOARD_WAVE_35)
     list(APPEND srcs "pmic_stub.c")
 endif()
 

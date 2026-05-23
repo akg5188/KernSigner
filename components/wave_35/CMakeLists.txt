@@ -1,4 +1,4 @@
-if(CONFIG_KERN_BOARD_WAVE_35)
+if(CONFIG_KSIG_BOARD_WAVE_35)
     idf_component_register(
         SRCS "wave_35.c" "pmic.c"
         INCLUDE_DIRS "include"

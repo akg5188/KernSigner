@@ -58,17 +58,17 @@ KEY_SCREENSHOT_IDS=(
 )
 
 log() {
-  printf '[kern-delivery] %s\n' "$*"
+  printf '[signer-delivery] %s\n' "$*"
 }
 
 source_idf() {
   # shellcheck source=/dev/null
-  source "$IDF_PATH/export.sh" >/tmp/kern_idf_export.log
+  source "$IDF_PATH/export.sh" >/tmp/ksigner_idf_export.log
 }
 
 bake_fonts() {
   log "bake Chinese font subset"
-  (cd "$ROOT_DIR" && tools/bake_krux_cn_fonts.py)
+  (cd "$ROOT_DIR" && tools/bake_signer_cn_fonts.py)
 }
 
 build_sim() {
@@ -86,7 +86,7 @@ screenshots() {
   out="$ROOT_DIR/docs/screens/delivery_$stamp"
   mkdir -p "$out"
   log "capture simulator screenshots: $out"
-  (cd "$ROOT_DIR" && SDL_VIDEODRIVER=dummy simulator/build/kern_simulator \
+  (cd "$ROOT_DIR" && SDL_VIDEODRIVER=dummy simulator/build/signer_simulator \
     --width "$SIM_WIDTH" --height "$SIM_HEIGHT" --screenshot-dir "$out")
   LAST_SCREENSHOT_DIR="$out"
 }
@@ -149,7 +149,7 @@ verify_screenshots() {
   LAST_ACCEPTANCE_REPORT="$report"
 
   {
-    echo "Kern Acceptance Report"
+    echo "KernSigner Acceptance Report"
     echo "======================"
     echo
     echo "Time: $(date -Iseconds)"
@@ -309,7 +309,7 @@ verify_screenshots() {
     fi
   done
 
-  local png_python="${KERN_PNG_PYTHON:-/usr/bin/python3}"
+  local png_python="${KSIG_PNG_PYTHON:-/usr/bin/python3}"
   if [[ ! -x "$png_python" ]]; then
     png_python="$(command -v python3 2>/dev/null || true)"
   fi
@@ -503,8 +503,8 @@ verify_boot_log() {
 write_final_readiness_file() {
   local release_dir="$1"
   local output_file="$2"
-  local release_class="${KERN_RELEASE_CLASS:-development-acceptance}"
-  local require_production="${KERN_REQUIRE_PRODUCTION:-0}"
+  local release_class="${KSIG_RELEASE_CLASS:-development-acceptance}"
+  local require_production="${KSIG_REQUIRE_PRODUCTION:-0}"
   local firmware_file="$release_dir/kernsigner.bin"
   local acceptance_file="$release_dir/ACCEPTANCE_REPORT.txt"
   local summary_file="$release_dir/RELEASE_SUMMARY.txt"
@@ -633,12 +633,12 @@ write_build_provenance_file() {
   version="$(cat "$ROOT_DIR/version.txt" 2>/dev/null || echo unknown)"
 
   cat >"$output_file" <<EOF
-Kern Build Provenance
+KernSigner Build Provenance
 =====================
 
 Time: $(date -Iseconds)
 Release directory: $release_dir
-Release class: ${KERN_RELEASE_CLASS:-development-acceptance}
+Release class: ${KSIG_RELEASE_CLASS:-development-acceptance}
 
 Firmware:
 - File: $firmware_file
@@ -673,7 +673,7 @@ write_manufacturing_readiness_file() {
   fi
 
   cat >"$output_file" <<EOF
-Kern Manufacturing Readiness
+KernSigner Manufacturing Readiness
 ============================
 
 Production gate: $production_gate
@@ -750,7 +750,7 @@ verify_release_package() {
   done
 
   if [[ -s "$release_dir/SHA256SUMS.txt" ]]; then
-    if (cd "$release_dir" && sha256sum -c SHA256SUMS.txt >/tmp/kern_final_sha256.log); then
+    if (cd "$release_dir" && sha256sum -c SHA256SUMS.txt >/tmp/ksigner_final_sha256.log); then
       log "final verify: SHA256SUMS PASS"
     else
       log "final verify FAIL: SHA256SUMS mismatch"
@@ -786,7 +786,7 @@ verify_release_package() {
 
   if [[ -s "$release_dir/FINAL_READINESS.txt" ]]; then
     grep -Fq "Final readiness: PASS" "$release_dir/FINAL_READINESS.txt" || failures=1
-    if [[ "${KERN_REQUIRE_PRODUCTION:-0}" == "1" ]]; then
+    if [[ "${KSIG_REQUIRE_PRODUCTION:-0}" == "1" ]]; then
       grep -Fq "Production gate: PASS" "$release_dir/FINAL_READINESS.txt" || failures=1
     fi
   fi
@@ -797,7 +797,7 @@ verify_release_package() {
   fi
 
   if [[ -s "$release_dir/MANUFACTURING_READINESS.txt" &&
-        "${KERN_REQUIRE_PRODUCTION:-0}" == "1" ]]; then
+        "${KSIG_REQUIRE_PRODUCTION:-0}" == "1" ]]; then
     grep -Fq "Production gate: PASS" "$release_dir/MANUFACTURING_READINESS.txt" || failures=1
   fi
 
@@ -814,13 +814,13 @@ write_readme_first_file() {
   local output_file="$release_dir/README_FIRST.txt"
 
   cat >"$output_file" <<EOF
-Kern/Krux 先看这个
+KernSigner 先看这个
 ===================
 
-这是 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 的 Kern/Krux 真钱包功能版。
+这是 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 的 KernSigner 真钱包功能版。
 
 最快确认：
-1. 在仓库根目录执行：tools/kern_delivery.sh final
+1. 在仓库根目录执行：tools/signer_delivery.sh final
 2. 看到 final verify: PASS，说明这个交付包、固件 SHA256、截图、按钮验收、启动日志和文档都完整。
 3. 如果需要重刷真机，按 FLASH_COMMANDS.txt 操作。
 
@@ -849,32 +849,32 @@ write_flash_commands_file() {
   local output_file="$release_dir/FLASH_COMMANDS.txt"
 
   cat >"$output_file" <<EOF
-Kern/Krux 刷机与校验命令
+KernSigner 刷机与校验命令
 =========================
 
 进入项目目录：
 cd /home/ak/123/Kern
 
 最终校验最新交付包：
-tools/kern_delivery.sh final
+tools/signer_delivery.sh final
 
 重新生成开发验收包并自动最终校验：
-JOBS=2 tools/kern_delivery.sh ship
+JOBS=2 tools/signer_delivery.sh ship
 
 检查商业真钱包生产安全门槛：
-tools/kern_delivery.sh prodcheck
+tools/signer_delivery.sh prodcheck
 
 生成商业发布候选包：
-JOBS=2 tools/kern_delivery.sh prodship
+JOBS=2 tools/signer_delivery.sh prodship
 
 app-only 刷写当前开发板并抓启动日志：
-JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
+JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh appflash
 
 刷写真机、抓启动日志、重新生成开发验收包并最终校验：
-JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
+JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh shipflash
 
 只观察启动日志：
-ESPPORT=/dev/ttyACM0 tools/kern_delivery.sh monitor
+ESPPORT=/dev/ttyACM0 tools/signer_delivery.sh monitor
 
 注意：
 - kernsigner.bin 是 app 分区升级固件，不是空白板完整 factory 镜像。
@@ -892,7 +892,7 @@ write_flash_script_files() {
   local release_dir="$1"
   local firmware_sha="$2"
 
-  if [[ "${KERN_REQUIRE_PRODUCTION:-0}" == "1" ]]; then
+  if [[ "${KSIG_REQUIRE_PRODUCTION:-0}" == "1" ]]; then
     cat >"$release_dir/flash_app_linux.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -1026,7 +1026,7 @@ package_release() {
   local boot_log_src boot_log_dst boot_log_status readiness_dst production_check_dst production_gate_status
 
   stamp="$(date +%Y%m%d_%H%M%S)"
-  release_dir="$ROOT_DIR/_release/kern_delivery_$stamp"
+  release_dir="$ROOT_DIR/_release/signer_delivery_$stamp"
   firmware_src="$ROOT_DIR/$BUILD_DIR/kernsigner.bin"
   firmware_dst="$release_dir/kernsigner.bin"
 
@@ -1128,7 +1128,7 @@ package_release() {
   fi
 
   cat >"$release_dir/RELEASE_SUMMARY.txt" <<EOF
-Kern Delivery Release
+KernSigner Delivery Release
 =====================
 
 Time: $(date -Iseconds)
@@ -1164,16 +1164,16 @@ Acceptance:
 - Flash commands: $release_dir/FLASH_COMMANDS.txt
 
 Suggested commands:
-- Re-run non-flashing checks: tools/kern_delivery.sh check
-- Build firmware binary: tools/kern_delivery.sh build
-- Check commercial production security gate: tools/kern_delivery.sh prodcheck
-- Create development acceptance package: tools/kern_delivery.sh release
-- Verify latest package: tools/kern_delivery.sh final
-- One-command development package + final verify: tools/kern_delivery.sh ship
-- One-command production candidate package + final verify: tools/kern_delivery.sh prodship
-- One-command app flash + development package + final verify: ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
-- One-command app flash + production candidate package + final verify: ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh prodshipflash
-- Flash app partition only when explicitly ready: ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
+- Re-run non-flashing checks: tools/signer_delivery.sh check
+- Build firmware binary: tools/signer_delivery.sh build
+- Check commercial production security gate: tools/signer_delivery.sh prodcheck
+- Create development acceptance package: tools/signer_delivery.sh release
+- Verify latest package: tools/signer_delivery.sh final
+- One-command development package + final verify: tools/signer_delivery.sh ship
+- One-command production candidate package + final verify: tools/signer_delivery.sh prodship
+- One-command app flash + development package + final verify: ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh shipflash
+- One-command app flash + production candidate package + final verify: ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh prodshipflash
+- Flash app partition only when explicitly ready: ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh appflash
 EOF
 
   readiness_dst="$release_dir/FINAL_READINESS.txt"
@@ -1232,13 +1232,13 @@ EOF
 }
 
 ship_release() {
-  KERN_RELEASE_CLASS="${KERN_RELEASE_CLASS:-development-acceptance}" \
+  KSIG_RELEASE_CLASS="${KSIG_RELEASE_CLASS:-development-acceptance}" \
   package_release
   verify_release_package "$(latest_release_dir)"
 }
 
 ship_flash_release() {
-  export KERN_RELEASE_CLASS="${KERN_RELEASE_CLASS:-development-acceptance}"
+  export KSIG_RELEASE_CLASS="${KSIG_RELEASE_CLASS:-development-acceptance}"
   bake_fonts
   build_firmware
   app_flash_firmware
@@ -1249,19 +1249,19 @@ ship_flash_release() {
 
 prod_ship_release() {
   production_check
-  KERN_RELEASE_CLASS=production-candidate KERN_REQUIRE_PRODUCTION=1 package_release
-  KERN_REQUIRE_PRODUCTION=1 verify_release_package "$(latest_release_dir)"
+  KSIG_RELEASE_CLASS=production-candidate KSIG_REQUIRE_PRODUCTION=1 package_release
+  KSIG_REQUIRE_PRODUCTION=1 verify_release_package "$(latest_release_dir)"
 }
 
 prod_ship_flash_release() {
   production_check
-  if [[ "${KERN_ALLOW_PRODUCTION_APPFLASH:-0}" != "1" ]]; then
+  if [[ "${KSIG_ALLOW_PRODUCTION_APPFLASH:-0}" != "1" ]]; then
     log "production app-only flashing is blocked"
-    log "use the reviewed production provisioning flow instead, or set KERN_ALLOW_PRODUCTION_APPFLASH=1 only for controlled lab recovery"
+    log "use the reviewed production provisioning flow instead, or set KSIG_ALLOW_PRODUCTION_APPFLASH=1 only for controlled lab recovery"
     return 1
   fi
-  export KERN_RELEASE_CLASS=production-candidate
-  export KERN_REQUIRE_PRODUCTION=1
+  export KSIG_RELEASE_CLASS=production-candidate
+  export KSIG_REQUIRE_PRODUCTION=1
   bake_fonts
   build_firmware
   app_flash_firmware
@@ -1355,7 +1355,7 @@ PY
 }
 
 production_check() {
-  "$ROOT_DIR/tools/kern_production_check.sh" "$(production_sdkconfig_path)"
+  "$ROOT_DIR/tools/signer_production_check.sh" "$(production_sdkconfig_path)"
 }
 
 case "$ACTION" in

@@ -42,16 +42,16 @@ set(SOURCES
     "ui/assets/icons_16.c"
     "ui/assets/icons_24.c"
     "ui/assets/icons_36.c"
-    "ui/assets/kern_logo_font.c"
-    "ui/assets/kern_logo_lvgl.c"
-    "ui/assets/krux_cn_20.c"
-    "ui/assets/krux_cn_28.c"
-    "krux_port/krux_camera_preview.c"
-    "krux_port/krux_feature_catalog.c"
-    "krux_port/krux_hardware_probe.c"
-    "krux_port/krux_qr_decoder.c"
-    "krux_port/krux_services.c"
-    "krux_port/krux_storage_browser.c"
+    "ui/assets/signer_logo_font.c"
+    "ui/assets/signer_logo_lvgl.c"
+    "ui/assets/signer_cn_20.c"
+    "ui/assets/signer_cn_28.c"
+    "signer_port/signer_camera_preview.c"
+    "signer_port/signer_feature_catalog.c"
+    "signer_port/signer_hardware_probe.c"
+    "signer_port/signer_qr_decoder.c"
+    "signer_port/signer_services.c"
+    "signer_port/signer_storage_browser.c"
     "pages/capture_entropy.c"
     "pages/load_descriptor_storage.c"
     "pages/passphrase.c"
@@ -69,7 +69,7 @@ set(SOURCES
     "pages/home/backup/mnemonic_steel.c"
     "pages/home/backup/mnemonic_tinyseed.c"
     "pages/home/backup/mnemonic_words.c"
-    "pages/krux_shell/krux_shell.c"
+    "pages/signer_shell/signer_shell.c"
     "pages/load_mnemonic/load_menu.c"
     "pages/load_mnemonic/load_punch_grid.c"
     "pages/load_mnemonic/load_storage.c"
@@ -105,19 +105,19 @@ set(SOURCES
 )
 
 # Select touch driver based on board
-if(CONFIG_KERN_BOARD_WAVE_4B)
+if(CONFIG_KSIG_BOARD_WAVE_4B)
     set(TOUCH_DRIVER esp_lcd_touch_gt911)
     set(FONT_POLICY_WIDTH 720)
     set(FONT_POLICY_HEIGHT 720)
-elseif(CONFIG_KERN_BOARD_WAVE_35)
+elseif(CONFIG_KSIG_BOARD_WAVE_35)
     set(TOUCH_DRIVER esp_lcd_touch_ft5x06)
     set(FONT_POLICY_WIDTH 320)
     set(FONT_POLICY_HEIGHT 480)
-elseif(CONFIG_KERN_BOARD_WAVE_5)
+elseif(CONFIG_KSIG_BOARD_WAVE_5)
     set(TOUCH_DRIVER esp_lcd_touch_gt911)
     set(FONT_POLICY_WIDTH 720)
     set(FONT_POLICY_HEIGHT 1280)
-elseif(CONFIG_KERN_BOARD_WAVE_43)
+elseif(CONFIG_KSIG_BOARD_WAVE_43)
     set(TOUCH_DRIVER esp_lcd_touch_gt911)
     set(FONT_POLICY_WIDTH 480)
     set(FONT_POLICY_HEIGHT 800)

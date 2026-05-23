@@ -1,4 +1,4 @@
-if(CONFIG_KERN_BOARD_WAVE_4B)
+if(CONFIG_KSIG_BOARD_WAVE_4B)
     idf_component_register(
         SRCS "wave_4b.c"
         INCLUDE_DIRS "include"

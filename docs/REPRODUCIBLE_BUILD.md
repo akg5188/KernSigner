@@ -38,8 +38,8 @@ sha256sum firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
 Expected included firmware SHA256:
 
 ```text
-4720bc98d51c13a5afb81079873f7a4084878f1637d9af6f29e7c5460c632f53  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
-b4a18710d3520fb47d56600561a60ce92c49180d73220fb8b997053c3953493b  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
+dc2ae5caa3a8200c37dcdb7cbaa4d42ef89dfa86219fd45e99581efe1aef5fc1  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
+be1768a4f3897d04dadddab364cb34092e22ecb15c254d6c1c19dea8de27c07a  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
 ```
 
 A byte-for-byte match can depend on using the same ESP-IDF, toolchain, submodule commits, generated font assets, and sdkconfig. If the hash differs, compare:

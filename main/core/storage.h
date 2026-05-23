@@ -7,11 +7,11 @@
  * SD card: base64-encoded for KEF, raw text for plaintext.
  *
  * Mnemonic paths:
- *   SD:     /sdcard/kern/mnemonics/<sanitized_id>.kef
+ *   SD:     /sdcard/signer/mnemonics/<sanitized_id>.kef
  *
  * Descriptor paths:
  *   Flash:  /spiffs/d_<sanitized_id>.kef or .txt
- *   SD:     /sdcard/kern/descriptors/<sanitized_id>.kef or .txt
+ *   SD:     /sdcard/signer/descriptors/<sanitized_id>.kef or .txt
  */
 
 #ifndef STORAGE_H
@@ -29,8 +29,8 @@ typedef enum {
 } storage_location_t;
 
 #define STORAGE_FLASH_BASE_PATH "/spiffs"
-#define STORAGE_SD_MNEMONICS_DIR "/sdcard/kern/mnemonics"
-#define STORAGE_SD_DESCRIPTORS_DIR "/sdcard/kern/descriptors"
+#define STORAGE_SD_MNEMONICS_DIR "/sdcard/signer/mnemonics"
+#define STORAGE_SD_DESCRIPTORS_DIR "/sdcard/signer/descriptors"
 
 #define STORAGE_MAX_SANITIZED_ID_LEN 24
 #define STORAGE_MNEMONIC_PREFIX "m_"

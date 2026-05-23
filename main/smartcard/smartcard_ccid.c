@@ -59,7 +59,7 @@ void smartcard_ccid_snapshot(smartcard_ccid_report_t *out) {
 #include "usb/usb_helpers.h"
 #include "usb/usb_host.h"
 
-#define TAG "KERN_CCID"
+#define TAG "KSIG_CCID"
 
 #define USB_DESC_TYPE_INTERFACE 0x04
 #define USB_DESC_TYPE_ENDPOINT 0x05
@@ -1802,12 +1802,12 @@ esp_err_t smartcard_ccid_start(void) {
   }
 
   BaseType_t ok =
-      xTaskCreatePinnedToCore(host_lib_task, "kern_usb_host", 6144, NULL, 5,
+      xTaskCreatePinnedToCore(host_lib_task, "ksig_usb_host", 6144, NULL, 5,
                               &s_ctx.host_task, 0);
   if (ok != pdPASS)
     return ESP_ERR_NO_MEM;
 
-  ok = xTaskCreatePinnedToCore(client_task, "kern_ccid", 8192, &s_ctx, 4,
+  ok = xTaskCreatePinnedToCore(client_task, "ksig_ccid", 8192, &s_ctx, 4,
                                &s_ctx.client_task, 0);
   if (ok != pdPASS)
     return ESP_ERR_NO_MEM;

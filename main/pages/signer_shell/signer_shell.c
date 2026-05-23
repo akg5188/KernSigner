@@ -1,9 +1,9 @@
-#include "krux_shell.h"
-#include "krux_port/krux_camera_preview.h"
-#include "krux_port/krux_feature_catalog.h"
-#include "krux_port/krux_hardware_probe.h"
-#include "krux_port/krux_services.h"
-#include "krux_port/krux_storage_browser.h"
+#include "signer_shell.h"
+#include "signer_port/signer_camera_preview.h"
+#include "signer_port/signer_feature_catalog.h"
+#include "signer_port/signer_hardware_probe.h"
+#include "signer_port/signer_services.h"
+#include "signer_port/signer_storage_browser.h"
 #include "core/crypto_utils.h"
 #include "core/evm.h"
 #include "core/pin.h"
@@ -75,7 +75,7 @@
 #include <wally_bip39.h>
 #include <wally_core.h>
 
-static const char *TAG = "KERN_KRUX";
+static const char *TAG = "KSIG_SHELL";
 #ifndef ESP_ERR_INVALID_RESPONSE
 #define ESP_ERR_INVALID_RESPONSE ESP_ERR_INVALID_STATE
 #endif
@@ -114,7 +114,7 @@ static bool s_allow_sensitive_render;
 static char s_custom_derivation_return_id[40];
 #endif
 
-static const char *const KRUX_HOME_MENU_IDS[] = {
+static const char *const SIGNER_HOME_MENU_IDS[] = {
     "legacy_scan_sign", "pi_connect_wallet", "pi_mnemonic_tools",
     "smartcard_tools", "settings", "pi_self_check",
 };
@@ -122,36 +122,36 @@ static const char *const KRUX_HOME_MENU_IDS[] = {
 typedef struct {
   const char *label;
   const char *target_id;
-} krux_menu_override_t;
+} signer_menu_override_t;
 
-static bool krux_id_is(const char *id, const char *expected) {
+static bool signer_id_is(const char *id, const char *expected) {
   return id && expected && strcmp(id, expected) == 0;
 }
 
-static bool krux_id_is_any(const char *id, const char *a, const char *b) {
-  return krux_id_is(id, a) || krux_id_is(id, b);
+static bool signer_id_is_any(const char *id, const char *a, const char *b) {
+  return signer_id_is(id, a) || signer_id_is(id, b);
 }
 
-static bool krux_smartcard_tools_group_id(const char *id) {
-  return krux_id_is_any(id, "smartcard_satochip_tools",
+static bool signer_smartcard_tools_group_id(const char *id) {
+  return signer_id_is_any(id, "smartcard_satochip_tools",
                         "smartcard_satochip_maint") ||
-         krux_id_is_any(id, "smartcard_satochip_advanced_tools",
+         signer_id_is_any(id, "smartcard_satochip_advanced_tools",
                         "smartcard_satochip_pubkey_tools") ||
-         krux_id_is_any(id, "smartcard_satochip_2fa_tools",
+         signer_id_is_any(id, "smartcard_satochip_2fa_tools",
                         "smartcard_satochip_session_tools");
 }
 
-static bool krux_smartcard_seedkeeper_group_id(const char *id) {
-  return krux_id_is_any(id, "smartcard_satochip_seedkeeper_tools",
+static bool signer_smartcard_seedkeeper_group_id(const char *id) {
+  return signer_id_is_any(id, "smartcard_satochip_seedkeeper_tools",
                         "smartcard_seedkeeper_advanced_tools");
 }
 
-static bool krux_smartcard_certificate_group_id(const char *id) {
-  return krux_id_is_any(id, "smartcard_satochip_certificate_tools",
+static bool signer_smartcard_certificate_group_id(const char *id) {
+  return signer_id_is_any(id, "smartcard_satochip_certificate_tools",
                         "smartcard_certificate_tools");
 }
 
-static bool krux_id_has_prefix(const char *id, const char *prefix) {
+static bool signer_id_has_prefix(const char *id, const char *prefix) {
   if (!id || !prefix)
     return false;
   return strncmp(id, prefix, strlen(prefix)) == 0;
@@ -179,7 +179,7 @@ static const char *shell_alias_target_for_id(const char *id) {
   return NULL;
 }
 
-static const char *shell_back_target_for_feature(const krux_feature_t *feature) {
+static const char *shell_back_target_for_feature(const signer_feature_t *feature) {
   if (!feature || !feature->parent_id)
     return "home";
 
@@ -195,32 +195,32 @@ static const char *shell_back_target_for_feature(const krux_feature_t *feature) 
   return feature->parent_id;
 }
 
-static bool krux_sign_wallet_group_id(const char *id) {
-  return krux_id_is_any(id, "sign_okx", "sign_bitget") ||
-         krux_id_is_any(id, "sign_metamask", "sign_rabby") ||
-         krux_id_is_any(id, "sign_tokenpocket", "sign_imtoken") ||
-         krux_id_is(id, "sign_btc");
+static bool signer_sign_wallet_group_id(const char *id) {
+  return signer_id_is_any(id, "sign_okx", "sign_bitget") ||
+         signer_id_is_any(id, "sign_metamask", "sign_rabby") ||
+         signer_id_is_any(id, "sign_tokenpocket", "sign_imtoken") ||
+         signer_id_is(id, "sign_btc");
 }
 
-static bool krux_sign_mnemonic_target_id(const char *id) {
-  return krux_id_is_any(id, "sign_okx_mnemonic", "sign_bitget_mnemonic") ||
-         krux_id_is_any(id, "sign_metamask_mnemonic",
+static bool signer_sign_mnemonic_target_id(const char *id) {
+  return signer_id_is_any(id, "sign_okx_mnemonic", "sign_bitget_mnemonic") ||
+         signer_id_is_any(id, "sign_metamask_mnemonic",
                         "sign_rabby_mnemonic") ||
-         krux_id_is_any(id, "sign_tokenpocket_mnemonic",
+         signer_id_is_any(id, "sign_tokenpocket_mnemonic",
                         "sign_imtoken_mnemonic") ||
-         krux_id_is(id, "sign_btc_mnemonic");
+         signer_id_is(id, "sign_btc_mnemonic");
 }
 
-static bool krux_sign_satochip_target_id(const char *id) {
-  return krux_id_is_any(id, "sign_okx_satochip", "sign_bitget_satochip") ||
-         krux_id_is_any(id, "sign_metamask_satochip",
+static bool signer_sign_satochip_target_id(const char *id) {
+  return signer_id_is_any(id, "sign_okx_satochip", "sign_bitget_satochip") ||
+         signer_id_is_any(id, "sign_metamask_satochip",
                         "sign_rabby_satochip") ||
-         krux_id_is_any(id, "sign_tokenpocket_satochip",
+         signer_id_is_any(id, "sign_tokenpocket_satochip",
                         "sign_imtoken_satochip") ||
-         krux_id_is(id, "sign_btc_satochip");
+         signer_id_is(id, "sign_btc_satochip");
 }
 
-static const krux_menu_override_t KRUX_HOME_MENU[] = {
+static const signer_menu_override_t SIGNER_HOME_MENU[] = {
     {"扫码签名", "legacy_scan_sign"},
     {"连接钱包", "pi_connect_wallet"},
     {"助记词", "pi_mnemonic_tools"},
@@ -231,7 +231,7 @@ static const krux_menu_override_t KRUX_HOME_MENU[] = {
     {"工具", "tools"},
 };
 
-static const krux_menu_override_t KRUX_LOAD_MENU[] = {
+static const signer_menu_override_t SIGNER_LOAD_MENU[] = {
     {"二维码", "load_camera"},
     {"手动", "load_manual"},
     {"序号", "load_digits"},
@@ -242,7 +242,7 @@ static const krux_menu_override_t KRUX_LOAD_MENU[] = {
     {"点阵", "load_punch_grid"},
 };
 
-static const krux_menu_override_t KRUX_NEW_MENU[] = {
+static const signer_menu_override_t SIGNER_NEW_MENU[] = {
     {"骰子", "new_dice_d6"},
     {"抛硬币", "new_coin_entropy"},
     {"D20", "new_dice_d20"},
@@ -253,13 +253,13 @@ static const krux_menu_override_t KRUX_NEW_MENU[] = {
     {"智能卡", "new_seedkeeper_create_mnemonic"},
 };
 
-static const krux_menu_override_t KRUX_TOOLS_MENU[] = {
+static const signer_menu_override_t SIGNER_TOOLS_MENU[] = {
     {"二维码", "tools_create_qr"},
     {"扫码", "tools_qr_capture"},
     {"文件", "tools_file_manager"},
 };
 
-static const krux_menu_override_t KRUX_PI_MNEMONIC_MENU[] = {
+static const signer_menu_override_t SIGNER_PI_MNEMONIC_MENU[] = {
     {"创建", "new_mnemonic"},
     {"导入", "load_mnemonic"},
     {"本机助记词", "legacy_select_mnemonic"},
@@ -268,19 +268,19 @@ static const krux_menu_override_t KRUX_PI_MNEMONIC_MENU[] = {
     {"高级", "pi_mnemonic_advanced"},
 };
 
-static const krux_menu_override_t KRUX_MNEMONIC_WRITE_SMARTCARD_MENU[] = {
+static const signer_menu_override_t SIGNER_MNEMONIC_WRITE_SMARTCARD_MENU[] = {
     {"SeedKeeper", "smartcard_seedkeeper_write_mnemonic"},
     {"Satochip", "smartcard_satochip_write_mnemonic"},
 };
 
-static const krux_menu_override_t KRUX_PI_MNEMONIC_ADVANCED_MENU[] = {
+static const signer_menu_override_t SIGNER_PI_MNEMONIC_ADVANCED_MENU[] = {
     {"助记词加密", "tools_secondary_mnemonic"},
     {"派生地址", "custom_derivation"},
     {"BIP85", "bip85"},
     {"自检", "bip39_check_tools"},
 };
 
-static const krux_menu_override_t KRUX_PI_CONNECT_MENU[] = {
+static const signer_menu_override_t SIGNER_PI_CONNECT_MENU[] = {
     {"BTC", "btc_wallet"},
     {"OKX", "connect_okx"},
     {"Bitget", "connect_bitget"},
@@ -292,7 +292,7 @@ static const krux_menu_override_t KRUX_PI_CONNECT_MENU[] = {
     {"Keystone", "custom_derivation"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_WEB3_MENU[] = {
+static const signer_menu_override_t SIGNER_CONNECT_WEB3_MENU[] = {
     {"OKX", "connect_okx"},
     {"Bitget", "connect_bitget"},
     {"MetaMask", "connect_metamask"},
@@ -301,52 +301,52 @@ static const krux_menu_override_t KRUX_CONNECT_WEB3_MENU[] = {
     {"imToken", "connect_imtoken"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_OKX_MENU[] = {
+static const signer_menu_override_t SIGNER_CONNECT_OKX_MENU[] = {
     {"助记词", "web3_okx_mnemonic"},
     {"智能卡", "web3_okx_satochip"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_BITGET_MENU[] = {
+static const signer_menu_override_t SIGNER_CONNECT_BITGET_MENU[] = {
     {"助记词", "web3_bitget_mnemonic"},
     {"智能卡", "web3_bitget_satochip"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_METAMASK_MENU[] = {
+static const signer_menu_override_t SIGNER_CONNECT_METAMASK_MENU[] = {
     {"助记词", "web3_metamask_mnemonic"},
     {"智能卡", "web3_metamask_satochip"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_RABBY_MENU[] = {
+static const signer_menu_override_t SIGNER_CONNECT_RABBY_MENU[] = {
     {"助记词", "web3_rabby_mnemonic"},
     {"智能卡", "web3_rabby_satochip"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_TOKENPOCKET_MENU[] = {
+static const signer_menu_override_t SIGNER_CONNECT_TOKENPOCKET_MENU[] = {
     {"助记词", "web3_tokenpocket_mnemonic"},
     {"智能卡", "web3_tokenpocket_satochip"},
 };
 
-static const krux_menu_override_t KRUX_CONNECT_IMTOKEN_MENU[] = {
+static const signer_menu_override_t SIGNER_CONNECT_IMTOKEN_MENU[] = {
     {"助记词", "web3_imtoken_mnemonic"},
     {"智能卡", "web3_imtoken_satochip"},
 };
 
-static const krux_menu_override_t KRUX_BTC_WALLET_MENU[] = {
+static const signer_menu_override_t SIGNER_BTC_WALLET_MENU[] = {
     {"助记词", "btc_mnemonic"},
     {"智能卡", "btc_satochip"},
 };
 
-static const krux_menu_override_t KRUX_BTC_MNEMONIC_MENU[] = {
+static const signer_menu_override_t SIGNER_BTC_MNEMONIC_MENU[] = {
     {"zpub", "btc_bluewallet_zpub"},
     {"xpub", "btc_bluewallet_xpub"},
 };
 
-static const krux_menu_override_t KRUX_BTC_SATOCHIP_MENU[] = {
+static const signer_menu_override_t SIGNER_BTC_SATOCHIP_MENU[] = {
     {"zpub", "btc_satochip_zpub"},
     {"xpub", "btc_satochip_xpub"},
 };
 
-static const krux_menu_override_t KRUX_PI_SELF_CHECK_MENU[] = {
+static const signer_menu_override_t SIGNER_PI_SELF_CHECK_MENU[] = {
     {"系统", "system_overview"},
     {"安全", "security_check"},
     {"交付", "delivery_check"},
@@ -354,7 +354,7 @@ static const krux_menu_override_t KRUX_PI_SELF_CHECK_MENU[] = {
     {"外设", "device_tests"},
 };
 
-static const krux_menu_override_t KRUX_WALLET_MENU[] = {
+static const signer_menu_override_t SIGNER_WALLET_MENU[] = {
     {"助记词", "legacy_select_mnemonic"},
     {"扫码签名", "legacy_scan_sign"},
     {"公钥", "legacy_public_key"},
@@ -364,7 +364,7 @@ static const krux_menu_override_t KRUX_WALLET_MENU[] = {
     {"清除会话", "login_clear_session"},
 };
 
-static const krux_menu_override_t KRUX_SIGNING_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGNING_MENU[] = {
     {"BTC", "sign_btc"},
     {"OKX", "sign_okx"},
     {"Bitget", "sign_bitget"},
@@ -374,47 +374,47 @@ static const krux_menu_override_t KRUX_SIGNING_MENU[] = {
     {"imToken", "sign_imtoken"},
 };
 
-static const krux_menu_override_t KRUX_SIGN_OKX_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGN_OKX_MENU[] = {
     {"助记词", "sign_okx_mnemonic"},
     {"智能卡", "sign_okx_satochip"},
 };
 
-static const krux_menu_override_t KRUX_SIGN_BITGET_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGN_BITGET_MENU[] = {
     {"助记词", "sign_bitget_mnemonic"},
     {"智能卡", "sign_bitget_satochip"},
 };
 
-static const krux_menu_override_t KRUX_SIGN_METAMASK_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGN_METAMASK_MENU[] = {
     {"助记词", "sign_metamask_mnemonic"},
     {"智能卡", "sign_metamask_satochip"},
 };
 
-static const krux_menu_override_t KRUX_SIGN_RABBY_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGN_RABBY_MENU[] = {
     {"助记词", "sign_rabby_mnemonic"},
     {"智能卡", "sign_rabby_satochip"},
 };
 
-static const krux_menu_override_t KRUX_SIGN_TOKENPOCKET_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGN_TOKENPOCKET_MENU[] = {
     {"助记词", "sign_tokenpocket_mnemonic"},
     {"智能卡", "sign_tokenpocket_satochip"},
 };
 
-static const krux_menu_override_t KRUX_SIGN_IMTOKEN_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGN_IMTOKEN_MENU[] = {
     {"助记词", "sign_imtoken_mnemonic"},
     {"智能卡", "sign_imtoken_satochip"},
 };
 
-static const krux_menu_override_t KRUX_SIGN_BTC_MENU[] = {
+static const signer_menu_override_t SIGNER_SIGN_BTC_MENU[] = {
     {"助记词", "sign_btc_mnemonic"},
     {"智能卡", "sign_btc_satochip"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_MENU[] = {
     {"Satochip", "smartcard_satochip_tools"},
     {"SeedKeeper", "smartcard_satochip_seedkeeper_tools"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_SATOCHIP_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_SATOCHIP_MENU[] = {
     {"信息", "smartcard_card_info"},
     {"地址", "satochip_path_address"},
     {"写入", "smartcard_satochip_write_mnemonic"},
@@ -424,7 +424,7 @@ static const krux_menu_override_t KRUX_SMARTCARD_SATOCHIP_MENU[] = {
     {"证书", "smartcard_satochip_certificate_tools"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_MAINT_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_MAINT_MENU[] = {
     {"设置PIN", "smartcard_satochip_setup_pin"},
     {"改PIN", "smartcard_satochip_change_pin"},
     {"解锁", "smartcard_satochip_unblock_pin"},
@@ -436,29 +436,29 @@ static const krux_menu_override_t KRUX_SMARTCARD_MAINT_MENU[] = {
     {"真伪", "smartcard_satochip_authenticity"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_ADVANCED_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_ADVANCED_MENU[] = {
     {"认证钥", "smartcard_satochip_pubkey_tools"},
     {"2FA", "smartcard_satochip_2fa_tools"},
     {"会话", "smartcard_satochip_session_tools"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_PUBKEY_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_PUBKEY_MENU[] = {
     {"导主钥", "smartcard_satochip_export_authentikey"},
     {"写NDEF", "smartcard_satochip_import_ndef_authentikey"},
     {"写信任钥", "smartcard_satochip_import_trusted_pubkey"},
     {"导信任钥", "smartcard_satochip_export_trusted_pubkey"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_2FA_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_2FA_MENU[] = {
     {"设2FA", "smartcard_satochip_set_2fa_key"},
     {"清2FA", "smartcard_satochip_reset_2fa_key"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_SESSION_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_SESSION_MENU[] = {
     {"登出", "smartcard_satochip_logout_all"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_SEEDKEEPER_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_SEEDKEEPER_MENU[] = {
     {"状态", "smartcard_seedkeeper_status_page"},
     {"设置PIN", "smartcard_seedkeeper_setup_pin"},
     {"改PIN", "smartcard_seedkeeper_change_pin"},
@@ -476,183 +476,183 @@ static const krux_menu_override_t KRUX_SMARTCARD_SEEDKEEPER_MENU[] = {
     {"高级", "smartcard_seedkeeper_advanced_tools"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_SEEDKEEPER_ADVANCED_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_SEEDKEEPER_ADVANCED_MENU[] = {
     {"主种子", "smartcard_seedkeeper_generate_masterseed"},
     {"2FA", "smartcard_seedkeeper_generate_2fa_secret"},
     {"派生密码", "smartcard_seedkeeper_derive_master_password"},
     {"重置条目", "smartcard_seedkeeper_reset_secret"},
 };
 
-static const krux_menu_override_t KRUX_SMARTCARD_CERTIFICATE_MENU[] = {
+static const signer_menu_override_t SIGNER_SMARTCARD_CERTIFICATE_MENU[] = {
     {"导出", "smartcard_certificate_export"},
     {"导入", "smartcard_certificate_import"},
 };
 
-static const krux_feature_t KRUX_LOCAL_SMARTCARD_FEATURES[] = {
+static const signer_feature_t SIGNER_LOCAL_SMARTCARD_FEATURES[] = {
     {"mnemonic_write_smartcard", "pi_mnemonic_tools", "写卡",
      "SeedKeeper / Satochip", "把当前助记词写入智能卡。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_GROUP,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_GROUP,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_write_mnemonic", "smartcard_satochip_tools",
      "写入", "当前助记词", "把当前助记词写入 Satochip。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_seedkeeper_tools", "smartcard_tools",
      "SeedKeeper", "状态 / 助记词 / 高级",
      "管理 SeedKeeper。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_GROUP,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_GROUP,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_status_page",
      "smartcard_satochip_seedkeeper_tools", "状态", "读卡 / 空间",
      "查看 SeedKeeper 状态和空间。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_EXTERNAL_IO},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_EXTERNAL_IO},
     {"smartcard_seedkeeper_setup_pin",
      "smartcard_satochip_seedkeeper_tools", "设置PIN", "新卡初始化",
      "给新 SeedKeeper 或重置后的卡设置 PIN。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_free_space",
      "smartcard_satochip_seedkeeper_tools", "剩余空间", "可用空间",
      "查看 SeedKeeper 剩余空间。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_EXTERNAL_IO},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_EXTERNAL_IO},
     {"smartcard_seedkeeper_list_page",
      "smartcard_satochip_seedkeeper_tools", "列表", "条目",
      "查看卡内条目列表。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_advanced_tools",
      "smartcard_satochip_seedkeeper_tools", "高级", "生成 / 派生 / 重置",
      "SeedKeeper 高级动作。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_GROUP,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_GROUP,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_generate_masterseed",
      "smartcard_seedkeeper_advanced_tools", "主种子", "生成主种子",
      "在卡上生成主种子。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_generate_2fa_secret",
      "smartcard_seedkeeper_advanced_tools", "2FA", "生成 2FA",
      "在卡上生成 2FA 秘密。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_derive_master_password",
      "smartcard_seedkeeper_advanced_tools", "派生密码", "按 SID 派生",
      "从卡内条目派生主密码。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_reset_secret",
      "smartcard_seedkeeper_advanced_tools", "重置条目", "按 SID 删除",
      "删除卡内指定条目。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_create_mnemonic",
      "smartcard_satochip_seedkeeper_tools", "智能卡创建", "卡内真随机",
      "用 SeedKeeper 随机数创建助记词。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_write_mnemonic",
      "smartcard_satochip_seedkeeper_tools", "写入卡", "当前助记词",
      "把当前助记词写入卡。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_view_mnemonic",
      "smartcard_satochip_seedkeeper_tools", "查看卡", "卡内助记词",
      "查看卡内助记词。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_load_mnemonic",
      "smartcard_satochip_seedkeeper_tools", "卡导入", "卡到内存",
      "把卡内助记词加载到开发板内存。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_save_password",
      "smartcard_satochip_seedkeeper_tools", "存密码", "密码条目",
      "保存密码到 SeedKeeper。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_load_descriptor",
      "smartcard_satochip_seedkeeper_tools", "读描述符", "从卡加载",
      "从 SeedKeeper 加载钱包描述符。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_save_descriptor",
      "smartcard_satochip_seedkeeper_tools", "存描述符", "写入卡",
      "保存钱包描述符到 SeedKeeper。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_clone",
      "smartcard_satochip_seedkeeper_tools", "克隆", "卡到卡",
      "克隆 SeedKeeper 条目。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_change_pin",
      "smartcard_satochip_seedkeeper_tools", "改PIN", "修改卡 PIN",
      "修改 SeedKeeper 卡 PIN。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_reset",
      "smartcard_satochip_seedkeeper_tools", "重置", "恢复出厂",
      "清空 SeedKeeper 并回到未初始化。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"new_seedkeeper_create_mnemonic",
      "new_mnemonic", "智能卡", "卡内真随机",
      "用 SeedKeeper 随机数创建助记词。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"load_seedkeeper_mnemonic",
      "load_mnemonic", "智能卡", "从卡导入",
      "从 SeedKeeper 导入助记词。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_certificate_tools", "smartcard_satochip_tools",
      "证书", "导出 / 导入", "个人证书导出和导入入口。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_GROUP,
-     KRUX_FEATURE_SERVICE_STUB, KRUX_FEATURE_RISK_EXTERNAL_IO},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_GROUP,
+     SIGNER_FEATURE_SERVICE_STUB, SIGNER_FEATURE_RISK_EXTERNAL_IO},
     {"smartcard_certificate_export", "smartcard_satochip_certificate_tools",
      "导出", "导出个人证书", "导出个人证书的 PEM 文本。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_VIEW_ONLY},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_VIEW_ONLY},
     {"smartcard_certificate_import", "smartcard_satochip_certificate_tools",
      "导入", "导入个人证书", "导入个人证书 PEM 文本。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_EXTERNAL_IO},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_EXTERNAL_IO},
     {"smartcard_satochip_change_pin", "smartcard_satochip_maint", "改 PIN",
-     "修改卡 PIN", "输入旧 PIN 和新 PIN。", "main/pages/krux_shell/krux_shell.c",
-     KRUX_FEATURE_ACTION, KRUX_FEATURE_UI_READY,
-     KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "修改卡 PIN", "输入旧 PIN 和新 PIN。", "main/pages/signer_shell/signer_shell.c",
+     SIGNER_FEATURE_ACTION, SIGNER_FEATURE_UI_READY,
+     SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_unblock_pin", "smartcard_satochip_maint", "解锁",
      "PUK 解锁", "用 PUK 解锁被锁定的 PIN。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_set_label", "smartcard_satochip_maint", "改标签",
-     "修改卡标签", "写入卡片标签。", "main/pages/krux_shell/krux_shell.c",
-     KRUX_FEATURE_ACTION, KRUX_FEATURE_UI_READY,
-     KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "修改卡标签", "写入卡片标签。", "main/pages/signer_shell/signer_shell.c",
+     SIGNER_FEATURE_ACTION, SIGNER_FEATURE_UI_READY,
+     SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_nfc_policy", "smartcard_satochip_maint", "NFC",
-     "修改 NFC 策略", "写入 NFC 策略值。", "main/pages/krux_shell/krux_shell.c",
-     KRUX_FEATURE_ACTION, KRUX_FEATURE_UI_READY,
-     KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "修改 NFC 策略", "写入 NFC 策略值。", "main/pages/signer_shell/signer_shell.c",
+     SIGNER_FEATURE_ACTION, SIGNER_FEATURE_UI_READY,
+     SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_feature_policy", "smartcard_satochip_maint",
      "功能", "修改功能策略", "写入 Schnorr / Nostr / Liquid 策略。",
-     "main/pages/krux_shell/krux_shell.c", KRUX_FEATURE_ACTION,
-     KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_reset_seed", "smartcard_satochip_maint", "重置",
-     "重置卡种子", "执行种子重置。", "main/pages/krux_shell/krux_shell.c",
-     KRUX_FEATURE_ACTION, KRUX_FEATURE_UI_READY,
-     KRUX_FEATURE_RISK_SECRET_MATERIAL},
+     "重置卡种子", "执行种子重置。", "main/pages/signer_shell/signer_shell.c",
+     SIGNER_FEATURE_ACTION, SIGNER_FEATURE_UI_READY,
+     SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_satochip_reset_factory", "smartcard_satochip_maint", "出厂",
-     "恢复出厂", "发送出厂复位信号。", "main/pages/krux_shell/krux_shell.c",
-     KRUX_FEATURE_ACTION, KRUX_FEATURE_UI_READY,
-     KRUX_FEATURE_RISK_DEVICE_CONTROL},
+     "恢复出厂", "发送出厂复位信号。", "main/pages/signer_shell/signer_shell.c",
+     SIGNER_FEATURE_ACTION, SIGNER_FEATURE_UI_READY,
+     SIGNER_FEATURE_RISK_DEVICE_CONTROL},
     {"smartcard_satochip_authenticity", "smartcard_satochip_maint", "真伪",
-     "检查真伪", "读取个人证书和真伪状态。", "main/pages/krux_shell/krux_shell.c",
-     KRUX_FEATURE_ACTION, KRUX_FEATURE_UI_READY, KRUX_FEATURE_RISK_VIEW_ONLY},
+     "检查真伪", "读取个人证书和真伪状态。", "main/pages/signer_shell/signer_shell.c",
+     SIGNER_FEATURE_ACTION, SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_VIEW_ONLY},
 };
 
-static const krux_menu_override_t KRUX_SATOCHIP_PUBKEY_MENU[] = {
+static const signer_menu_override_t SIGNER_SATOCHIP_PUBKEY_MENU[] = {
     {"zpub", "satochip_btc_zpub"},
     {"ypub", "satochip_btc_ypub"},
     {"xpub", "satochip_btc_xpub"},
@@ -661,7 +661,7 @@ static const krux_menu_override_t KRUX_SATOCHIP_PUBKEY_MENU[] = {
     {"tpub", "satochip_btc_tpub"},
 };
 
-static const krux_menu_override_t KRUX_BACKUP_MENU[] = {
+static const signer_menu_override_t SIGNER_BACKUP_MENU[] = {
     {"序号", "backup_seed_words"},
     {"原始熵", "backup_entropy"},
     {"二维码", "backup_seed_qr"},
@@ -671,7 +671,7 @@ static const krux_menu_override_t KRUX_BACKUP_MENU[] = {
     {"1248", "backup_stackbit"},
 };
 
-static const krux_menu_override_t KRUX_ADDRESSES_MENU[] = {
+static const signer_menu_override_t SIGNER_ADDRESSES_MENU[] = {
     {"派生地址", "custom_derivation"},
     {"收款", "custom_derivation"},
     {"找零", "custom_derivation"},
@@ -679,7 +679,7 @@ static const krux_menu_override_t KRUX_ADDRESSES_MENU[] = {
     {"二维码", "legacy_addresses"},
 };
 
-static const krux_menu_override_t KRUX_SETTINGS_MENU[] = {
+static const signer_menu_override_t SIGNER_SETTINGS_MENU[] = {
     {"PIN", "settings_pin"},
     {"亮度", "settings_display"},
     {"相机", "settings_camera"},
@@ -688,7 +688,7 @@ static const krux_menu_override_t KRUX_SETTINGS_MENU[] = {
     {"关于", "about"},
 };
 
-static const krux_menu_override_t KRUX_DEVICE_TESTS_MENU[] = {
+static const signer_menu_override_t SIGNER_DEVICE_TESTS_MENU[] = {
     {"触摸", "test_screen_touch"},
     {"相机", "test_camera"},
     {"存储卡", "test_storage"},
@@ -847,46 +847,46 @@ static bool product_screen_is_visible(const char *id) {
   if (!id)
     return false;
 
-  return !krux_id_is_any(id, "connect_mnemonic", "connect_satochip") &&
+  return !signer_id_is_any(id, "connect_mnemonic", "connect_satochip") &&
          strcmp(id, "smartcard_seedkeeper") != 0 &&
-         !krux_id_is_any(id, "smartcard_seedkeeper_status",
+         !signer_id_is_any(id, "smartcard_seedkeeper_status",
                          "smartcard_seedkeeper_list") &&
          strcmp(id, "smartcard_seedkeeper_logs") != 0 &&
          strcmp(id, "smartcard_seedkeeper_logs_page") != 0 &&
-         !krux_id_is_any(id, "seedkeeper_status", "seedkeeper_list") &&
+         !signer_id_is_any(id, "seedkeeper_status", "seedkeeper_list") &&
          strcmp(id, "seedkeeper_logs") != 0 &&
          strcmp(id, "connect_address") != 0 &&
-         !krux_id_is_any(id, "web3_address_mnemonic",
+         !signer_id_is_any(id, "web3_address_mnemonic",
                          "web3_address_satochip") &&
-         !krux_id_is_any(id, "addresses", "addr_receive") &&
-         !krux_id_is_any(id, "addr_change", "addr_scan_check") &&
+         !signer_id_is_any(id, "addresses", "addr_receive") &&
+         !signer_id_is_any(id, "addr_change", "addr_scan_check") &&
          strcmp(id, "addr_qr_view") != 0 &&
          strcmp(id, "connect_web3") != 0 &&
          strcmp(id, "smartcard_web3_scan") != 0 &&
          strcmp(id, "web3_satochip") != 0 &&
-         !krux_id_is_any(id, "sign_mnemonic", "sign_satochip") &&
-         !krux_id_is_any(id, "web3", "web3_okx") &&
-         !krux_id_is_any(id, "web3_bitget", "web3_metamask") &&
-         !krux_id_is_any(id, "web3_rabby", "web3_tokenpocket") &&
+         !signer_id_is_any(id, "sign_mnemonic", "sign_satochip") &&
+         !signer_id_is_any(id, "web3", "web3_okx") &&
+         !signer_id_is_any(id, "web3_bitget", "web3_metamask") &&
+         !signer_id_is_any(id, "web3_rabby", "web3_tokenpocket") &&
          strcmp(id, "web3_imtoken") != 0 &&
-         !krux_id_is_any(id, "web3_address", "web3_message_sign") &&
+         !signer_id_is_any(id, "web3_address", "web3_message_sign") &&
          strcmp(id, "web3_typed_data") != 0;
 }
 
-static const krux_feature_t *shell_local_feature_find(const char *id) {
+static const signer_feature_t *shell_local_feature_find(const char *id) {
   if (!id)
     return NULL;
 
-  for (size_t i = 0; i < sizeof(KRUX_LOCAL_SMARTCARD_FEATURES) /
-                           sizeof(KRUX_LOCAL_SMARTCARD_FEATURES[0]); i++) {
-    if (strcmp(KRUX_LOCAL_SMARTCARD_FEATURES[i].id, id) == 0)
-      return &KRUX_LOCAL_SMARTCARD_FEATURES[i];
+  for (size_t i = 0; i < sizeof(SIGNER_LOCAL_SMARTCARD_FEATURES) /
+                           sizeof(SIGNER_LOCAL_SMARTCARD_FEATURES[0]); i++) {
+    if (strcmp(SIGNER_LOCAL_SMARTCARD_FEATURES[i].id, id) == 0)
+      return &SIGNER_LOCAL_SMARTCARD_FEATURES[i];
   }
   return NULL;
 }
 
-static const krux_feature_t *shell_feature_find(const char *id) {
-  const krux_feature_t *feature = krux_feature_find(id);
+static const signer_feature_t *shell_feature_find(const char *id) {
+  const signer_feature_t *feature = signer_feature_find(id);
   if (feature)
     return feature;
   return shell_local_feature_find(id);
@@ -894,11 +894,11 @@ static const krux_feature_t *shell_feature_find(const char *id) {
 
 static int max_i(int a, int b) { return a > b ? a : b; }
 
-static lv_color_t krux_canvas_color(void) { return lv_color_hex(0x000000); }
-static lv_color_t krux_card_color(void) { return bg_color(); }
-static lv_color_t krux_card_pressed_color(void) { return highlight_color(); }
-static lv_color_t krux_text_color(void) { return main_color(); }
-static lv_color_t krux_muted_color(void) { return secondary_color(); }
+static lv_color_t signer_canvas_color(void) { return lv_color_hex(0x000000); }
+static lv_color_t signer_card_color(void) { return bg_color(); }
+static lv_color_t signer_card_pressed_color(void) { return highlight_color(); }
+static lv_color_t signer_text_color(void) { return main_color(); }
+static lv_color_t signer_muted_color(void) { return secondary_color(); }
 
 static bool shell_is_wave_43_portrait(void) {
   return theme_get_screen_width() <= 520 && theme_get_screen_height() >= 760;
@@ -979,9 +979,9 @@ static bool shell_should_use_grid(size_t menu_count, bool is_home,
   if (theme_get_screen_width() < 420)
     return false;
   if (id && (strcmp(id, "smartcard_tools") == 0 ||
-             krux_smartcard_tools_group_id(id) ||
-             krux_smartcard_seedkeeper_group_id(id) ||
-             krux_smartcard_certificate_group_id(id)))
+             signer_smartcard_tools_group_id(id) ||
+             signer_smartcard_seedkeeper_group_id(id) ||
+             signer_smartcard_certificate_group_id(id)))
     return true;
   return is_home || menu_count >= 5;
 }
@@ -999,39 +999,39 @@ static bool shell_force_single_column_menu(const char *id) {
                 strcmp(id, "btc_satochip") == 0);
 }
 
-static lv_color_t status_color(krux_feature_status_t status) {
+static lv_color_t status_color(signer_feature_status_t status) {
   switch (status) {
-  case KRUX_FEATURE_VERIFIED:
+  case SIGNER_FEATURE_VERIFIED:
     return yes_color();
-  case KRUX_FEATURE_HARDWARE_WIRED:
+  case SIGNER_FEATURE_HARDWARE_WIRED:
     return cyan_color();
-  case KRUX_FEATURE_SERVICE_STUB:
+  case SIGNER_FEATURE_SERVICE_STUB:
     return highlight_color();
-  case KRUX_FEATURE_UI_READY:
+  case SIGNER_FEATURE_UI_READY:
     return main_color();
-  case KRUX_FEATURE_NOT_STARTED:
+  case SIGNER_FEATURE_NOT_STARTED:
   default:
     return secondary_color();
   }
 }
 
-static lv_color_t risk_color(krux_feature_risk_t risk) {
+static lv_color_t risk_color(signer_feature_risk_t risk) {
   switch (risk) {
-  case KRUX_FEATURE_RISK_SIGNING:
-  case KRUX_FEATURE_RISK_SECRET_MATERIAL:
+  case SIGNER_FEATURE_RISK_SIGNING:
+  case SIGNER_FEATURE_RISK_SECRET_MATERIAL:
     return error_color();
-  case KRUX_FEATURE_RISK_EXTERNAL_IO:
-  case KRUX_FEATURE_RISK_DEVICE_CONTROL:
+  case SIGNER_FEATURE_RISK_EXTERNAL_IO:
+  case SIGNER_FEATURE_RISK_DEVICE_CONTROL:
     return cyan_color();
-  case KRUX_FEATURE_RISK_VIEW_ONLY:
+  case SIGNER_FEATURE_RISK_VIEW_ONLY:
   default:
     return highlight_color();
   }
 }
 
-static bool use_two_column_cards(const krux_feature_t *feature) {
+static bool use_two_column_cards(const signer_feature_t *feature) {
   return theme_get_screen_width() >= 420 &&
-         krux_feature_child_count(feature->id) > 2;
+         signer_feature_child_count(feature->id) > 2;
 }
 
 static lv_obj_t *create_text(lv_obj_t *parent, const char *text, bool medium,
@@ -1089,7 +1089,7 @@ static lv_obj_t *create_chip(lv_obj_t *parent, const char *text,
   return chip;
 }
 
-static void legacy_wallet_return_to_krux_cb(void);
+static void legacy_wallet_return_to_signer_cb(void);
 static void legacy_wallet_return_to_home_cb(void);
 static void legacy_wallet_launch_load(void);
 static void legacy_wallet_launch_home(void);
@@ -1119,10 +1119,10 @@ static lv_obj_t *satochip_maint_attach_extra_field(lv_obj_t *parent,
                                                    bool multiline,
                                                    size_t max_len,
                                                    lv_obj_t **slot);
-static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature);
-static void create_krux_child_menu(lv_obj_t *list,
-                                   const krux_feature_t *feature);
-static const krux_feature_t *shell_feature_find(const char *id);
+static void create_signer_header(lv_obj_t *root, const signer_feature_t *feature);
+static void create_signer_child_menu(lv_obj_t *list,
+                                   const signer_feature_t *feature);
+static const signer_feature_t *shell_feature_find(const char *id);
 #ifdef SIMULATOR
 static bool simulator_launch_custom_derivation(void);
 #endif
@@ -1130,12 +1130,12 @@ static bool simulator_launch_custom_derivation(void);
 #ifdef SIMULATOR
 static void simulator_custom_derivation_return_cb(void) {
   custom_derivation_page_destroy();
-  (void)krux_shell_show_screen("pi_connect_wallet");
+  (void)signer_shell_show_screen("pi_connect_wallet");
 }
 
 static void simulator_custom_derivation_import_cb(void) {
   custom_derivation_page_destroy();
-  (void)krux_shell_show_screen("load_mnemonic");
+  (void)signer_shell_show_screen("load_mnemonic");
 }
 
 static bool simulator_launch_custom_derivation(void) {
@@ -1158,7 +1158,7 @@ static bool wallet_ready_for_legacy_pages(void) {
 }
 
 static void legacy_wallet_intermediate_blocked_cb(void) {
-  (void)krux_shell_show_screen("pi_loaded_mnemonic");
+  (void)signer_shell_show_screen("pi_loaded_mnemonic");
 }
 
 static bool legacy_wallet_require_signing_key(void) {
@@ -1191,8 +1191,8 @@ static lv_obj_t *legacy_wallet_prepare_root(void) {
   return s_parent;
 }
 
-static void legacy_wallet_return_to_krux_cb(void) {
-  (void)krux_shell_show_screen("home");
+static void legacy_wallet_return_to_signer_cb(void) {
+  (void)signer_shell_show_screen("home");
 }
 
 static void legacy_wallet_launch_login(void) {
@@ -1203,65 +1203,65 @@ static void legacy_wallet_launch_login(void) {
 
 static void legacy_wallet_launch_load(void) {
   lv_obj_t *root = legacy_wallet_prepare_root();
-  load_menu_page_create(root, legacy_wallet_return_to_krux_cb);
+  load_menu_page_create(root, legacy_wallet_return_to_signer_cb);
   load_menu_page_show();
 }
 
 static void legacy_wallet_launch_new(void) {
   lv_obj_t *root = legacy_wallet_prepare_root();
-  new_mnemonic_menu_page_create(root, legacy_wallet_return_to_krux_cb);
+  new_mnemonic_menu_page_create(root, legacy_wallet_return_to_signer_cb);
   new_mnemonic_menu_page_show();
 }
 
 static void shell_return_from_key_confirmation_cb(void) {
   key_confirmation_page_destroy();
-  (void)krux_shell_show_screen("pi_mnemonic_tools");
+  (void)signer_shell_show_screen("pi_mnemonic_tools");
 }
 
 static void shell_success_from_key_confirmation_cb(void) {
   key_confirmation_page_destroy();
-  (void)krux_shell_show_screen("home");
+  (void)signer_shell_show_screen("home");
 }
 
 static void shell_return_from_mnemonic_editor_cb(void) {
   mnemonic_editor_page_destroy();
-  (void)krux_shell_show_screen("new_mnemonic");
+  (void)signer_shell_show_screen("new_mnemonic");
 }
 
 static void shell_return_from_load_mnemonic_editor_cb(void) {
   mnemonic_editor_page_destroy();
-  (void)krux_shell_show_screen("load_mnemonic");
+  (void)signer_shell_show_screen("load_mnemonic");
 }
 
 static void shell_return_from_load_qr_cb(void) {
   qr_scanner_page_destroy();
-  (void)krux_shell_show_screen("load_mnemonic");
+  (void)signer_shell_show_screen("load_mnemonic");
 }
 
 static void shell_return_from_load_storage_cb(void) {
   load_storage_page_destroy();
-  (void)krux_shell_show_screen("load_mnemonic");
+  (void)signer_shell_show_screen("load_mnemonic");
 }
 
 static void shell_return_from_manual_input_cb(void) {
   manual_input_page_destroy();
-  (void)krux_shell_show_screen("new_mnemonic");
+  (void)signer_shell_show_screen("new_mnemonic");
 }
 
 static void shell_return_from_load_manual_input_cb(void) {
   manual_input_page_destroy();
-  (void)krux_shell_show_screen("load_mnemonic");
+  (void)signer_shell_show_screen("load_mnemonic");
 }
 
 static void shell_success_from_manual_input_cb(void) {
   key_confirmation_page_destroy();
   manual_input_page_destroy();
-  (void)krux_shell_show_screen("home");
+  (void)signer_shell_show_screen("home");
 }
 
 static void shell_show_generated_mnemonic(char *mnemonic) {
   if (!mnemonic) {
-    (void)krux_shell_show_screen("new_mnemonic");
+    (void)signer_shell_show_screen("new_mnemonic");
     return;
   }
 
@@ -1296,33 +1296,33 @@ static void shell_return_from_load_mnemonic_tool_cb(void) {
     mnemonic_editor_page_show();
     SECURE_FREE_STRING(mnemonic);
   } else {
-    (void)krux_shell_show_screen("load_mnemonic");
+    (void)signer_shell_show_screen("load_mnemonic");
   }
 }
 
 static void shell_return_from_bip39_check_cb(void) {
   bip39_check_page_destroy();
-  (void)krux_shell_show_screen("pi_mnemonic_tools");
+  (void)signer_shell_show_screen("pi_mnemonic_tools");
 }
 
 static void shell_return_from_punch_grid_cb(void) {
   load_punch_grid_page_destroy();
-  (void)krux_shell_show_screen("load_mnemonic");
+  (void)signer_shell_show_screen("load_mnemonic");
 }
 
 static void shell_return_from_tinyseed_restore_cb(void) {
   tinyseed_restore_page_destroy();
-  (void)krux_shell_show_screen("load_punch_grid");
+  (void)signer_shell_show_screen("load_punch_grid");
 }
 
 static void shell_return_from_stackbit_restore_cb(void) {
   stackbit_restore_page_destroy();
-  (void)krux_shell_show_screen("load_punch_grid");
+  (void)signer_shell_show_screen("load_punch_grid");
 }
 
 static void shell_return_from_custom_derivation_cb(void) {
   custom_derivation_page_destroy();
-  (void)krux_shell_show_screen(s_custom_derivation_return_id[0]
+  (void)signer_shell_show_screen(s_custom_derivation_return_id[0]
                                    ? s_custom_derivation_return_id
                                    : "pi_connect_wallet");
 }
@@ -1419,37 +1419,37 @@ static void legacy_wallet_launch_backup(void) {
 
 static void shell_return_from_backup_words_cb(void) {
   mnemonic_words_page_destroy();
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void shell_return_from_backup_entropy_cb(void) {
   mnemonic_entropy_page_destroy();
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void shell_return_from_backup_grid_cb(void) {
   mnemonic_grid_page_destroy();
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void shell_return_from_backup_steel_cb(void) {
   mnemonic_steel_page_destroy();
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void shell_return_from_backup_1248_cb(void) {
   mnemonic_1248_page_destroy();
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void shell_return_from_backup_qr_cb(void) {
   mnemonic_qr_page_destroy();
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void shell_return_from_backup_kef_cb(void) {
   store_mnemonic_page_destroy();
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void legacy_wallet_launch_scan(void) {
@@ -1468,13 +1468,13 @@ static void legacy_wallet_launch_scan_for_shell(void) {
   }
 
   lv_obj_t *root = legacy_wallet_prepare_root();
-  scan_page_create(root, legacy_wallet_return_to_krux_cb);
+  scan_page_create(root, legacy_wallet_return_to_signer_cb);
   scan_page_show();
 }
 
 static void legacy_wallet_return_from_slots_cb(void) {
   mnemonic_slots_page_destroy();
-  (void)krux_shell_show_screen("pi_mnemonic_tools");
+  (void)signer_shell_show_screen("pi_mnemonic_tools");
 }
 
 static void legacy_wallet_success_from_slots_cb(void) {
@@ -1538,7 +1538,7 @@ static void legacy_wallet_launch_settings(void) {
 
 static void legacy_system_return_from_pin_settings_cb(void) {
   login_settings_page_destroy();
-  (void)krux_shell_show_screen("settings");
+  (void)signer_shell_show_screen("settings");
 }
 
 static void legacy_system_launch_pin_settings(void) {
@@ -1549,7 +1549,7 @@ static void legacy_system_launch_pin_settings(void) {
 
 static void legacy_wallet_passphrase_done_cb(void *user_data) {
   (void)user_data;
-  (void)krux_shell_show_screen("pi_mnemonic_tools");
+  (void)signer_shell_show_screen("pi_mnemonic_tools");
 }
 
 static void legacy_wallet_passphrase_error_cb(void) {
@@ -1558,7 +1558,7 @@ static void legacy_wallet_passphrase_error_cb(void) {
 
 static void legacy_wallet_return_from_passphrase_cb(void) {
   passphrase_page_destroy();
-  (void)krux_shell_show_screen("pi_mnemonic_tools");
+  (void)signer_shell_show_screen("pi_mnemonic_tools");
 }
 
 static void legacy_wallet_passphrase_success_cb(const char *passphrase) {
@@ -1629,68 +1629,68 @@ static void legacy_wallet_launch_logout(void) {
   legacy_wallet_launch_login();
 }
 #else
-static void legacy_wallet_return_to_krux_cb(void) {
-  (void)krux_shell_show_screen("home");
+static void legacy_wallet_return_to_signer_cb(void) {
+  (void)signer_shell_show_screen("home");
 }
 
 static void legacy_wallet_return_to_home_cb(void) {
-  (void)krux_shell_show_screen("wallet_home");
+  (void)signer_shell_show_screen("wallet_home");
 }
 
 static void legacy_wallet_launch_home(void) {
-  (void)krux_shell_show_screen("wallet_home");
+  (void)signer_shell_show_screen("wallet_home");
 }
 
 static void legacy_wallet_launch_login(void) {
-  (void)krux_shell_show_screen("wallet_home");
+  (void)signer_shell_show_screen("wallet_home");
 }
 
 static void legacy_wallet_launch_load(void) {
-  (void)krux_shell_show_screen("load_mnemonic");
+  (void)signer_shell_show_screen("load_mnemonic");
 }
 
 static void legacy_wallet_launch_new(void) {
-  (void)krux_shell_show_screen("new_mnemonic");
+  (void)signer_shell_show_screen("new_mnemonic");
 }
 
 static void legacy_wallet_launch_public_key(void) {
-  (void)krux_shell_show_screen("btc_bluewallet_zpub");
+  (void)signer_shell_show_screen("btc_bluewallet_zpub");
 }
 
 static void legacy_wallet_launch_addresses(void) {
-  (void)krux_shell_show_screen("addresses");
+  (void)signer_shell_show_screen("addresses");
 }
 
 static void legacy_wallet_launch_backup(void) {
-  (void)krux_shell_show_screen("backup_export");
+  (void)signer_shell_show_screen("backup_export");
 }
 
 static void legacy_wallet_launch_scan(void) {
-  (void)krux_shell_show_screen("sign_psbt_qr");
+  (void)signer_shell_show_screen("sign_psbt_qr");
 }
 
 static void legacy_wallet_launch_scan_for_shell(void) {
-  (void)krux_shell_show_screen("sign_psbt_qr");
+  (void)signer_shell_show_screen("sign_psbt_qr");
 }
 
 static void legacy_wallet_launch_slots(void) {
-  (void)krux_shell_show_screen("wallet_home");
+  (void)signer_shell_show_screen("wallet_home");
 }
 
 static void legacy_wallet_launch_settings(void) {
-  (void)krux_shell_show_screen("settings_wallet");
+  (void)signer_shell_show_screen("settings_wallet");
 }
 
 static void legacy_system_launch_pin_settings(void) {
-  (void)krux_shell_show_screen("settings_pin");
+  (void)signer_shell_show_screen("settings_pin");
 }
 
 static void legacy_wallet_launch_descriptor(void) {
-  (void)krux_shell_show_screen("wallet_descriptor");
+  (void)signer_shell_show_screen("wallet_descriptor");
 }
 
 static void legacy_wallet_launch_logout(void) {
-  (void)krux_shell_show_screen("boot_login");
+  (void)signer_shell_show_screen("boot_login");
 }
 #endif
 
@@ -1728,7 +1728,7 @@ static bool legacy_wallet_needs_mnemonic_slot_choice(const char *id) {
                 strcmp(id, "btc_mnemonic") == 0 ||
                 strcmp(id, "btc_bluewallet_zpub") == 0 ||
                 strcmp(id, "btc_bluewallet_xpub") == 0 ||
-                krux_sign_mnemonic_target_id(id));
+                signer_sign_mnemonic_target_id(id));
 }
 
 static void legacy_wallet_resume_pending_mnemonic_screen(void) {
@@ -1740,7 +1740,7 @@ static void legacy_wallet_resume_pending_mnemonic_screen(void) {
     return;
 
   s_allow_sensitive_render = true;
-  (void)krux_shell_show_screen(target);
+  (void)signer_shell_show_screen(target);
   s_allow_sensitive_render = false;
 }
 
@@ -1749,7 +1749,7 @@ static void legacy_wallet_cancel_direct_sensitive(void) {
   s_pending_sensitive_screen = NULL;
   s_pending_mnemonic_screen[0] = '\0';
   s_pending_public_key_mode = PUBLIC_KEY_EXPORT_STANDARD;
-  (void)krux_shell_show_screen(s_current_screen_id ? s_current_screen_id
+  (void)signer_shell_show_screen(s_current_screen_id ? s_current_screen_id
                                                    : "home");
 }
 
@@ -1795,7 +1795,7 @@ static void legacy_wallet_show_pending_sensitive_screen(void) {
       }
     }
     s_allow_sensitive_render = true;
-    (void)krux_shell_show_screen(target);
+    (void)signer_shell_show_screen(target);
     s_allow_sensitive_render = false;
   }
 }
@@ -1989,11 +1989,11 @@ static bool legacy_wallet_handle_direct_target(const char *target_id) {
                           legacy_wallet_cancel_direct_sensitive);
     return true;
   }
-  if (krux_sign_mnemonic_target_id(target_id)) {
+  if (signer_sign_mnemonic_target_id(target_id)) {
     legacy_wallet_launch_unified_scan_for_shell();
     return true;
   }
-  if (krux_sign_satochip_target_id(target_id)) {
+  if (signer_sign_satochip_target_id(target_id)) {
     legacy_wallet_launch_unified_scan_for_shell();
     return true;
   }
@@ -2066,12 +2066,12 @@ static bool legacy_wallet_handle_direct_target(const char *target_id) {
   }
 #else
   if (strcmp(target_id, "bip85") == 0)
-    return krux_shell_show_screen("bip85_mnemonic");
+    return signer_shell_show_screen("bip85_mnemonic");
   if (strcmp(target_id, "load_camera") == 0 ||
       strcmp(target_id, "load_manual") == 0 ||
       strcmp(target_id, "load_digits") == 0 ||
       strcmp(target_id, "load_sd") == 0)
-    return krux_shell_show_screen(target_id);
+    return signer_shell_show_screen(target_id);
   if (strcmp(target_id, "new_dice_d6") == 0 ||
       strcmp(target_id, "new_coin_entropy") == 0 ||
       strcmp(target_id, "new_words_select") == 0 ||
@@ -2085,8 +2085,8 @@ static bool legacy_wallet_handle_direct_target(const char *target_id) {
       strcmp(target_id, "load_stackbit_restore") == 0 ||
       strcmp(target_id, "bip39_check_tools") == 0 ||
       strcmp(target_id, "custom_derivation") == 0 ||
-      krux_sign_mnemonic_target_id(target_id) ||
-      krux_sign_satochip_target_id(target_id) ||
+      signer_sign_mnemonic_target_id(target_id) ||
+      signer_sign_satochip_target_id(target_id) ||
       strcmp(target_id, "backup_seed_words") == 0 ||
       strcmp(target_id, "backup_entropy") == 0 ||
       strcmp(target_id, "backup_grid") == 0 ||
@@ -2097,7 +2097,7 @@ static bool legacy_wallet_handle_direct_target(const char *target_id) {
       strcmp(target_id, "tools_secondary_mnemonic") == 0 ||
       strcmp(target_id, "bip85_mnemonic") == 0 ||
       strcmp(target_id, "login_passphrase") == 0)
-    return krux_shell_show_screen(target_id);
+    return signer_shell_show_screen(target_id);
 #endif
 
   return false;
@@ -2284,7 +2284,7 @@ static void legacy_wallet_run_pending_sensitive_route(void) {
 static void legacy_wallet_cancel_pending_sensitive_route(void) {
   s_pending_sensitive_route = NULL;
   s_pending_mnemonic_screen[0] = '\0';
-  (void)krux_shell_show_screen(s_current_screen_id ? s_current_screen_id
+  (void)signer_shell_show_screen(s_current_screen_id ? s_current_screen_id
                                                    : "home");
 }
 #endif
@@ -2380,7 +2380,7 @@ static lv_obj_t *create_row(lv_obj_t *parent) {
   return row;
 }
 
-static void create_hero(lv_obj_t *root, const krux_feature_t *feature) {
+static void create_hero(lv_obj_t *root, const signer_feature_t *feature) {
   lv_obj_t *hero =
       create_panel(root,
                    feature->parent_id ? disabled_color() : highlight_color(),
@@ -2393,10 +2393,10 @@ static void create_hero(lv_obj_t *root, const krux_feature_t *feature) {
   char progress_text[80];
   if (!feature->parent_id) {
     snprintf(progress_text, sizeof(progress_text), "功能 %zu 项",
-             krux_feature_action_count());
+             signer_feature_action_count());
   } else {
     snprintf(progress_text, sizeof(progress_text), "子项 %zu 项",
-             krux_feature_child_count(feature->id));
+             signer_feature_child_count(feature->id));
   }
   create_chip(top, progress_text, disabled_color());
 
@@ -2404,9 +2404,9 @@ static void create_hero(lv_obj_t *root, const krux_feature_t *feature) {
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_LEFT, 0);
 
   lv_obj_t *chips = create_row(hero);
-  create_chip(chips, krux_feature_status_name(feature->status),
+  create_chip(chips, signer_feature_status_name(feature->status),
               status_color(feature->status));
-  create_chip(chips, krux_feature_risk_name(feature->risk),
+  create_chip(chips, signer_feature_risk_name(feature->risk),
               risk_color(feature->risk));
 }
 
@@ -2416,7 +2416,7 @@ static void nav_event_cb(lv_event_t *event) {
   if (alias_target)
     target_id = alias_target;
   if (satochip_legacy_seedkeeper_id(target_id)) {
-    (void)krux_shell_show_screen("smartcard_satochip_seedkeeper_tools");
+    (void)signer_shell_show_screen("smartcard_satochip_seedkeeper_tools");
     return;
   }
 #ifndef SIMULATOR
@@ -2426,11 +2426,11 @@ static void nav_event_cb(lv_event_t *event) {
 #endif
   if (legacy_wallet_handle_target(target_id))
     return;
-  (void)krux_shell_show_screen(target_id);
+  (void)signer_shell_show_screen(target_id);
 }
 
 static lv_obj_t *create_menu_card(lv_obj_t *parent,
-                                  const krux_feature_t *feature, bool primary,
+                                  const signer_feature_t *feature, bool primary,
                                   bool two_columns) {
   lv_obj_t *btn = lv_btn_create(parent);
   lv_obj_set_width(btn, two_columns ? LV_PCT(48) : LV_PCT(100));
@@ -2459,7 +2459,7 @@ static lv_obj_t *create_menu_card(lv_obj_t *parent,
   lv_obj_set_style_text_font(btn_label, theme_font_medium(), 0);
   lv_obj_set_style_text_color(btn_label, main_color(), 0);
 
-  create_chip(title_row, krux_feature_status_name(feature->status),
+  create_chip(title_row, signer_feature_status_name(feature->status),
               status_color(feature->status));
   return btn;
 }
@@ -2630,7 +2630,7 @@ static void refresh_file_list_label(lv_obj_t *label) {
   lv_refr_now(NULL);
 
   static char text[4096];
-  esp_err_t ret = krux_storage_browser_format_root(text, sizeof(text));
+  esp_err_t ret = signer_storage_browser_format_root(text, sizeof(text));
   if (ret != ESP_OK) {
     if (text[0]) {
       lv_label_set_text(label, text);
@@ -2675,7 +2675,7 @@ static void create_build_identity_block(lv_obj_t *parent) {
   char line[384];
   snprintf(line, sizeof(line),
            "项目：%s\n版本：%s\nIDF：%s\n构建：%s %s\n目标板：wave_43 / 480x800\n定位：离线钱包",
-           desc ? desc->project_name : "kern",
+           desc ? desc->project_name : "KernSigner",
            desc ? desc->version : "unknown",
            desc ? desc->idf_ver : "unknown",
            desc ? desc->date : "unknown",
@@ -2758,7 +2758,7 @@ static void create_system_security_block(lv_obj_t *parent) {
 }
 
 static void create_wallet_entry_block(lv_obj_t *parent,
-                                      const krux_feature_t *feature) {
+                                      const signer_feature_t *feature) {
   const char *route = legacy_wallet_route_for_target(feature ? feature->id : NULL);
   lv_obj_t *panel =
       create_panel(parent, route ? yes_color() : error_color(),
@@ -2836,8 +2836,8 @@ static bool target_requires_shell_gate(const char *id) {
   if (!id)
     return false;
   return strcmp(id, "sign_mnemonic") == 0 ||
-         krux_sign_mnemonic_target_id(id) ||
-         krux_sign_satochip_target_id(id) ||
+         signer_sign_mnemonic_target_id(id) ||
+         signer_sign_satochip_target_id(id) ||
          is_web3_wallet_choice(id) ||
          is_btc_wallet_choice(id) ||
          strcmp(id, "legacy_public_key") == 0 ||
@@ -3009,7 +3009,7 @@ static void web3_auto_page_timer_cb(lv_timer_t *timer) {
 }
 
 static void create_connect_wallet_block(lv_obj_t *parent,
-                                        const krux_feature_t *feature) {
+                                        const signer_feature_t *feature) {
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "以太坊钱包", true,
@@ -3220,7 +3220,7 @@ static void satochip_pin_input_cleanup(void) {
 static void satochip_pin_back_cb(lv_event_t *event) {
   (void)event;
   satochip_pin_input_cleanup();
-  (void)krux_shell_show_screen(s_satochip_pending_return_id[0]
+  (void)signer_shell_show_screen(s_satochip_pending_return_id[0]
                                    ? s_satochip_pending_return_id
                                    : "pi_connect_wallet");
 }
@@ -3281,7 +3281,7 @@ static void satochip_connect_finish_ui(void) {
   lv_obj_clean(s_parent);
   theme_apply_screen(s_parent);
   lv_obj_t *root = theme_create_page_container(s_parent);
-  lv_obj_set_style_bg_color(root, krux_canvas_color(), 0);
+  lv_obj_set_style_bg_color(root, signer_canvas_color(), 0);
   lv_obj_set_style_pad_top(root, shell_margin_v(), 0);
   lv_obj_set_style_pad_bottom(root, shell_margin_v(), 0);
   lv_obj_set_style_pad_left(root, shell_margin_h(), 0);
@@ -3291,9 +3291,9 @@ static void satochip_connect_finish_ui(void) {
   lv_obj_set_flex_align(root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER);
 
-  const krux_feature_t *feature = krux_feature_find(s_current_screen_id);
+  const signer_feature_t *feature = signer_feature_find(s_current_screen_id);
   if (feature)
-    create_krux_header(root, feature);
+    create_signer_header(root, feature);
 
   lv_obj_t *panel =
       create_panel(root, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -3439,7 +3439,7 @@ static void card_info_finish_ui(void) {
   }
   s_card_info_task_handle = NULL;
   s_card_info_task_with_caps = false;
-  (void)krux_shell_show_screen(s_current_screen_id);
+  (void)signer_shell_show_screen(s_current_screen_id);
 }
 
 static void card_info_poll_cb(lv_timer_t *timer) {
@@ -3783,7 +3783,7 @@ static void satochip_tool_finish_ui(void) {
   lv_obj_clean(s_parent);
   theme_apply_screen(s_parent);
   lv_obj_t *root = theme_create_page_container(s_parent);
-  lv_obj_set_style_bg_color(root, krux_canvas_color(), 0);
+  lv_obj_set_style_bg_color(root, signer_canvas_color(), 0);
   lv_obj_set_style_pad_top(root, shell_margin_v(), 0);
   lv_obj_set_style_pad_bottom(root, shell_margin_v(), 0);
   lv_obj_set_style_pad_left(root, shell_margin_h(), 0);
@@ -3793,9 +3793,9 @@ static void satochip_tool_finish_ui(void) {
   lv_obj_set_flex_align(root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER);
 
-  const krux_feature_t *feature = krux_feature_find(s_current_screen_id);
+  const signer_feature_t *feature = signer_feature_find(s_current_screen_id);
   if (feature)
-    create_krux_header(root, feature);
+    create_signer_header(root, feature);
 
   lv_obj_t *panel =
       create_panel(root,
@@ -3992,7 +3992,7 @@ static void satochip_pin_ready_cb(lv_event_t *event) {
 }
 
 static void create_satochip_connect_block(lv_obj_t *parent,
-                                          const krux_feature_t *feature) {
+                                          const signer_feature_t *feature) {
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "智能卡", true, main_color());
@@ -4053,7 +4053,7 @@ static void satochip_tool_focus_pin_cb(lv_event_t *event) {
 }
 
 static void create_satochip_tool_block(lv_obj_t *parent,
-                                       const krux_feature_t *feature,
+                                       const signer_feature_t *feature,
                                        satochip_tool_mode_t mode) {
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -4117,7 +4117,7 @@ static void create_satochip_tool_block(lv_obj_t *parent,
 }
 
 static void create_btc_wallet_block(lv_obj_t *parent,
-                                    const krux_feature_t *feature) {
+                                    const signer_feature_t *feature) {
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "比特币钱包", true, main_color());
@@ -4126,7 +4126,7 @@ static void create_btc_wallet_block(lv_obj_t *parent,
 }
 
 static void create_direct_input_block(lv_obj_t *parent,
-                                      const krux_feature_t *feature,
+                                      const signer_feature_t *feature,
                                       const char *body) {
   (void)body;
   lv_obj_t *panel =
@@ -4216,7 +4216,7 @@ static void create_security_settings_block(lv_obj_t *parent) {
 }
 
 static void create_status_block(lv_obj_t *parent,
-                                const krux_feature_t *feature) {
+                                const signer_feature_t *feature) {
   lv_obj_t *status =
       create_panel(parent, status_color(feature->status),
                    max_i(14, theme_get_default_padding() / 2));
@@ -4225,22 +4225,22 @@ static void create_status_block(lv_obj_t *parent,
 
   char line[192];
   snprintf(line, sizeof(line), "%s / %s",
-           krux_feature_status_name(feature->status),
-           krux_feature_risk_name(feature->risk));
+           signer_feature_status_name(feature->status),
+           signer_feature_risk_name(feature->risk));
   create_text(status, line, true, main_color());
 
-  create_text(status, krux_feature_status_detail(feature->status), false,
+  create_text(status, signer_feature_status_detail(feature->status), false,
               secondary_color());
-  create_text(status, krux_feature_risk_detail(feature->risk), false,
+  create_text(status, signer_feature_risk_detail(feature->risk), false,
               secondary_color());
-  create_text(status, krux_service_guard_for_feature(feature), false,
+  create_text(status, signer_service_guard_for_feature(feature), false,
               risk_color(feature->risk));
-  create_text(status, krux_service_next_step_for_feature(feature), false,
+  create_text(status, signer_service_next_step_for_feature(feature), false,
               main_color());
 }
 
 static void create_source_block(lv_obj_t *parent,
-                                const krux_feature_t *feature) {
+                                const signer_feature_t *feature) {
   (void)parent;
   (void)feature;
 }
@@ -4250,16 +4250,16 @@ static void create_service_block(lv_obj_t *parent) {
       create_panel(parent, disabled_color(), max_i(12, theme_get_small_padding()));
 
   create_text(panel, "已启用底层服务", false, highlight_color());
-  for (size_t i = 0; i < krux_service_status_count(); i++) {
-    const krux_service_status_t *service = krux_service_status_at(i);
+  for (size_t i = 0; i < signer_service_status_count(); i++) {
+    const signer_service_status_t *service = signer_service_status_at(i);
     if (!service)
       continue;
-    if (service->state != KRUX_SERVICE_READY)
+    if (service->state != SIGNER_SERVICE_READY)
       continue;
 
     char line[224];
     snprintf(line, sizeof(line), "%s：%s\n%s", service->title,
-             krux_service_state_name(service->state), service->summary);
+             signer_service_state_name(service->state), service->summary);
     create_text(panel, line, false, yes_color());
   }
 }
@@ -4271,8 +4271,8 @@ static void create_progress_block(lv_obj_t *parent) {
   char line[224];
   snprintf(line, sizeof(line),
            "可用功能：%zu\n设备项目：%zu\n\n首页只保留常用入口，设备检查里集中查看设备状态。",
-           krux_feature_count_by_status(KRUX_FEATURE_VERIFIED),
-           krux_feature_count_by_status(KRUX_FEATURE_HARDWARE_WIRED));
+           signer_feature_count_by_status(SIGNER_FEATURE_VERIFIED),
+           signer_feature_count_by_status(SIGNER_FEATURE_HARDWARE_WIRED));
 
   create_text(panel, "可用功能范围", false, highlight_color());
   create_text(panel, line, false, main_color());
@@ -4285,7 +4285,7 @@ static void create_hardware_snapshot_block(lv_obj_t *parent,
   create_text(panel, title ? title : "硬件状态", false, highlight_color());
 
   char text[512];
-  krux_hardware_probe_format_snapshot(text, sizeof(text));
+  signer_hardware_probe_format_snapshot(text, sizeof(text));
   create_text(panel, text, false, main_color());
 }
 
@@ -4351,7 +4351,7 @@ static void smartcard_probe_finish_ui(void) {
   s_smartcard_probe_task_handle = NULL;
   s_smartcard_probe_task_with_caps = false;
   if (strcmp(s_current_screen_id, "smartcard_probe") == 0)
-    (void)krux_shell_show_screen("smartcard_probe");
+    (void)signer_shell_show_screen("smartcard_probe");
 }
 
 static void smartcard_probe_poll_cb(lv_timer_t *timer) {
@@ -4427,7 +4427,7 @@ static void smartcard_probe_event_cb(lv_event_t *event) {
 static void smartcard_web3_scan_event_cb(lv_event_t *event) {
   (void)event;
   lv_obj_t *root = legacy_wallet_prepare_root();
-  scan_page_create_smartcard_web3(root, legacy_wallet_return_to_krux_cb);
+  scan_page_create_smartcard_web3(root, legacy_wallet_return_to_signer_cb);
   scan_page_show();
 }
 #endif
@@ -4435,10 +4435,10 @@ static void smartcard_web3_scan_event_cb(lv_event_t *event) {
 static void legacy_wallet_launch_unified_scan_for_shell(void) {
 #ifndef SIMULATOR
   lv_obj_t *root = legacy_wallet_prepare_root();
-  scan_page_create_unified(root, legacy_wallet_return_to_krux_cb);
+  scan_page_create_unified(root, legacy_wallet_return_to_signer_cb);
   scan_page_show();
 #else
-  (void)krux_shell_show_screen("sign_psbt_qr");
+  (void)signer_shell_show_screen("sign_psbt_qr");
 #endif
 }
 
@@ -4487,7 +4487,7 @@ static void satochip_status_finish_ui(void) {
   s_satochip_status_task_with_caps = false;
   if (strcmp(s_current_screen_id, "smartcard_web3_scan") == 0 ||
       strcmp(s_current_screen_id, "web3_satochip") == 0)
-    (void)krux_shell_show_screen(s_current_screen_id);
+    (void)signer_shell_show_screen(s_current_screen_id);
 }
 
 static void satochip_status_poll_cb(lv_timer_t *timer) {
@@ -4954,7 +4954,7 @@ static void seedkeeper_label_with_wallet_fp(const char *label, const char *fp,
                                             char out[SEEDKEEPER_LABEL_MAX_BYTES + 1]) {
   if (!out)
     return;
-  const char *safe_label = (label && label[0]) ? label : "Kern 助记词";
+  const char *safe_label = (label && label[0]) ? label : "KernSigner 助记词";
   if (!fp || !fp[0] || strstr(safe_label, fp)) {
     snprintf(out, SEEDKEEPER_LABEL_MAX_BYTES + 1, "%s", safe_label);
     return;
@@ -5021,7 +5021,7 @@ static void satochip_seedkeeper_lookup_select_item(uint16_t sid) {
   s_satochip_seedkeeper_selected_header_valid = true;
   s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_ITEM;
   s_satochip_maint_result[0] = '\0';
-  (void)krux_shell_show_screen(s_current_screen_id);
+  (void)signer_shell_show_screen(s_current_screen_id);
 }
 
 static void satochip_seedkeeper_select_item_cb(lv_event_t *event) {
@@ -5041,14 +5041,14 @@ static void satochip_seedkeeper_lookup_back_cb(lv_event_t *event) {
   secure_memzero(&s_satochip_seedkeeper_selected_header,
                  sizeof(s_satochip_seedkeeper_selected_header));
   s_satochip_maint_result[0] = '\0';
-  (void)krux_shell_show_screen(s_current_screen_id);
+  (void)signer_shell_show_screen(s_current_screen_id);
 }
 
 static void satochip_seedkeeper_lookup_edit_back_cb(lv_event_t *event) {
   (void)event;
   s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_ITEM;
   s_satochip_maint_result[0] = '\0';
-  (void)krux_shell_show_screen(s_current_screen_id);
+  (void)signer_shell_show_screen(s_current_screen_id);
 }
 
 static void satochip_seedkeeper_lookup_item_action_cb(lv_event_t *event) {
@@ -5058,7 +5058,7 @@ static void satochip_seedkeeper_lookup_item_action_cb(lv_event_t *event) {
       SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE) {
     s_satochip_seedkeeper_lookup_stage = SATOCHIP_SEEDKEEPER_LOOKUP_EDIT;
     s_satochip_maint_result[0] = '\0';
-    (void)krux_shell_show_screen(s_current_screen_id);
+    (void)signer_shell_show_screen(s_current_screen_id);
     return;
   }
   satochip_maint_start();
@@ -5472,7 +5472,7 @@ static bool seedkeeper_build_plain_header(uint8_t type, uint8_t subtype,
   if (!out || out_len < 15 || !written_out)
     return false;
 
-  const char *safe_label = (label && label[0]) ? label : "Kern";
+  const char *safe_label = (label && label[0]) ? label : "KernSigner";
   size_t label_len = strnlen(safe_label, SEEDKEEPER_LABEL_MAX_BYTES + 1);
   if (label_len > SEEDKEEPER_LABEL_MAX_BYTES)
     label_len = SEEDKEEPER_LABEL_MAX_BYTES;
@@ -6708,7 +6708,7 @@ static void satochip_maint_task(void *arg) {
     }
 
     const char *label =
-        s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "BIP39-RNG-Kern";
+        s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "BIP39-RNG-KernSigner";
     s_satochip_maint_task_err = smartcard_seedkeeper_generate_random_secret(
         s_satochip_maint_pin, SEEDKEEPER_TYPE_SECRET_KEY, 0x00,
         (uint8_t)entropy_len, SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, label,
@@ -6822,7 +6822,7 @@ static void satochip_maint_task(void *arg) {
 	    size_t header_len = 0;
 	    size_t secret_len = 0;
 	    const char *label = s_satochip_maint_text_a[0] ? s_satochip_maint_text_a
-	                                                    : "Kern 助记词";
+	                                                    : "KernSigner 助记词";
     const char *passphrase =
         s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "";
     memset(header_fingerprint, 0, sizeof(header_fingerprint));
@@ -7182,7 +7182,7 @@ static void satochip_maint_task(void *arg) {
       break;
     }
     const char *salt =
-        s_satochip_maint_text_c[0] ? s_satochip_maint_text_c : "Kern";
+        s_satochip_maint_text_c[0] ? s_satochip_maint_text_c : "KernSigner";
     s_satochip_maint_task_err = smartcard_seedkeeper_derive_master_password(
         s_satochip_maint_pin, salt, sid, 0, false, apdu, 30000);
     satochip_format_apdu_result(s_satochip_maint_result,
@@ -7271,7 +7271,7 @@ static void satochip_maint_finish_ui(void) {
   s_satochip_maint_task_with_caps = false;
   if (seedkeeper_reset_step_done)
     s_satochip_maint_mode = SATOCHIP_MAINT_SEEDKEEPER_RESET;
-  (void)krux_shell_show_screen(s_current_screen_id);
+  (void)signer_shell_show_screen(s_current_screen_id);
 }
 
 static void satochip_maint_poll_cb(lv_timer_t *timer) {
@@ -7621,7 +7621,7 @@ static lv_obj_t *satochip_maint_create_result_panel(lv_obj_t *parent,
 }
 
 static void create_satochip_change_pin_block(lv_obj_t *parent,
-                                             const krux_feature_t *feature) {
+                                             const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_CHANGE_PIN);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7637,7 +7637,7 @@ static void create_satochip_change_pin_block(lv_obj_t *parent,
 }
 
 static void create_satochip_setup_pin_block(lv_obj_t *parent,
-                                            const krux_feature_t *feature) {
+                                            const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SETUP_PIN);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7650,7 +7650,7 @@ static void create_satochip_setup_pin_block(lv_obj_t *parent,
 }
 
 static void create_satochip_seedkeeper_change_pin_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_CHANGE_PIN);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7666,7 +7666,7 @@ static void create_satochip_seedkeeper_change_pin_block(
 }
 
 static void create_satochip_seedkeeper_setup_pin_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_SETUP_PIN);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7679,7 +7679,7 @@ static void create_satochip_seedkeeper_setup_pin_block(
 }
 
 static void create_satochip_seedkeeper_reset_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_RESET);
   lv_obj_t *panel =
       create_panel(parent, error_color(), max_i(14, theme_get_small_padding()));
@@ -7703,7 +7703,7 @@ static void create_satochip_seedkeeper_reset_block(
 }
 
 static void create_satochip_unblock_pin_block(lv_obj_t *parent,
-                                              const krux_feature_t *feature) {
+                                              const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_UNBLOCK_PIN);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7713,7 +7713,7 @@ static void create_satochip_unblock_pin_block(lv_obj_t *parent,
 }
 
 static void create_satochip_set_label_block(lv_obj_t *parent,
-                                            const krux_feature_t *feature) {
+                                            const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SET_LABEL);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7725,7 +7725,7 @@ static void create_satochip_set_label_block(lv_obj_t *parent,
 }
 
 static void create_satochip_nfc_policy_block(lv_obj_t *parent,
-                                             const krux_feature_t *feature) {
+                                             const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_NFC_POLICY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7739,7 +7739,7 @@ static void create_satochip_nfc_policy_block(lv_obj_t *parent,
 }
 
 static void create_satochip_feature_policy_block(lv_obj_t *parent,
-                                                 const krux_feature_t *feature) {
+                                                 const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_FEATURE_POLICY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7755,7 +7755,7 @@ static void create_satochip_feature_policy_block(lv_obj_t *parent,
 }
 
 static void create_satochip_export_authentikey_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_EXPORT_AUTHENTIKEY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7764,7 +7764,7 @@ static void create_satochip_export_authentikey_block(
 }
 
 static void create_satochip_import_ndef_authentikey_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_IMPORT_NDEF_AUTHENTIKEY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7775,7 +7775,7 @@ static void create_satochip_import_ndef_authentikey_block(
 }
 
 static void create_satochip_import_trusted_pubkey_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_IMPORT_TRUSTED_PUBKEY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7786,7 +7786,7 @@ static void create_satochip_import_trusted_pubkey_block(
 }
 
 static void create_satochip_export_trusted_pubkey_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_EXPORT_TRUSTED_PUBKEY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7795,7 +7795,7 @@ static void create_satochip_export_trusted_pubkey_block(
 }
 
 static void create_satochip_set_2fa_key_block(lv_obj_t *parent,
-                                               const krux_feature_t *feature) {
+                                               const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SET_2FA_KEY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7808,7 +7808,7 @@ static void create_satochip_set_2fa_key_block(lv_obj_t *parent,
 }
 
 static void create_satochip_reset_2fa_key_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_RESET_2FA_KEY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7819,7 +7819,7 @@ static void create_satochip_reset_2fa_key_block(
 }
 
 static void create_satochip_logout_all_block(lv_obj_t *parent,
-                                             const krux_feature_t *feature) {
+                                             const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_LOGOUT_ALL);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7828,7 +7828,7 @@ static void create_satochip_logout_all_block(lv_obj_t *parent,
 }
 
 static void create_satochip_seedkeeper_status_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_STATUS);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7839,7 +7839,7 @@ static void create_satochip_seedkeeper_status_block(
 }
 
 static void create_satochip_seedkeeper_free_space_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_FREE_SPACE);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7850,7 +7850,7 @@ static void create_satochip_seedkeeper_free_space_block(
 }
 
 static void create_satochip_seedkeeper_list_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_LIST);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7861,7 +7861,7 @@ static void create_satochip_seedkeeper_list_block(
 }
 
 static void create_satochip_seedkeeper_logs_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_LOGS);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7870,7 +7870,7 @@ static void create_satochip_seedkeeper_logs_block(
 }
 
 static void create_satochip_seedkeeper_stub_block(
-    lv_obj_t *parent, const krux_feature_t *feature, satochip_maint_mode_t mode,
+    lv_obj_t *parent, const signer_feature_t *feature, satochip_maint_mode_t mode,
     const char *primary_placeholder, bool primary_password,
     const char *extra_a_label, const char *extra_a_placeholder,
     const char *extra_b_label, const char *extra_b_placeholder) {
@@ -7894,7 +7894,7 @@ static void create_satochip_seedkeeper_stub_block(
 }
 
 static void create_satochip_reset_seed_block(lv_obj_t *parent,
-                                             const krux_feature_t *feature) {
+                                             const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_RESET_SEED);
   lv_obj_t *panel =
       create_panel(parent, error_color(), max_i(14, theme_get_small_padding()));
@@ -7907,7 +7907,7 @@ static void create_satochip_reset_seed_block(lv_obj_t *parent,
 }
 
 static void create_satochip_reset_factory_block(lv_obj_t *parent,
-                                                const krux_feature_t *feature) {
+                                                const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_RESET_FACTORY);
   lv_obj_t *panel =
       create_panel(parent, error_color(), max_i(14, theme_get_small_padding()));
@@ -7919,7 +7919,7 @@ static void create_satochip_reset_factory_block(lv_obj_t *parent,
 }
 
 static void create_satochip_seedkeeper_create_mnemonic_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_CREATE_MNEMONIC);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7929,20 +7929,20 @@ static void create_satochip_seedkeeper_create_mnemonic_block(
   satochip_maint_attach_extra_field(panel, "词数", "12/15/18/21/24", "12",
                                     false, false, 8,
                                     &s_satochip_maint_extra_a);
-  satochip_maint_attach_extra_field(panel, "标签", "BIP39-RNG-Kern",
-                                    "BIP39-RNG-Kern", false, false, 80,
+  satochip_maint_attach_extra_field(panel, "标签", "BIP39-RNG-KernSigner",
+                                    "BIP39-RNG-KernSigner", false, false, 80,
                                     &s_satochip_maint_extra_b);
   satochip_maint_create_result_panel(parent, "创建结果");
 }
 
 static void create_satochip_seedkeeper_write_mnemonic_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_WRITE_MNEMONIC);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
   create_text(panel, feature ? feature->title : "写入卡", true, main_color());
   satochip_maint_attach_primary_input(panel, "卡 PIN", true, false, 64, "");
-  satochip_maint_attach_extra_field(panel, "标签", "Kern 助记词", "Kern 助记词",
+  satochip_maint_attach_extra_field(panel, "标签", "KernSigner 助记词", "KernSigner 助记词",
                                     false, false, 80,
                                     &s_satochip_maint_extra_a);
   satochip_maint_attach_extra_field(panel, "密语", "可留空", "", true, false,
@@ -7951,7 +7951,7 @@ static void create_satochip_seedkeeper_write_mnemonic_block(
 }
 
 static void create_satochip_write_mnemonic_block(lv_obj_t *parent,
-                                                 const krux_feature_t *feature) {
+                                                 const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SATOCHIP_WRITE_MNEMONIC);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7964,7 +7964,7 @@ static void create_satochip_write_mnemonic_block(lv_obj_t *parent,
 }
 
 static void create_satochip_seedkeeper_view_mnemonic_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7973,7 +7973,7 @@ static void create_satochip_seedkeeper_view_mnemonic_block(
 }
 
 static void create_satochip_seedkeeper_load_mnemonic_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7982,7 +7982,7 @@ static void create_satochip_seedkeeper_load_mnemonic_block(
 }
 
 static void create_satochip_seedkeeper_save_password_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -7997,7 +7997,7 @@ static void create_satochip_seedkeeper_save_password_block(
 }
 
 static void create_satochip_seedkeeper_save_descriptor_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -8013,7 +8013,7 @@ static void create_satochip_seedkeeper_save_descriptor_block(
 }
 
 static void create_satochip_certificate_export_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_CERT_EXPORT);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -8023,7 +8023,7 @@ static void create_satochip_certificate_export_block(
 }
 
 static void create_satochip_certificate_import_block(
-    lv_obj_t *parent, const krux_feature_t *feature) {
+    lv_obj_t *parent, const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_CERT_IMPORT);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -8037,7 +8037,7 @@ static void create_satochip_certificate_import_block(
 }
 
 static void create_satochip_authenticity_block(lv_obj_t *parent,
-                                               const krux_feature_t *feature) {
+                                               const signer_feature_t *feature) {
   satochip_maint_prepare(SATOCHIP_MAINT_AUTHENTICITY);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -8109,7 +8109,7 @@ static void camera_preview_event_cb(lv_event_t *event) {
   if (!action)
     action = &CAMERA_ACTION_TEST;
 
-  (void)krux_camera_preview_open_ex(action->preview_title, action->notice,
+  (void)signer_camera_preview_open_ex(action->preview_title, action->notice,
                                     action->reveal_qr_payload);
 }
 
@@ -8165,7 +8165,7 @@ static void storage_probe_event_cb(lv_event_t *event) {
   lv_refr_now(NULL);
 
   char detail[256];
-  esp_err_t ret = krux_hardware_probe_storage_rw(detail, sizeof(detail));
+  esp_err_t ret = signer_hardware_probe_storage_rw(detail, sizeof(detail));
   char text[320];
   snprintf(text, sizeof(text), "%s\n结果：%s",
            ret == ESP_OK ? "存储卡读写检查通过" : "存储卡读写检查失败",
@@ -8322,7 +8322,7 @@ static void create_qr_demo_block(lv_obj_t *parent, const char *title,
   lv_obj_set_style_border_width(qr, 10, 0);
   lv_obj_set_style_radius(qr, 0, 0);
 
-  const char *data = payload ? payload : "KERN-KRUX-QR";
+  const char *data = payload ? payload : "KSIG-QR";
   lv_result_t res = lv_qrcode_update(qr, data, (uint32_t)strlen(data));
   create_text(panel, res == LV_RESULT_OK ? "二维码编码成功" : "二维码编码失败",
               false, res == LV_RESULT_OK ? yes_color() : error_color());
@@ -8365,7 +8365,7 @@ static void create_delivery_acceptance_block(lv_obj_t *parent) {
 }
 
 static bool create_special_detail_cards(lv_obj_t *parent,
-                                        const krux_feature_t *feature) {
+                                        const signer_feature_t *feature) {
   if (strcmp(feature->id, "test_screen_touch") == 0) {
     create_touch_probe_block(parent);
     return true;
@@ -8832,13 +8832,13 @@ static bool create_special_detail_cards(lv_obj_t *parent,
 }
 
 static void create_detail_cards(lv_obj_t *parent,
-                                const krux_feature_t *feature) {
+                                const signer_feature_t *feature) {
   if (strcmp(feature->id, "load_mnemonic") == 0) {
-    create_krux_child_menu(parent, feature);
+    create_signer_child_menu(parent, feature);
     return;
   }
   if (strcmp(feature->id, "load_punch_grid") == 0) {
-    create_krux_child_menu(parent, feature);
+    create_signer_child_menu(parent, feature);
     return;
   }
   if (strcmp(feature->id, "backup_seed_words") == 0 ||
@@ -8860,15 +8860,15 @@ static void create_detail_cards(lv_obj_t *parent,
   if (create_special_detail_cards(parent, feature))
     return;
 
-  if (feature->risk == KRUX_FEATURE_RISK_SECRET_MATERIAL ||
-      feature->risk == KRUX_FEATURE_RISK_SIGNING) {
+  if (feature->risk == SIGNER_FEATURE_RISK_SECRET_MATERIAL ||
+      feature->risk == SIGNER_FEATURE_RISK_SIGNING) {
     create_wallet_entry_block(parent, feature);
   } else {
     create_build_identity_block(parent);
   }
 }
 
-static void style_krux_container(lv_obj_t *obj, lv_color_t color) {
+static void style_signer_container(lv_obj_t *obj, lv_color_t color) {
   lv_obj_set_style_bg_color(obj, color, 0);
   lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(obj, 0, 0);
@@ -8877,22 +8877,22 @@ static void style_krux_container(lv_obj_t *obj, lv_color_t color) {
   lv_obj_set_style_radius(obj, 0, 0);
 }
 
-static void create_krux_status_bar(lv_obj_t *root,
-                                   const krux_feature_t *feature) {
+static void create_signer_status_bar(lv_obj_t *root,
+                                   const signer_feature_t *feature) {
   (void)feature;
   lv_obj_t *bar = lv_obj_create(root);
   lv_obj_set_width(bar, LV_PCT(100));
   lv_obj_set_height(bar, shell_status_height());
-  style_krux_container(bar, krux_card_color());
+  style_signer_container(bar, signer_card_color());
   lv_obj_set_style_pad_all(bar, 0, 0);
   lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
 
   lv_obj_t *battery = lv_obj_create(bar);
   lv_obj_set_size(battery, 22, 10);
   lv_obj_align(battery, LV_ALIGN_RIGHT_MID, -6, 0);
-  lv_obj_set_style_bg_color(battery, krux_card_color(), 0);
+  lv_obj_set_style_bg_color(battery, signer_card_color(), 0);
   lv_obj_set_style_bg_opa(battery, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(battery, krux_text_color(), 0);
+  lv_obj_set_style_border_color(battery, signer_text_color(), 0);
   lv_obj_set_style_border_width(battery, 2, 0);
   lv_obj_set_style_radius(battery, 0, 0);
   lv_obj_set_style_pad_all(battery, 0, 0);
@@ -8900,14 +8900,14 @@ static void create_krux_status_bar(lv_obj_t *root,
   lv_obj_t *tip = lv_obj_create(bar);
   lv_obj_set_size(tip, 3, 6);
   lv_obj_align_to(tip, battery, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
-  lv_obj_set_style_bg_color(tip, krux_text_color(), 0);
+  lv_obj_set_style_bg_color(tip, signer_text_color(), 0);
   lv_obj_set_style_bg_opa(tip, LV_OPA_COVER, 0);
   lv_obj_set_style_border_width(tip, 0, 0);
   lv_obj_set_style_radius(tip, 0, 0);
 }
 
-static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
-  create_krux_status_bar(root, feature);
+static void create_signer_header(lv_obj_t *root, const signer_feature_t *feature) {
+  create_signer_status_bar(root, feature);
 
   if (!feature || strcmp(feature->id, "home") == 0)
     return;
@@ -8915,7 +8915,7 @@ static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
   lv_obj_t *header = lv_obj_create(root);
   lv_obj_set_width(header, LV_PCT(100));
   lv_obj_set_height(header, LV_SIZE_CONTENT);
-  style_krux_container(header, krux_canvas_color());
+  style_signer_container(header, signer_canvas_color());
   lv_obj_set_style_pad_all(header, 0, 0);
   lv_obj_set_style_pad_top(header, shell_header_pad_y(), 0);
   lv_obj_set_style_pad_bottom(header, shell_header_pad_y(), 0);
@@ -8926,7 +8926,7 @@ static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
   lv_obj_t *title_row = lv_obj_create(header);
   lv_obj_set_width(title_row, LV_PCT(100));
   lv_obj_set_height(title_row, shell_is_wave_43_portrait() ? 54 : 60);
-  style_krux_container(title_row, krux_canvas_color());
+  style_signer_container(title_row, signer_canvas_color());
   lv_obj_set_style_pad_all(title_row, 0, 0);
   lv_obj_set_style_pad_column(title_row, shell_is_wave_43_portrait() ? 16 : 18,
                               0);
@@ -8937,7 +8937,7 @@ static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
   lv_obj_t *back = lv_btn_create(title_row);
   lv_obj_set_size(back, shell_is_wave_43_portrait() ? 84 : 96,
                   shell_is_wave_43_portrait() ? 52 : 54);
-  lv_obj_set_style_bg_color(back, krux_card_color(), 0);
+  lv_obj_set_style_bg_color(back, signer_card_color(), 0);
   lv_obj_set_style_bg_opa(back, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(back, highlight_color(), 0);
   lv_obj_set_style_border_width(back, 2, 0);
@@ -8964,18 +8964,18 @@ static void create_krux_header(lv_obj_t *root, const krux_feature_t *feature) {
   lv_obj_t *spacer = lv_obj_create(title_row);
   lv_obj_set_size(spacer, shell_is_wave_43_portrait() ? 84 : 96,
                   shell_is_wave_43_portrait() ? 50 : 54);
-  style_krux_container(spacer, krux_canvas_color());
+  style_signer_container(spacer, signer_canvas_color());
   lv_obj_clear_flag(spacer, LV_OBJ_FLAG_SCROLLABLE);
 
 }
 
-static lv_obj_t *create_krux_list(lv_obj_t *root, bool center_items,
+static lv_obj_t *create_signer_list(lv_obj_t *root, bool center_items,
                                   bool grid_mode) {
   bool home_grid = grid_mode && s_rendering_home_grid;
   lv_obj_t *list = lv_obj_create(root);
   lv_obj_set_width(list, LV_PCT(100));
   lv_obj_set_flex_grow(list, 1);
-  style_krux_container(list, krux_canvas_color());
+  style_signer_container(list, signer_canvas_color());
   lv_obj_set_style_pad_all(list, 0, 0);
   if (grid_mode && !home_grid) {
     lv_obj_set_style_pad_top(list, shell_is_wave_43_portrait() ? 22 : 20, 0);
@@ -9001,7 +9001,7 @@ static lv_obj_t *create_krux_list(lv_obj_t *root, bool center_items,
   return list;
 }
 
-static lv_obj_t *create_krux_menu_button(lv_obj_t *parent, const char *label,
+static lv_obj_t *create_signer_menu_button(lv_obj_t *parent, const char *label,
                                          const char *subtitle,
                                          const char *target_id,
                                          bool primary) {
@@ -9026,8 +9026,8 @@ static lv_obj_t *create_krux_menu_button(lv_obj_t *parent, const char *label,
                                 : shell_menu_button_height(multiline,
                                                            has_subtitle);
   lv_obj_set_height(btn, height);
-  lv_obj_set_style_bg_color(btn, krux_card_color(), LV_STATE_DEFAULT);
-  lv_obj_set_style_bg_color(btn, krux_card_pressed_color(), LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(btn, signer_card_color(), LV_STATE_DEFAULT);
+  lv_obj_set_style_bg_color(btn, signer_card_pressed_color(), LV_STATE_PRESSED);
   lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
   lv_obj_set_style_radius(btn, 8, 0);
   lv_obj_set_style_border_width(btn, 2, 0);
@@ -9066,38 +9066,38 @@ static lv_obj_t *create_krux_menu_button(lv_obj_t *parent, const char *label,
   lv_obj_set_style_text_font(title, theme_font_medium(), 0);
   if (home_grid)
     lv_obj_set_style_text_font(title, theme_font_medium(), 0);
-  lv_obj_set_style_text_color(title, krux_text_color(), 0);
+  lv_obj_set_style_text_color(title, signer_text_color(), 0);
   lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
 
   return btn;
 }
 
-static bool create_krux_override_menu(lv_obj_t *list,
-                                      const krux_menu_override_t *items,
+static bool create_signer_override_menu(lv_obj_t *list,
+                                      const signer_menu_override_t *items,
                                       size_t count) {
   if (!items || count == 0)
     return false;
 
   for (size_t i = 0; i < count; i++) {
-    create_krux_menu_button(list, items[i].label, NULL, items[i].target_id,
+    create_signer_menu_button(list, items[i].label, NULL, items[i].target_id,
                             true);
   }
   return true;
 }
 
-static bool krux_screen_has_override_menu(const char *id) {
+static bool signer_screen_has_override_menu(const char *id) {
   return id && (strcmp(id, "home") == 0 || strcmp(id, "load_mnemonic") == 0 ||
                 strcmp(id, "new_mnemonic") == 0 ||
                 strcmp(id, "tools") == 0 ||
                 strcmp(id, "settings") == 0 ||
                 strcmp(id, "wallet_home") == 0 ||
                 strcmp(id, "signing") == 0 ||
-                krux_sign_wallet_group_id(id) ||
+                signer_sign_wallet_group_id(id) ||
                 strcmp(id, "satochip_btc_pubkeys") == 0 ||
                 strcmp(id, "smartcard_tools") == 0 ||
-                krux_smartcard_tools_group_id(id) ||
-                krux_smartcard_seedkeeper_group_id(id) ||
-                krux_smartcard_certificate_group_id(id) ||
+                signer_smartcard_tools_group_id(id) ||
+                signer_smartcard_seedkeeper_group_id(id) ||
+                signer_smartcard_certificate_group_id(id) ||
                 is_connect_wallet_group_menu(id) ||
                 strcmp(id, "backup_export") == 0 ||
                 strcmp(id, "addresses") == 0 ||
@@ -9109,374 +9109,374 @@ static bool krux_screen_has_override_menu(const char *id) {
                 strcmp(id, "pi_self_check") == 0);
 }
 
-static size_t krux_override_menu_count(const char *id) {
+static size_t signer_override_menu_count(const char *id) {
   if (!id)
     return 0;
   if (strcmp(id, "home") == 0)
-    return sizeof(KRUX_HOME_MENU) / sizeof(KRUX_HOME_MENU[0]);
+    return sizeof(SIGNER_HOME_MENU) / sizeof(SIGNER_HOME_MENU[0]);
   if (strcmp(id, "load_mnemonic") == 0)
-    return sizeof(KRUX_LOAD_MENU) / sizeof(KRUX_LOAD_MENU[0]);
+    return sizeof(SIGNER_LOAD_MENU) / sizeof(SIGNER_LOAD_MENU[0]);
   if (strcmp(id, "new_mnemonic") == 0)
-    return sizeof(KRUX_NEW_MENU) / sizeof(KRUX_NEW_MENU[0]);
+    return sizeof(SIGNER_NEW_MENU) / sizeof(SIGNER_NEW_MENU[0]);
   if (strcmp(id, "tools") == 0)
-    return sizeof(KRUX_TOOLS_MENU) / sizeof(KRUX_TOOLS_MENU[0]);
+    return sizeof(SIGNER_TOOLS_MENU) / sizeof(SIGNER_TOOLS_MENU[0]);
   if (strcmp(id, "settings") == 0)
-    return sizeof(KRUX_SETTINGS_MENU) / sizeof(KRUX_SETTINGS_MENU[0]);
+    return sizeof(SIGNER_SETTINGS_MENU) / sizeof(SIGNER_SETTINGS_MENU[0]);
   if (strcmp(id, "wallet_home") == 0)
-    return sizeof(KRUX_WALLET_MENU) / sizeof(KRUX_WALLET_MENU[0]);
+    return sizeof(SIGNER_WALLET_MENU) / sizeof(SIGNER_WALLET_MENU[0]);
   if (strcmp(id, "signing") == 0)
-    return sizeof(KRUX_SIGNING_MENU) / sizeof(KRUX_SIGNING_MENU[0]);
+    return sizeof(SIGNER_SIGNING_MENU) / sizeof(SIGNER_SIGNING_MENU[0]);
   if (strcmp(id, "sign_okx") == 0)
-    return sizeof(KRUX_SIGN_OKX_MENU) / sizeof(KRUX_SIGN_OKX_MENU[0]);
+    return sizeof(SIGNER_SIGN_OKX_MENU) / sizeof(SIGNER_SIGN_OKX_MENU[0]);
   if (strcmp(id, "sign_bitget") == 0)
-    return sizeof(KRUX_SIGN_BITGET_MENU) / sizeof(KRUX_SIGN_BITGET_MENU[0]);
+    return sizeof(SIGNER_SIGN_BITGET_MENU) / sizeof(SIGNER_SIGN_BITGET_MENU[0]);
   if (strcmp(id, "sign_metamask") == 0)
-    return sizeof(KRUX_SIGN_METAMASK_MENU) /
-           sizeof(KRUX_SIGN_METAMASK_MENU[0]);
+    return sizeof(SIGNER_SIGN_METAMASK_MENU) /
+           sizeof(SIGNER_SIGN_METAMASK_MENU[0]);
   if (strcmp(id, "sign_rabby") == 0)
-    return sizeof(KRUX_SIGN_RABBY_MENU) / sizeof(KRUX_SIGN_RABBY_MENU[0]);
+    return sizeof(SIGNER_SIGN_RABBY_MENU) / sizeof(SIGNER_SIGN_RABBY_MENU[0]);
   if (strcmp(id, "sign_tokenpocket") == 0)
-    return sizeof(KRUX_SIGN_TOKENPOCKET_MENU) /
-           sizeof(KRUX_SIGN_TOKENPOCKET_MENU[0]);
+    return sizeof(SIGNER_SIGN_TOKENPOCKET_MENU) /
+           sizeof(SIGNER_SIGN_TOKENPOCKET_MENU[0]);
   if (strcmp(id, "sign_imtoken") == 0)
-    return sizeof(KRUX_SIGN_IMTOKEN_MENU) / sizeof(KRUX_SIGN_IMTOKEN_MENU[0]);
+    return sizeof(SIGNER_SIGN_IMTOKEN_MENU) / sizeof(SIGNER_SIGN_IMTOKEN_MENU[0]);
   if (strcmp(id, "sign_btc") == 0)
-    return sizeof(KRUX_SIGN_BTC_MENU) / sizeof(KRUX_SIGN_BTC_MENU[0]);
+    return sizeof(SIGNER_SIGN_BTC_MENU) / sizeof(SIGNER_SIGN_BTC_MENU[0]);
   if (strcmp(id, "satochip_btc_pubkeys") == 0)
-    return sizeof(KRUX_SATOCHIP_PUBKEY_MENU) /
-           sizeof(KRUX_SATOCHIP_PUBKEY_MENU[0]);
+    return sizeof(SIGNER_SATOCHIP_PUBKEY_MENU) /
+           sizeof(SIGNER_SATOCHIP_PUBKEY_MENU[0]);
   if (strcmp(id, "connect_web3") == 0)
-    return sizeof(KRUX_CONNECT_WEB3_MENU) /
-           sizeof(KRUX_CONNECT_WEB3_MENU[0]);
+    return sizeof(SIGNER_CONNECT_WEB3_MENU) /
+           sizeof(SIGNER_CONNECT_WEB3_MENU[0]);
   if (strcmp(id, "connect_okx") == 0)
-    return sizeof(KRUX_CONNECT_OKX_MENU) / sizeof(KRUX_CONNECT_OKX_MENU[0]);
+    return sizeof(SIGNER_CONNECT_OKX_MENU) / sizeof(SIGNER_CONNECT_OKX_MENU[0]);
   if (strcmp(id, "connect_bitget") == 0)
-    return sizeof(KRUX_CONNECT_BITGET_MENU) /
-           sizeof(KRUX_CONNECT_BITGET_MENU[0]);
+    return sizeof(SIGNER_CONNECT_BITGET_MENU) /
+           sizeof(SIGNER_CONNECT_BITGET_MENU[0]);
   if (strcmp(id, "connect_metamask") == 0)
-    return sizeof(KRUX_CONNECT_METAMASK_MENU) /
-           sizeof(KRUX_CONNECT_METAMASK_MENU[0]);
+    return sizeof(SIGNER_CONNECT_METAMASK_MENU) /
+           sizeof(SIGNER_CONNECT_METAMASK_MENU[0]);
   if (strcmp(id, "connect_rabby") == 0)
-    return sizeof(KRUX_CONNECT_RABBY_MENU) /
-           sizeof(KRUX_CONNECT_RABBY_MENU[0]);
+    return sizeof(SIGNER_CONNECT_RABBY_MENU) /
+           sizeof(SIGNER_CONNECT_RABBY_MENU[0]);
   if (strcmp(id, "connect_tokenpocket") == 0)
-    return sizeof(KRUX_CONNECT_TOKENPOCKET_MENU) /
-           sizeof(KRUX_CONNECT_TOKENPOCKET_MENU[0]);
+    return sizeof(SIGNER_CONNECT_TOKENPOCKET_MENU) /
+           sizeof(SIGNER_CONNECT_TOKENPOCKET_MENU[0]);
   if (strcmp(id, "connect_imtoken") == 0)
-    return sizeof(KRUX_CONNECT_IMTOKEN_MENU) /
-           sizeof(KRUX_CONNECT_IMTOKEN_MENU[0]);
+    return sizeof(SIGNER_CONNECT_IMTOKEN_MENU) /
+           sizeof(SIGNER_CONNECT_IMTOKEN_MENU[0]);
   if (strcmp(id, "btc_wallet") == 0)
-    return sizeof(KRUX_BTC_WALLET_MENU) / sizeof(KRUX_BTC_WALLET_MENU[0]);
+    return sizeof(SIGNER_BTC_WALLET_MENU) / sizeof(SIGNER_BTC_WALLET_MENU[0]);
   if (strcmp(id, "btc_mnemonic") == 0)
-    return sizeof(KRUX_BTC_MNEMONIC_MENU) / sizeof(KRUX_BTC_MNEMONIC_MENU[0]);
+    return sizeof(SIGNER_BTC_MNEMONIC_MENU) / sizeof(SIGNER_BTC_MNEMONIC_MENU[0]);
   if (strcmp(id, "btc_satochip") == 0)
-    return sizeof(KRUX_BTC_SATOCHIP_MENU) /
-           sizeof(KRUX_BTC_SATOCHIP_MENU[0]);
+    return sizeof(SIGNER_BTC_SATOCHIP_MENU) /
+           sizeof(SIGNER_BTC_SATOCHIP_MENU[0]);
   if (strcmp(id, "backup_export") == 0)
-    return sizeof(KRUX_BACKUP_MENU) / sizeof(KRUX_BACKUP_MENU[0]);
+    return sizeof(SIGNER_BACKUP_MENU) / sizeof(SIGNER_BACKUP_MENU[0]);
   if (strcmp(id, "addresses") == 0)
-    return sizeof(KRUX_ADDRESSES_MENU) / sizeof(KRUX_ADDRESSES_MENU[0]);
+    return sizeof(SIGNER_ADDRESSES_MENU) / sizeof(SIGNER_ADDRESSES_MENU[0]);
   if (strcmp(id, "device_tests") == 0)
-    return sizeof(KRUX_DEVICE_TESTS_MENU) / sizeof(KRUX_DEVICE_TESTS_MENU[0]);
+    return sizeof(SIGNER_DEVICE_TESTS_MENU) / sizeof(SIGNER_DEVICE_TESTS_MENU[0]);
   if (strcmp(id, "smartcard_tools") == 0)
-    return sizeof(KRUX_SMARTCARD_MENU) / sizeof(KRUX_SMARTCARD_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_MENU) / sizeof(SIGNER_SMARTCARD_MENU[0]);
   if (strcmp(id, "smartcard_satochip_tools") == 0)
-    return sizeof(KRUX_SMARTCARD_SATOCHIP_MENU) /
-           sizeof(KRUX_SMARTCARD_SATOCHIP_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_SATOCHIP_MENU) /
+           sizeof(SIGNER_SMARTCARD_SATOCHIP_MENU[0]);
   if (strcmp(id, "smartcard_satochip_maint") == 0)
-    return sizeof(KRUX_SMARTCARD_MAINT_MENU) /
-           sizeof(KRUX_SMARTCARD_MAINT_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_MAINT_MENU) /
+           sizeof(SIGNER_SMARTCARD_MAINT_MENU[0]);
   if (strcmp(id, "smartcard_satochip_advanced_tools") == 0)
-    return sizeof(KRUX_SMARTCARD_ADVANCED_MENU) /
-           sizeof(KRUX_SMARTCARD_ADVANCED_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_ADVANCED_MENU) /
+           sizeof(SIGNER_SMARTCARD_ADVANCED_MENU[0]);
   if (strcmp(id, "smartcard_satochip_pubkey_tools") == 0)
-    return sizeof(KRUX_SMARTCARD_PUBKEY_MENU) /
-           sizeof(KRUX_SMARTCARD_PUBKEY_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_PUBKEY_MENU) /
+           sizeof(SIGNER_SMARTCARD_PUBKEY_MENU[0]);
   if (strcmp(id, "smartcard_satochip_2fa_tools") == 0)
-    return sizeof(KRUX_SMARTCARD_2FA_MENU) / sizeof(KRUX_SMARTCARD_2FA_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_2FA_MENU) / sizeof(SIGNER_SMARTCARD_2FA_MENU[0]);
   if (strcmp(id, "smartcard_satochip_session_tools") == 0)
-    return sizeof(KRUX_SMARTCARD_SESSION_MENU) /
-           sizeof(KRUX_SMARTCARD_SESSION_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_SESSION_MENU) /
+           sizeof(SIGNER_SMARTCARD_SESSION_MENU[0]);
   if (strcmp(id, "smartcard_seedkeeper_advanced_tools") == 0)
-    return sizeof(KRUX_SMARTCARD_SEEDKEEPER_ADVANCED_MENU) /
-           sizeof(KRUX_SMARTCARD_SEEDKEEPER_ADVANCED_MENU[0]);
-  if (krux_smartcard_seedkeeper_group_id(id))
-    return sizeof(KRUX_SMARTCARD_SEEDKEEPER_MENU) /
-           sizeof(KRUX_SMARTCARD_SEEDKEEPER_MENU[0]);
-  if (krux_smartcard_certificate_group_id(id))
-    return sizeof(KRUX_SMARTCARD_CERTIFICATE_MENU) /
-           sizeof(KRUX_SMARTCARD_CERTIFICATE_MENU[0]);
+    return sizeof(SIGNER_SMARTCARD_SEEDKEEPER_ADVANCED_MENU) /
+           sizeof(SIGNER_SMARTCARD_SEEDKEEPER_ADVANCED_MENU[0]);
+  if (signer_smartcard_seedkeeper_group_id(id))
+    return sizeof(SIGNER_SMARTCARD_SEEDKEEPER_MENU) /
+           sizeof(SIGNER_SMARTCARD_SEEDKEEPER_MENU[0]);
+  if (signer_smartcard_certificate_group_id(id))
+    return sizeof(SIGNER_SMARTCARD_CERTIFICATE_MENU) /
+           sizeof(SIGNER_SMARTCARD_CERTIFICATE_MENU[0]);
   if (strcmp(id, "pi_mnemonic_tools") == 0)
-    return sizeof(KRUX_PI_MNEMONIC_MENU) / sizeof(KRUX_PI_MNEMONIC_MENU[0]);
+    return sizeof(SIGNER_PI_MNEMONIC_MENU) / sizeof(SIGNER_PI_MNEMONIC_MENU[0]);
   if (strcmp(id, "mnemonic_write_smartcard") == 0)
-    return sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU) /
-           sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU[0]);
+    return sizeof(SIGNER_MNEMONIC_WRITE_SMARTCARD_MENU) /
+           sizeof(SIGNER_MNEMONIC_WRITE_SMARTCARD_MENU[0]);
   if (strcmp(id, "pi_mnemonic_advanced") == 0)
-    return sizeof(KRUX_PI_MNEMONIC_ADVANCED_MENU) /
-           sizeof(KRUX_PI_MNEMONIC_ADVANCED_MENU[0]);
+    return sizeof(SIGNER_PI_MNEMONIC_ADVANCED_MENU) /
+           sizeof(SIGNER_PI_MNEMONIC_ADVANCED_MENU[0]);
   if (strcmp(id, "pi_connect_wallet") == 0)
-    return sizeof(KRUX_PI_CONNECT_MENU) / sizeof(KRUX_PI_CONNECT_MENU[0]);
+    return sizeof(SIGNER_PI_CONNECT_MENU) / sizeof(SIGNER_PI_CONNECT_MENU[0]);
   if (strcmp(id, "pi_self_check") == 0)
-    return sizeof(KRUX_PI_SELF_CHECK_MENU) / sizeof(KRUX_PI_SELF_CHECK_MENU[0]);
+    return sizeof(SIGNER_PI_SELF_CHECK_MENU) / sizeof(SIGNER_PI_SELF_CHECK_MENU[0]);
   return 0;
 }
 
-static void create_krux_home_menu(lv_obj_t *list) {
-  (void)KRUX_HOME_MENU_IDS;
-  for (size_t i = 0; i < sizeof(KRUX_HOME_MENU) / sizeof(KRUX_HOME_MENU[0]); i++) {
-    create_krux_menu_button(list, KRUX_HOME_MENU[i].label, NULL,
-                            KRUX_HOME_MENU[i].target_id, true);
+static void create_signer_home_menu(lv_obj_t *list) {
+  (void)SIGNER_HOME_MENU_IDS;
+  for (size_t i = 0; i < sizeof(SIGNER_HOME_MENU) / sizeof(SIGNER_HOME_MENU[0]); i++) {
+    create_signer_menu_button(list, SIGNER_HOME_MENU[i].label, NULL,
+                            SIGNER_HOME_MENU[i].target_id, true);
   }
 }
 
-static void create_krux_child_menu(lv_obj_t *list,
-                                   const krux_feature_t *feature) {
+static void create_signer_child_menu(lv_obj_t *list,
+                                   const signer_feature_t *feature) {
   if (strcmp(feature->id, "load_mnemonic") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_LOAD_MENU,
-          sizeof(KRUX_LOAD_MENU) / sizeof(KRUX_LOAD_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_LOAD_MENU,
+          sizeof(SIGNER_LOAD_MENU) / sizeof(SIGNER_LOAD_MENU[0])))
     return;
   if (strcmp(feature->id, "new_mnemonic") == 0 &&
-      create_krux_override_menu(list, KRUX_NEW_MENU,
-                                sizeof(KRUX_NEW_MENU) / sizeof(KRUX_NEW_MENU[0])))
+      create_signer_override_menu(list, SIGNER_NEW_MENU,
+                                sizeof(SIGNER_NEW_MENU) / sizeof(SIGNER_NEW_MENU[0])))
     return;
   if (strcmp(feature->id, "tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_TOOLS_MENU,
-          sizeof(KRUX_TOOLS_MENU) / sizeof(KRUX_TOOLS_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_TOOLS_MENU,
+          sizeof(SIGNER_TOOLS_MENU) / sizeof(SIGNER_TOOLS_MENU[0])))
     return;
   if (strcmp(feature->id, "settings") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SETTINGS_MENU,
-          sizeof(KRUX_SETTINGS_MENU) / sizeof(KRUX_SETTINGS_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SETTINGS_MENU,
+          sizeof(SIGNER_SETTINGS_MENU) / sizeof(SIGNER_SETTINGS_MENU[0])))
     return;
   if (strcmp(feature->id, "wallet_home") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_WALLET_MENU,
-          sizeof(KRUX_WALLET_MENU) / sizeof(KRUX_WALLET_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_WALLET_MENU,
+          sizeof(SIGNER_WALLET_MENU) / sizeof(SIGNER_WALLET_MENU[0])))
     return;
   if (strcmp(feature->id, "signing") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGNING_MENU,
-          sizeof(KRUX_SIGNING_MENU) / sizeof(KRUX_SIGNING_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGNING_MENU,
+          sizeof(SIGNER_SIGNING_MENU) / sizeof(SIGNER_SIGNING_MENU[0])))
     return;
   if (strcmp(feature->id, "sign_okx") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGN_OKX_MENU,
-          sizeof(KRUX_SIGN_OKX_MENU) / sizeof(KRUX_SIGN_OKX_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGN_OKX_MENU,
+          sizeof(SIGNER_SIGN_OKX_MENU) / sizeof(SIGNER_SIGN_OKX_MENU[0])))
     return;
   if (strcmp(feature->id, "sign_bitget") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGN_BITGET_MENU,
-          sizeof(KRUX_SIGN_BITGET_MENU) / sizeof(KRUX_SIGN_BITGET_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGN_BITGET_MENU,
+          sizeof(SIGNER_SIGN_BITGET_MENU) / sizeof(SIGNER_SIGN_BITGET_MENU[0])))
     return;
   if (strcmp(feature->id, "sign_metamask") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGN_METAMASK_MENU,
-          sizeof(KRUX_SIGN_METAMASK_MENU) /
-              sizeof(KRUX_SIGN_METAMASK_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGN_METAMASK_MENU,
+          sizeof(SIGNER_SIGN_METAMASK_MENU) /
+              sizeof(SIGNER_SIGN_METAMASK_MENU[0])))
     return;
   if (strcmp(feature->id, "sign_rabby") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGN_RABBY_MENU,
-          sizeof(KRUX_SIGN_RABBY_MENU) / sizeof(KRUX_SIGN_RABBY_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGN_RABBY_MENU,
+          sizeof(SIGNER_SIGN_RABBY_MENU) / sizeof(SIGNER_SIGN_RABBY_MENU[0])))
     return;
   if (strcmp(feature->id, "sign_tokenpocket") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGN_TOKENPOCKET_MENU,
-          sizeof(KRUX_SIGN_TOKENPOCKET_MENU) /
-              sizeof(KRUX_SIGN_TOKENPOCKET_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGN_TOKENPOCKET_MENU,
+          sizeof(SIGNER_SIGN_TOKENPOCKET_MENU) /
+              sizeof(SIGNER_SIGN_TOKENPOCKET_MENU[0])))
     return;
   if (strcmp(feature->id, "sign_imtoken") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGN_IMTOKEN_MENU,
-          sizeof(KRUX_SIGN_IMTOKEN_MENU) / sizeof(KRUX_SIGN_IMTOKEN_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGN_IMTOKEN_MENU,
+          sizeof(SIGNER_SIGN_IMTOKEN_MENU) / sizeof(SIGNER_SIGN_IMTOKEN_MENU[0])))
     return;
   if (strcmp(feature->id, "sign_btc") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SIGN_BTC_MENU,
-          sizeof(KRUX_SIGN_BTC_MENU) / sizeof(KRUX_SIGN_BTC_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SIGN_BTC_MENU,
+          sizeof(SIGNER_SIGN_BTC_MENU) / sizeof(SIGNER_SIGN_BTC_MENU[0])))
     return;
   if (strcmp(feature->id, "satochip_btc_pubkeys") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SATOCHIP_PUBKEY_MENU,
-          sizeof(KRUX_SATOCHIP_PUBKEY_MENU) /
-              sizeof(KRUX_SATOCHIP_PUBKEY_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SATOCHIP_PUBKEY_MENU,
+          sizeof(SIGNER_SATOCHIP_PUBKEY_MENU) /
+              sizeof(SIGNER_SATOCHIP_PUBKEY_MENU[0])))
     return;
   if (strcmp(feature->id, "connect_web3") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_CONNECT_WEB3_MENU,
-          sizeof(KRUX_CONNECT_WEB3_MENU) / sizeof(KRUX_CONNECT_WEB3_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_CONNECT_WEB3_MENU,
+          sizeof(SIGNER_CONNECT_WEB3_MENU) / sizeof(SIGNER_CONNECT_WEB3_MENU[0])))
     return;
   if (strcmp(feature->id, "connect_okx") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_CONNECT_OKX_MENU,
-          sizeof(KRUX_CONNECT_OKX_MENU) / sizeof(KRUX_CONNECT_OKX_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_CONNECT_OKX_MENU,
+          sizeof(SIGNER_CONNECT_OKX_MENU) / sizeof(SIGNER_CONNECT_OKX_MENU[0])))
     return;
   if (strcmp(feature->id, "connect_bitget") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_CONNECT_BITGET_MENU,
-          sizeof(KRUX_CONNECT_BITGET_MENU) /
-              sizeof(KRUX_CONNECT_BITGET_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_CONNECT_BITGET_MENU,
+          sizeof(SIGNER_CONNECT_BITGET_MENU) /
+              sizeof(SIGNER_CONNECT_BITGET_MENU[0])))
     return;
   if (strcmp(feature->id, "connect_metamask") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_CONNECT_METAMASK_MENU,
-          sizeof(KRUX_CONNECT_METAMASK_MENU) /
-              sizeof(KRUX_CONNECT_METAMASK_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_CONNECT_METAMASK_MENU,
+          sizeof(SIGNER_CONNECT_METAMASK_MENU) /
+              sizeof(SIGNER_CONNECT_METAMASK_MENU[0])))
     return;
   if (strcmp(feature->id, "connect_rabby") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_CONNECT_RABBY_MENU,
-          sizeof(KRUX_CONNECT_RABBY_MENU) /
-              sizeof(KRUX_CONNECT_RABBY_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_CONNECT_RABBY_MENU,
+          sizeof(SIGNER_CONNECT_RABBY_MENU) /
+              sizeof(SIGNER_CONNECT_RABBY_MENU[0])))
     return;
   if (strcmp(feature->id, "connect_tokenpocket") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_CONNECT_TOKENPOCKET_MENU,
-          sizeof(KRUX_CONNECT_TOKENPOCKET_MENU) /
-              sizeof(KRUX_CONNECT_TOKENPOCKET_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_CONNECT_TOKENPOCKET_MENU,
+          sizeof(SIGNER_CONNECT_TOKENPOCKET_MENU) /
+              sizeof(SIGNER_CONNECT_TOKENPOCKET_MENU[0])))
     return;
   if (strcmp(feature->id, "connect_imtoken") == 0 &&
-      create_krux_override_menu(list, KRUX_CONNECT_IMTOKEN_MENU,
-                                sizeof(KRUX_CONNECT_IMTOKEN_MENU) /
-                                    sizeof(KRUX_CONNECT_IMTOKEN_MENU[0])))
+      create_signer_override_menu(list, SIGNER_CONNECT_IMTOKEN_MENU,
+                                sizeof(SIGNER_CONNECT_IMTOKEN_MENU) /
+                                    sizeof(SIGNER_CONNECT_IMTOKEN_MENU[0])))
     return;
   if (strcmp(feature->id, "btc_wallet") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_BTC_WALLET_MENU,
-          sizeof(KRUX_BTC_WALLET_MENU) / sizeof(KRUX_BTC_WALLET_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_BTC_WALLET_MENU,
+          sizeof(SIGNER_BTC_WALLET_MENU) / sizeof(SIGNER_BTC_WALLET_MENU[0])))
     return;
   if (strcmp(feature->id, "btc_mnemonic") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_BTC_MNEMONIC_MENU,
-          sizeof(KRUX_BTC_MNEMONIC_MENU) /
-              sizeof(KRUX_BTC_MNEMONIC_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_BTC_MNEMONIC_MENU,
+          sizeof(SIGNER_BTC_MNEMONIC_MENU) /
+              sizeof(SIGNER_BTC_MNEMONIC_MENU[0])))
     return;
   if (strcmp(feature->id, "btc_satochip") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_BTC_SATOCHIP_MENU,
-          sizeof(KRUX_BTC_SATOCHIP_MENU) /
-              sizeof(KRUX_BTC_SATOCHIP_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_BTC_SATOCHIP_MENU,
+          sizeof(SIGNER_BTC_SATOCHIP_MENU) /
+              sizeof(SIGNER_BTC_SATOCHIP_MENU[0])))
     return;
   if (strcmp(feature->id, "backup_export") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_BACKUP_MENU,
-          sizeof(KRUX_BACKUP_MENU) / sizeof(KRUX_BACKUP_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_BACKUP_MENU,
+          sizeof(SIGNER_BACKUP_MENU) / sizeof(SIGNER_BACKUP_MENU[0])))
     return;
   if (strcmp(feature->id, "addresses") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_ADDRESSES_MENU,
-          sizeof(KRUX_ADDRESSES_MENU) / sizeof(KRUX_ADDRESSES_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_ADDRESSES_MENU,
+          sizeof(SIGNER_ADDRESSES_MENU) / sizeof(SIGNER_ADDRESSES_MENU[0])))
     return;
   if (strcmp(feature->id, "device_tests") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_DEVICE_TESTS_MENU,
-          sizeof(KRUX_DEVICE_TESTS_MENU) / sizeof(KRUX_DEVICE_TESTS_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_DEVICE_TESTS_MENU,
+          sizeof(SIGNER_DEVICE_TESTS_MENU) / sizeof(SIGNER_DEVICE_TESTS_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_MENU,
-          sizeof(KRUX_SMARTCARD_MENU) / sizeof(KRUX_SMARTCARD_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_MENU,
+          sizeof(SIGNER_SMARTCARD_MENU) / sizeof(SIGNER_SMARTCARD_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_SATOCHIP_MENU,
-          sizeof(KRUX_SMARTCARD_SATOCHIP_MENU) /
-              sizeof(KRUX_SMARTCARD_SATOCHIP_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_SATOCHIP_MENU,
+          sizeof(SIGNER_SMARTCARD_SATOCHIP_MENU) /
+              sizeof(SIGNER_SMARTCARD_SATOCHIP_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_maint") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_MAINT_MENU,
-          sizeof(KRUX_SMARTCARD_MAINT_MENU) /
-              sizeof(KRUX_SMARTCARD_MAINT_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_MAINT_MENU,
+          sizeof(SIGNER_SMARTCARD_MAINT_MENU) /
+              sizeof(SIGNER_SMARTCARD_MAINT_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_advanced_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_ADVANCED_MENU,
-          sizeof(KRUX_SMARTCARD_ADVANCED_MENU) /
-              sizeof(KRUX_SMARTCARD_ADVANCED_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_ADVANCED_MENU,
+          sizeof(SIGNER_SMARTCARD_ADVANCED_MENU) /
+              sizeof(SIGNER_SMARTCARD_ADVANCED_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_pubkey_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_PUBKEY_MENU,
-          sizeof(KRUX_SMARTCARD_PUBKEY_MENU) /
-              sizeof(KRUX_SMARTCARD_PUBKEY_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_PUBKEY_MENU,
+          sizeof(SIGNER_SMARTCARD_PUBKEY_MENU) /
+              sizeof(SIGNER_SMARTCARD_PUBKEY_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_2fa_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_2FA_MENU,
-          sizeof(KRUX_SMARTCARD_2FA_MENU) / sizeof(KRUX_SMARTCARD_2FA_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_2FA_MENU,
+          sizeof(SIGNER_SMARTCARD_2FA_MENU) / sizeof(SIGNER_SMARTCARD_2FA_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_session_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_SESSION_MENU,
-          sizeof(KRUX_SMARTCARD_SESSION_MENU) /
-              sizeof(KRUX_SMARTCARD_SESSION_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_SESSION_MENU,
+          sizeof(SIGNER_SMARTCARD_SESSION_MENU) /
+              sizeof(SIGNER_SMARTCARD_SESSION_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_seedkeeper_advanced_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_SEEDKEEPER_ADVANCED_MENU,
-          sizeof(KRUX_SMARTCARD_SEEDKEEPER_ADVANCED_MENU) /
-              sizeof(KRUX_SMARTCARD_SEEDKEEPER_ADVANCED_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_SEEDKEEPER_ADVANCED_MENU,
+          sizeof(SIGNER_SMARTCARD_SEEDKEEPER_ADVANCED_MENU) /
+              sizeof(SIGNER_SMARTCARD_SEEDKEEPER_ADVANCED_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_seedkeeper_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_SEEDKEEPER_MENU,
-          sizeof(KRUX_SMARTCARD_SEEDKEEPER_MENU) /
-              sizeof(KRUX_SMARTCARD_SEEDKEEPER_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_SEEDKEEPER_MENU,
+          sizeof(SIGNER_SMARTCARD_SEEDKEEPER_MENU) /
+              sizeof(SIGNER_SMARTCARD_SEEDKEEPER_MENU[0])))
     return;
   if (strcmp(feature->id, "smartcard_satochip_certificate_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_SMARTCARD_CERTIFICATE_MENU,
-          sizeof(KRUX_SMARTCARD_CERTIFICATE_MENU) /
-              sizeof(KRUX_SMARTCARD_CERTIFICATE_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_SMARTCARD_CERTIFICATE_MENU,
+          sizeof(SIGNER_SMARTCARD_CERTIFICATE_MENU) /
+              sizeof(SIGNER_SMARTCARD_CERTIFICATE_MENU[0])))
     return;
   if (strcmp(feature->id, "pi_mnemonic_tools") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_PI_MNEMONIC_MENU,
-          sizeof(KRUX_PI_MNEMONIC_MENU) / sizeof(KRUX_PI_MNEMONIC_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_PI_MNEMONIC_MENU,
+          sizeof(SIGNER_PI_MNEMONIC_MENU) / sizeof(SIGNER_PI_MNEMONIC_MENU[0])))
     return;
   if (strcmp(feature->id, "mnemonic_write_smartcard") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_MNEMONIC_WRITE_SMARTCARD_MENU,
-          sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU) /
-              sizeof(KRUX_MNEMONIC_WRITE_SMARTCARD_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_MNEMONIC_WRITE_SMARTCARD_MENU,
+          sizeof(SIGNER_MNEMONIC_WRITE_SMARTCARD_MENU) /
+              sizeof(SIGNER_MNEMONIC_WRITE_SMARTCARD_MENU[0])))
     return;
   if (strcmp(feature->id, "pi_mnemonic_advanced") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_PI_MNEMONIC_ADVANCED_MENU,
-          sizeof(KRUX_PI_MNEMONIC_ADVANCED_MENU) /
-              sizeof(KRUX_PI_MNEMONIC_ADVANCED_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_PI_MNEMONIC_ADVANCED_MENU,
+          sizeof(SIGNER_PI_MNEMONIC_ADVANCED_MENU) /
+              sizeof(SIGNER_PI_MNEMONIC_ADVANCED_MENU[0])))
     return;
   if (strcmp(feature->id, "pi_connect_wallet") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_PI_CONNECT_MENU,
-          sizeof(KRUX_PI_CONNECT_MENU) / sizeof(KRUX_PI_CONNECT_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_PI_CONNECT_MENU,
+          sizeof(SIGNER_PI_CONNECT_MENU) / sizeof(SIGNER_PI_CONNECT_MENU[0])))
     return;
   if (strcmp(feature->id, "pi_self_check") == 0 &&
-      create_krux_override_menu(
-          list, KRUX_PI_SELF_CHECK_MENU,
-          sizeof(KRUX_PI_SELF_CHECK_MENU) / sizeof(KRUX_PI_SELF_CHECK_MENU[0])))
+      create_signer_override_menu(
+          list, SIGNER_PI_SELF_CHECK_MENU,
+          sizeof(SIGNER_PI_SELF_CHECK_MENU) / sizeof(SIGNER_PI_SELF_CHECK_MENU[0])))
     return;
 
-  size_t child_count = krux_feature_child_count(feature->id);
+  size_t child_count = signer_feature_child_count(feature->id);
   for (size_t i = 0; i < child_count; i++) {
-    const krux_feature_t *child = krux_feature_child_at(feature->id, i);
+    const signer_feature_t *child = signer_feature_child_at(feature->id, i);
     if (child) {
-      create_krux_menu_button(list, child->title, child->subtitle, child->id,
+      create_signer_menu_button(list, child->title, child->subtitle, child->id,
                               i == 0);
     }
   }
 }
 
-static void create_krux_leaf_content(lv_obj_t *list,
-                                     const krux_feature_t *feature) {
+static void create_signer_leaf_content(lv_obj_t *list,
+                                     const signer_feature_t *feature) {
   create_detail_cards(list, feature);
 }
 
-static void create_krux_bottom_nav(lv_obj_t *root,
-                                   const krux_feature_t *feature) {
+static void create_signer_bottom_nav(lv_obj_t *root,
+                                   const signer_feature_t *feature) {
   if (!feature->parent_id)
     return;
 
@@ -9485,7 +9485,7 @@ static void create_krux_bottom_nav(lv_obj_t *root,
   lv_obj_t *row = lv_obj_create(root);
   lv_obj_set_width(row, LV_PCT(100));
   lv_obj_set_height(row, LV_SIZE_CONTENT);
-  style_krux_container(row, krux_canvas_color());
+  style_signer_container(row, signer_canvas_color());
   lv_obj_set_style_pad_all(row, 0, 0);
   lv_obj_set_style_pad_column(row, 10, 0);
   lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
@@ -9493,19 +9493,19 @@ static void create_krux_bottom_nav(lv_obj_t *root,
                         LV_FLEX_ALIGN_CENTER);
 
   if (strcmp(back_target, "home") != 0) {
-    lv_obj_t *home = create_krux_menu_button(row, "回到首页", NULL, "home", false);
+    lv_obj_t *home = create_signer_menu_button(row, "回到首页", NULL, "home", false);
     lv_obj_set_width(home, LV_PCT(48));
     lv_obj_set_height(home, shell_bottom_nav_height());
   }
 
   lv_obj_t *back =
-      create_krux_menu_button(row, "返回", NULL, back_target, true);
+      create_signer_menu_button(row, "返回", NULL, back_target, true);
   lv_obj_set_width(back, strcmp(back_target, "home") != 0 ? LV_PCT(48)
                                                           : LV_PCT(100));
   lv_obj_set_height(back, shell_bottom_nav_height());
 }
 
-static void render_screen(const krux_feature_t *feature) {
+static void render_screen(const signer_feature_t *feature) {
   if (!s_parent || !feature)
     return;
 
@@ -9514,7 +9514,7 @@ static void render_screen(const krux_feature_t *feature) {
   theme_apply_screen(s_parent);
 
   lv_obj_t *root = theme_create_page_container(s_parent);
-  lv_obj_set_style_bg_color(root, krux_canvas_color(), 0);
+  lv_obj_set_style_bg_color(root, signer_canvas_color(), 0);
   lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER);
@@ -9525,11 +9525,11 @@ static void render_screen(const krux_feature_t *feature) {
   lv_obj_set_style_pad_right(root, shell_margin_h(), 0);
   lv_obj_set_style_pad_gap(root, shell_root_gap(is_home), 0);
 
-  create_krux_header(root, feature);
+  create_signer_header(root, feature);
 
-  size_t child_count = krux_feature_child_count(feature->id);
-  bool has_override = krux_screen_has_override_menu(feature->id);
-  size_t menu_count = has_override ? krux_override_menu_count(feature->id)
+  size_t child_count = signer_feature_child_count(feature->id);
+  bool has_override = signer_screen_has_override_menu(feature->id);
+  size_t menu_count = has_override ? signer_override_menu_count(feature->id)
                                    : child_count;
   bool menu_screen = child_count > 0 || has_override;
   bool grid_mode =
@@ -9540,38 +9540,38 @@ static void render_screen(const krux_feature_t *feature) {
   s_menu_grid_mode = grid_mode;
   s_rendering_home_grid = grid_mode && is_home;
   s_compact_menu_grid = grid_mode && strcmp(feature->id, "smartcard_tools") == 0;
-  lv_obj_t *list = create_krux_list(root, center_items, grid_mode);
+  lv_obj_t *list = create_signer_list(root, center_items, grid_mode);
   if (!menu_screen && satochip_screen_uses_onscreen_keyboard(feature->id)) {
     lv_obj_set_style_pad_bottom(list, LV_VER_RES * 38 / 100, 0);
     lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_AUTO);
   }
   if (menu_screen) {
     if (is_home)
-      create_krux_home_menu(list);
+      create_signer_home_menu(list);
     else
-      create_krux_child_menu(list, feature);
+      create_signer_child_menu(list, feature);
   } else {
-    create_krux_leaf_content(list, feature);
+    create_signer_leaf_content(list, feature);
   }
 
   s_menu_grid_mode = false;
   s_rendering_home_grid = false;
   s_compact_menu_grid = false;
   const char *back_target = shell_back_target_for_feature(feature);
-  const krux_feature_t *parent = back_target ? krux_feature_find(back_target) : NULL;
+  const signer_feature_t *parent = back_target ? signer_feature_find(back_target) : NULL;
   bool deep_menu_screen = menu_screen && feature->parent_id && parent &&
                           parent->parent_id &&
                           strcmp(parent->parent_id, "home") != 0;
   if (!menu_screen || deep_menu_screen)
-    create_krux_bottom_nav(root, feature);
+    create_signer_bottom_nav(root, feature);
 }
 
-void krux_shell_create(lv_obj_t *parent) {
+void signer_shell_create(lv_obj_t *parent) {
   s_parent = parent ? parent : lv_screen_active();
-  (void)krux_shell_show_screen("home");
+  (void)signer_shell_show_screen("home");
 }
 
-bool krux_shell_show_screen(const char *screen_id) {
+bool signer_shell_show_screen(const char *screen_id) {
   const char *requested_id = screen_id ? screen_id : "home";
   const char *alias_target = shell_alias_target_for_id(requested_id);
   if (alias_target)
@@ -9593,7 +9593,7 @@ bool krux_shell_show_screen(const char *screen_id) {
   }
 #endif
 
-  const krux_feature_t *feature = shell_feature_find(requested_id);
+  const signer_feature_t *feature = shell_feature_find(requested_id);
   if (!feature)
     return false;
 
@@ -9605,20 +9605,20 @@ bool krux_shell_show_screen(const char *screen_id) {
   return true;
 }
 
-size_t krux_shell_screen_count(void) {
+size_t signer_shell_screen_count(void) {
   return sizeof(PRODUCT_SCREEN_IDS) / sizeof(PRODUCT_SCREEN_IDS[0]);
 }
 
-const char *krux_shell_screen_id_at(size_t index) {
-  if (index >= krux_shell_screen_count())
+const char *signer_shell_screen_id_at(size_t index) {
+  if (index >= signer_shell_screen_count())
     return NULL;
   return PRODUCT_SCREEN_IDS[index];
 }
 
-const char *krux_shell_screen_title_at(size_t index) {
-  const char *id = krux_shell_screen_id_at(index);
-  const krux_feature_t *feature = shell_feature_find(id);
+const char *signer_shell_screen_title_at(size_t index) {
+  const char *id = signer_shell_screen_id_at(index);
+  const signer_feature_t *feature = shell_feature_find(id);
   return feature ? feature->title : NULL;
 }
 
-const char *krux_shell_current_screen_id(void) { return s_current_screen_id; }
+const char *signer_shell_current_screen_id(void) { return s_current_screen_id; }

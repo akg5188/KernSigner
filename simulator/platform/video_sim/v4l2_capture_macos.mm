@@ -35,11 +35,11 @@ static uint16_t rgb888_to_rgb565(uint8_t r, uint8_t g, uint8_t b) {
   return (uint16_t)(((r & 0xF8u) << 8) | ((g & 0xFCu) << 3) | (b >> 3));
 }
 
-@interface KernVideoDelegate : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
+@interface SignerVideoDelegate : NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
 @property(nonatomic, assign) v4l2_capture_t *cap;
 @end
 
-@implementation KernVideoDelegate
+@implementation SignerVideoDelegate
 - (void)captureOutput:(AVCaptureOutput *)output
     didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
            fromConnection:(AVCaptureConnection *)connection {
@@ -162,7 +162,7 @@ v4l2_capture_t *v4l2_capture_open(const char *device, uint32_t desired_width,
 
     pthread_mutex_init(&cap->mutex, NULL);
     pthread_cond_init(&cap->cond, NULL);
-    cap->queue = dispatch_queue_create("kern.sim.webcam", DISPATCH_QUEUE_SERIAL);
+    cap->queue = dispatch_queue_create("signersim.webcam", DISPATCH_QUEUE_SERIAL);
 
     AVCaptureDevice *dev = select_device(device);
     if (!dev) {
@@ -199,7 +199,7 @@ v4l2_capture_t *v4l2_capture_open(const char *device, uint32_t desired_width,
     };
     cap->output.alwaysDiscardsLateVideoFrames = YES;
 
-    KernVideoDelegate *delegate = [[KernVideoDelegate alloc] init];
+    SignerVideoDelegate *delegate = [[SignerVideoDelegate alloc] init];
     delegate.cap = cap;
     cap->delegate = delegate;
     [cap->output setSampleBufferDelegate:delegate queue:cap->queue];

@@ -1,6 +1,6 @@
-# Kern Desktop Simulator
+# KernSigner Desktop Simulator
 
-Desktop simulator for the Kern Bitcoin air-gapped signer firmware.
+Desktop simulator for the KernSigner Bitcoin air-gapped signer firmware.
 Renders the real LVGL UI in an SDL2 window with mouse-as-touch
 input.
 
@@ -57,7 +57,7 @@ just sim-build
 ### Linux
 
 ```bash
-./simulator/build/kern_simulator
+./simulator/build/signer_simulator
 # or, from the repo root:
 just sim
 ```
@@ -65,7 +65,7 @@ just sim
 ### macOS
 
 ```bash
-./simulator/build/kern_simulator
+./simulator/build/signer_simulator
 # or, from the repo root:
 just sim
 ```
@@ -96,13 +96,13 @@ just sim --qr-image path/to/qr.png
 just sim --qr-dir path/to/qr-images/
 
 # Run with custom data directory
-just sim --data-dir /tmp/kern-sim-data
+just sim --data-dir /tmp/signer-sim-data
 
 # Run with custom resolution
 just sim --width 480 --height 480
 
 # Combine options
-just sim --qr-image path/to/qr.png --data-dir /tmp/kern-sim-data
+just sim --qr-image path/to/qr.png --data-dir /tmp/signer-sim-data
 ```
 
 ## Data Directory Layout
@@ -111,14 +111,14 @@ just sim --qr-image path/to/qr.png --data-dir /tmp/kern-sim-data
 sim_data/                 # default base data directory
   nvs/                    # Simulated NVS storage
   sdcard/                 # Simulated SD card
-    kern/
+    signer/
       mnemonics/
       descriptors/
 ```
 
 When `--data-dir <path>` is specified:
 - NVS data goes to `<path>/nvs/`
-- SD card data goes to `<path>/kern/` (mnemonics and
+- SD card data goes to `<path>/signer/` (mnemonics and
   descriptors subdirectories under it)
 
 Settings persist across runs in the NVS files.
@@ -135,9 +135,9 @@ real entropy (V4L2 on Linux, AVFoundation on macOS):
 ```bash
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DSIM_WEBCAM=ON
 cmake --build build -- -j$(nproc)
-./build/kern_simulator --webcam
+./build/signer_simulator --webcam
 # Or specify a device:
-./build/kern_simulator --webcam /dev/video1
+./build/signer_simulator --webcam /dev/video1
 ```
 
 Your user must be in the `video` group to access the webcam device:
@@ -152,9 +152,9 @@ sudo usermod -aG video $USER   # then log out/in
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DSIM_WEBCAM=ON \
   -DCMAKE_PREFIX_PATH="$(brew --prefix mbedtls);$(brew --prefix sdl2)"
 cmake --build build -- -j"$(sysctl -n hw.ncpu)"
-./build/kern_simulator --webcam
+./build/signer_simulator --webcam
 # Or specify a device by index:
-./build/kern_simulator --webcam 0
+./build/signer_simulator --webcam 0
 ```
 
 On macOS, the first run will prompt for Camera permission. If the
@@ -196,6 +196,6 @@ Forcing the software renderer works around this.
   bit-for-bit identical to the ESP-IDF-bundled mbedTLS used
   on the real device. Do not assume that KEF blobs, PIN
   hashes, or any other cryptographic output produced by the
-  simulator will round-trip on a physical Kern device.
+  simulator will round-trip on a physical KernSigner device.
 - PPA rotation may not match hardware exactly
 - Webcam support differs by OS (V4L2 on Linux, AVFoundation on macOS)

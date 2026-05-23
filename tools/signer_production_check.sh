@@ -20,7 +20,7 @@ fi
 failures=0
 
 log() {
-  printf '[kern-production-check] %s\n' "$*"
+  printf '[signer-production-check] %s\n' "$*"
 }
 
 require_set() {
@@ -87,7 +87,7 @@ log "checking sdkconfig: $SDKCONFIG"
 require_set CONFIG_SECURE_BOOT
 require_set CONFIG_FLASH_ENCRYPTION_ENABLED
 require_set CONFIG_NVS_ENCRYPTION
-require_set CONFIG_KERN_PRODUCTION_REQUIRE_PIN_HMAC
+require_set CONFIG_KSIG_PRODUCTION_REQUIRE_PIN_HMAC
 
 require_comment_not_set CONFIG_BT_ENABLED
 require_comment_not_set CONFIG_ESP_HOST_WIFI_ENABLED

@@ -66,7 +66,7 @@ Get-FileHash .\kernsigner-wave43-0.0.7-rc1-untested-full.bin -Algorithm SHA256
 完整固件 SHA256：
 
 ```text
-b4a18710d3520fb47d56600561a60ce92c49180d73220fb8b997053c3953493b
+be1768a4f3897d04dadddab364cb34092e22ecb15c254d6c1c19dea8de27c07a
 ```
 
 ## 编译同样固件
@@ -87,7 +87,7 @@ sha256sum build_wave_43_fresh/kernsigner.bin
 正常情况下，`build_wave_43_fresh/kernsigner.bin` 应该和 app 固件 SHA256 一致：
 
 ```text
-4720bc98d51c13a5afb81079873f7a4084878f1637d9af6f29e7c5460c632f53
+dc2ae5caa3a8200c37dcdb7cbaa4d42ef89dfa86219fd45e99581efe1aef5fc1
 ```
 
 ## 注意
