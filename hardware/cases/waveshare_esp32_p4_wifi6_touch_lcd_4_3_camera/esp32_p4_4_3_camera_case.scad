@@ -124,16 +124,19 @@ usb_cutout_h = 8.60;
 // USB-C side cutout corrections from first print:
 // - leave only a 3 mm bridge between the two ports;
 // - fill 4 mm on both outer ends;
-// - fill 1.5 mm on the screen/front side of both openings.
+// - first print filled 1.5 mm on the screen/front side of both openings;
+// - second print feedback needs 2.0 mm more screen-side plug clearance.
 usb_center_separator_w = 3.00;
 usb_outer_side_fill = 4.00;
 usb_screen_side_fill = 1.50;
+usb_screen_side_extra_clearance = 2.00;
 usb_cutout_pos_y_min = usb_center_separator_w / 2;
 usb_cutout_pos_y_max = usb_cutout_y1 + usb_cutout_w / 2 - usb_outer_side_fill;
 usb_cutout_neg_y_min = usb_cutout_y2 - usb_cutout_w / 2 + usb_outer_side_fill;
 usb_cutout_neg_y_max = -usb_center_separator_w / 2;
 usb_cutout_z_min = port_z_center - usb_cutout_h / 2;
-usb_cutout_z_max = port_z_center + usb_cutout_h / 2 - usb_screen_side_fill;
+usb_cutout_z_max = port_z_center + usb_cutout_h / 2 -
+                   usb_screen_side_fill + usb_screen_side_extra_clearance;
 
 // Official rear-view top-edge positions. The side buttons are intentionally
 // sealed in the printable case; these positions are kept only for reference.
