@@ -96,5 +96,6 @@ sha256sum build_wave_43_fresh/kernsigner.bin
 - 这是测试版，不是审计过的商业生产固件。
 - 本目录这版已经本地构建、通过模拟器验收，并在 `/dev/ttyACM0` 上完成 app-only 真机刷写；启动日志确认屏幕、GT911 触摸、LVGL task 和背光初始化正常。
 - 真实资产使用前，要先完成安全审计、真机验收和生产配置检查。
-- 第一次使用 ESP32-P4 4.3 摄像头时，先用普通黑白二维码手动调焦：保持 10-20 cm，捏住 OV5647 镜头外圈小幅旋转到二维码最清楚，再测 OKX、Bitget、TokenPocket 这类高密度动态码。
+- 第一次给手机小尺寸高密度签名二维码扫码前，先用普通黑白二维码手动调焦：保持 10-20 cm，捏住 OV5647 镜头外圈轻轻扭动/旋转到二维码边缘和小格子最清楚。只扭镜头外圈，不要扭排线或摄像头小板。普通二维码稳定后，再测 OKX、Bitget、TokenPocket 这类高密度动态码。
+- 本版测试资金流程已实测 OKX、Bitget、imToken、MetaMask、Rabby、TokenPocket 的 Web3 扫码签名；BTC 侧 BlueWallet 和 Electrum 的观察钱包/PSBT 签名流程也已实测通过。
 - 如果 USB 读卡器不亮，优先检查供电。ACR39U-NF 读卡器建议用外接供电 Hub 或稳定 OTG 供电方案。

@@ -78,17 +78,19 @@ The current tree is a **test-funds validation build**, not an audited production
 | Satochip 智能卡 | 已接可测主线 | 支持外接供电读卡器下的状态读取、设置/改 PIN、写入助记词、EVM 地址/连接码、Web3 测试签名、BTC 观察公钥读取、重置/出厂维护入口。 |
 | SeedKeeper 智能卡 | 已接可测维护主线 | 支持设置/改 PIN、写入助记词、查看卡内条目、导入本机、保存密码/描述符、重置。新版 SeedKeeper 重置必须用错 PIN/错 PUK 到 `FF00` 的流程。 |
 
-已写入或预留的 Web3/观察钱包入口：
+已实测签名的钱包入口：
 
-- OKX Wallet：EVM 连接码和常见测试转账签名已跑通。
-- Bitget Wallet：EVM 连接码和常见测试转账签名已跑通。
-- imToken：电脑端连接码和单账户 `crypto-hdkey` / `eth-signature` 回传样本已跑通；TypedData/EIP-712 仍按非生产能力处理。
-- MetaMask：电脑端连接码和单账户 `crypto-hdkey` / `eth-signature` 回传样本已跑通；TypedData/EIP-712 仍按非生产能力处理。
-- Rabby：有连接入口，按 Keystone 单账户连接码方向接入，仍需更多实扫回归。
-- TokenPocket：有连接入口，按 Keystone 单账户连接码方向接入，特殊二维码格式仍需专项样本回归。
+- OKX Wallet：EVM 连接码、圆点/高密度签名码和常见测试转账签名已实测通过。
+- Bitget Wallet：EVM 连接码和常见测试转账签名已实测通过。
+- imToken：单账户 `crypto-hdkey` 连接、`eth-sign-request` 扫码签名和 `eth-signature` 回传已实测通过。
+- MetaMask：单账户 `crypto-hdkey` 连接、扫码签名和 `eth-signature` 回传已实测通过。
+- Rabby：Keystone/QR 兼容连接和测试资金 Web3 签名已实测通过。
+- TokenPocket：连接、动态/多片二维码扫码签名和回传已实测通过。
 - Keystone：作为通用硬件钱包兼容格式使用，不是独立官方适配保证。
-- BlueWallet：BTC `xpub` / `zpub` 观察钱包路径可测，智能卡账户只读观察码可测。
-- Electrum：BTC 扫码签名和观察钱包流程已接入测试路径；常见 PSBT/扩展公钥路径可测，复杂多签、特殊脚本和异常交易仍需更多样本回归。
+- BlueWallet：BTC `xpub` / `zpub` 观察钱包和 PSBT 扫码签名流程已实测通过。
+- Electrum：BTC 观察钱包、PSBT/签名交易扫码流程已实测通过。
+
+以上是测试资金和小额验收口径，不等于生产审计通过。复杂合约、TypedData/EIP-712、多签、特殊脚本和异常交易仍需单独安全回归。
 
 简短理解：
 
@@ -196,7 +198,7 @@ For a first-time board or a board with unknown firmware, use the full firmware a
 
 扫码提示：
 
-- ESP32-P4 4.3 第一次使用摄像头时，先用普通黑白二维码手动调 OV5647 焦距：保持 10-20 cm，轻轻旋转镜头外圈，直到二维码边缘最清楚，再测 OKX、Bitget、TokenPocket 等动态码。
+- ESP32-P4 4.3 第一次给手机小尺寸高密度签名二维码扫码前，必须先手动调 OV5647 焦距：保持 10-20 cm，用手指捏住摄像头镜头外圈轻轻扭动/旋转，直到普通黑白二维码边缘和小格子最清楚，再扫 OKX、Bitget、TokenPocket 等动态签名码。
 - 手机钱包的小尺寸高密度签名码如果难扫，先截图或投屏到电脑屏幕放大，再让 ESP32-P4 摄像头直接扫描。
 - 仍然不稳定时，先收集清晰照片或短视频，在电脑端用 ZBar/UR parser 跑通，再改固件。
 - 日常扫码和摄像头排障，包括树莓派摄像头复刻，看 [docs/QR_CAMERA_TROUBLESHOOTING.zh-CN.md](docs/QR_CAMERA_TROUBLESHOOTING.zh-CN.md)。

@@ -55,10 +55,12 @@
 
 ## Web3
 
-- OKX 连接码可扫码添加观察账户。
-- Bitget 连接码可扫码添加观察账户。
-- MetaMask/Rabby/TokenPocket 显示连接码，不支持的场景要有中文提示。
-- 测试资金 EVM 转账签名成功。
+- OKX 连接码、圆点/高密度动态签名码和签名结果回传已实测通过。
+- Bitget 连接码、测试转账签名和签名结果回传已实测通过。
+- imToken 单账户连接、`eth-sign-request` 签名和 `eth-signature` 回传已实测通过。
+- MetaMask 单账户连接、扫码签名和签名结果回传已实测通过。
+- Rabby Keystone/QR 兼容连接和测试资金 Web3 签名已实测通过。
+- TokenPocket 连接、动态/多片二维码扫码签名和签名结果回传已实测通过。
 - personalSign 样本成功或明确记录不支持。
 - TypedData 必须拒签。
 - 签名结果二维码能被目标钱包扫描。
