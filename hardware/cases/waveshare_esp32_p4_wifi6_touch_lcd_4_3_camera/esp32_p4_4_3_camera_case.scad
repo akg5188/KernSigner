@@ -56,9 +56,9 @@ total_depth = back_thickness + inside_depth;
 // than the glass so touch use remains comfortable.
 front_rim_h = 1.20;
 front_rim_w = 2.20;
-// First print showed the front screen/glass opening about 0.5 mm too loose.
-// Tighten only this front rim pocket; side ports and rear holes stay unchanged.
-glass_clearance = 0.12;
+// The earlier tight fit pressed the screen and caused visible spots.
+// Restore the extra front glass clearance so the rim protects without clamping.
+glass_clearance = 0.38;
 glass_pocket_w = glass_w + 2 * glass_clearance;
 glass_pocket_h = glass_h + 2 * glass_clearance;
 
@@ -83,11 +83,11 @@ mount_plain_edge_from_top = 16.00;
 // Camera module location measured from the printed back cover.
 // Back view: the button edge is +Y. The camera is near the left short edge.
 camera_center_x_from_left_edge = 15.00;
-camera_center_y_from_button_edge = 37.00;
+camera_center_y_from_button_edge = 39.00;
 camera_center_y_from_plain_edge_reference = 36.00;
 // Mini OV5647/Raspberry-Pi-style camera opening: small visible round hole,
 // with a hidden square recess inside for the lens body.
-camera_lens_hole_d = 7.00;
+camera_lens_hole_d = 5.00;
 camera_lens_bevel_d = 10.20;
 camera_lens_bevel_depth = 1.00;
 camera_lens_relief_d = 10.80;
