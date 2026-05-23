@@ -52,9 +52,9 @@ back_thickness = 2.20;
 inside_depth = 10.20;
 total_depth = back_thickness + inside_depth;
 
-// Front rectangular protection rim. It is intentionally only slightly higher
-// than the glass so touch use remains comfortable.
-front_rim_h = 1.20;
+// Front rectangular protection rim. Keep it above the slightly proud screen
+// surface so the glass does not touch the table first.
+front_rim_h = 1.70;
 front_rim_w = 2.20;
 // The earlier tight fit pressed the screen and caused visible spots.
 // Restore the extra front glass clearance so the rim protects without clamping.
@@ -68,23 +68,23 @@ drop_in_w = glass_pocket_w;
 drop_in_h = glass_pocket_h;
 drop_in_r = 2.40;
 
-// Fixing: four simple measured screw holes through the back cover. The centers
-// are measured from the printed case edges, not from the official PCB drawing.
+// Fixing: four simple measured screw holes through the back cover. The camera
+// and USB-C are on the short edges; measure the holes from the actual lower
+// shell edges, not from the larger screen-side outer frame.
 use_mount_screws = true;
 mount_screw_clearance_d = 2.50;
 mount_screw_counterbore_d = 7.20;
 mount_screw_counterbore_depth = 1.50;
 mount_screw_bevel_d = 9.20;
 mount_screw_bevel_depth = 0.85;
-mount_side_from_outer_edge = 12.00;
-mount_usb_edge_from_bottom = 12.00;
-mount_plain_edge_from_top = 16.00;
+mount_long_edge_from_lower_edge = 9.00;
+mount_camera_side_from_lower_edge = 11.00;
+mount_usb_side_from_lower_edge = 8.00;
 
 // Camera module location measured from the printed back cover.
-// Back view: the button edge is +Y. The camera is near the left short edge.
-camera_center_x_from_left_edge = 15.00;
-camera_center_y_from_button_edge = 39.00;
-camera_center_y_from_plain_edge_reference = 36.00;
+// The camera is on the short edge, centered between the two long edges.
+camera_center_from_camera_side = 11.00;
+camera_center_y_offset_from_center = 0.00;
 // Mini OV5647/Raspberry-Pi-style camera opening: small visible round hole,
 // with a hidden square recess inside for the lens body.
 camera_lens_hole_d = 5.00;
@@ -162,8 +162,8 @@ function pcb_center_x() = from_pcb_left(pcb_w / 2);
 function pcb_center_y() = pcb_top() - pcb_h / 2;
 function from_pcb_left(x) = case_x_from_rear_x(rear_from_pcb_left(x));
 function from_pcb_top(y) = pcb_top() - y;
-function camera_x() = -outer_w / 2 + camera_center_x_from_left_edge;
-function camera_y() = outer_h / 2 - camera_center_y_from_button_edge;
+function camera_x() = lower_shell_x_min() + camera_center_from_camera_side;
+function camera_y() = lower_shell_y() + camera_center_y_offset_from_center;
 function usb_edge_sign() = mirror_official_rear_x ? 1 : -1;
 function clamp(v, lo, hi) = min(max(v, lo), hi);
 function lerp(a, b, t) = a + (b - a) * t;
@@ -199,6 +199,10 @@ function lower_shell_y() =
         pcb_cavity_y_max() + lower_shell_min_wall - lower_shell_h() / 2,
         pcb_cavity_y_min() - lower_shell_min_wall + lower_shell_h() / 2
     );
+function lower_shell_x_min() = lower_shell_x() - lower_shell_w() / 2;
+function lower_shell_x_max() = lower_shell_x() + lower_shell_w() / 2;
+function lower_shell_y_min() = lower_shell_y() - lower_shell_h() / 2;
+function lower_shell_y_max() = lower_shell_y() + lower_shell_h() / 2;
 function lower_shell_taper_start_z() =
     total_depth - lower_shell_taper_h;
 function cavity_transition_start_z() =
@@ -221,12 +225,12 @@ module rounded_prism(size, r) {
 }
 
 module mount_positions() {
-    mount_left_x = -outer_w / 2 + mount_side_from_outer_edge;
-    mount_right_x = outer_w / 2 - mount_side_from_outer_edge;
-    mount_top_y = outer_h / 2 - mount_plain_edge_from_top;
-    mount_bottom_y = -outer_h / 2 + mount_usb_edge_from_bottom;
+    mount_camera_x = lower_shell_x_min() + mount_camera_side_from_lower_edge;
+    mount_usb_x = lower_shell_x_max() - mount_usb_side_from_lower_edge;
+    mount_top_y = lower_shell_y_max() - mount_long_edge_from_lower_edge;
+    mount_bottom_y = lower_shell_y_min() + mount_long_edge_from_lower_edge;
 
-    for (x = [mount_left_x, mount_right_x])
+    for (x = [mount_camera_x, mount_usb_x])
         for (y = [mount_top_y, mount_bottom_y])
             translate([x, y, 0])
                 children();
