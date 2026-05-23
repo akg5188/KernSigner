@@ -75,11 +75,11 @@
 | 普通二维码都不灵敏 | 先调摄像头焦距、擦镜头、确认 FFC 排线插紧 |
 | 一直扫不到 | 确认二维码类型是否支持 |
 | 扫到但不能签 | 可能不是当前钱包、网络或路径不匹配 |
-| OKX 圆点码完全没反应 | 先按 OKX 圆点动态二维码复盘检查摄像头焦距和图像解码层 |
+| OKX 圆点码完全没反应 | 先按扫码与摄像头专项手册检查摄像头焦距和图像解码层 |
 | OKX 动态码有进度但不跳签名 | 查 UR 分片是否收齐、`eth-sign-request` CBOR 是否解析成功 |
 | 刷完二维码好了但字体乱码 | 查字体是否为压缩位图，重新烘焙并确认 `.bitmap_format = 0` |
 
-OKX 圆点动态二维码专项排障看 [OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md](OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md)。
+扫码、小尺寸高密度码和 OKX 圆点动态二维码专项排障看 [QR_CAMERA_TROUBLESHOOTING.zh-CN.md](QR_CAMERA_TROUBLESHOOTING.zh-CN.md)。OKX 事故细节再看 [OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md](OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md)。
 
 ## 助记词生成和 BIP39 网站不一致
 

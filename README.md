@@ -194,12 +194,13 @@ Prebuilt firmware is included for beginners who only want to flash the supported
 
 For a first-time board or a board with unknown firmware, use the full firmware at offset `0x0`. If the board already runs this project and you only want to update the app, use the app-only firmware at offset `0x20000`.
 
-Dense QR scanning tip:
+扫码提示：
 
-- First-time ESP32-P4 4.3 camera setup needs manual OV5647 focus: use a normal black/white QR at 10-20 cm, rotate the lens ring gently until module edges are sharp, then test OKX/Bitget/TokenPocket dynamic QR.
-- If a phone wallet shows a very small, high-density signing QR, first try displaying the QR on a computer screen and zooming it larger before scanning with the ESP32-P4 camera.
-- If direct scanning is still unreliable, collect a clear photo or short video and validate it on desktop with the ZBar/UR parser workflow before changing firmware.
-- OKX circular/dot QR debugging notes are in [docs/OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md](docs/OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md).
+- ESP32-P4 4.3 第一次使用摄像头时，先用普通黑白二维码手动调 OV5647 焦距：保持 10-20 cm，轻轻旋转镜头外圈，直到二维码边缘最清楚，再测 OKX、Bitget、TokenPocket 等动态码。
+- 手机钱包的小尺寸高密度签名码如果难扫，先截图或投屏到电脑屏幕放大，再让 ESP32-P4 摄像头直接扫描。
+- 仍然不稳定时，先收集清晰照片或短视频，在电脑端用 ZBar/UR parser 跑通，再改固件。
+- 日常扫码和摄像头排障，包括树莓派摄像头复刻，看 [docs/QR_CAMERA_TROUBLESHOOTING.zh-CN.md](docs/QR_CAMERA_TROUBLESHOOTING.zh-CN.md)。
+- OKX 圆点动态码事故细节归档在 [docs/OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md](docs/OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md)。
 
 ## Prerequisites
 
