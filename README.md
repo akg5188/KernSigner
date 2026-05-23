@@ -200,6 +200,12 @@ Android relay APK for dense QR handoff:
 - Release download mirror: [akg5188/satochip-signer releases](https://github.com/akg5188/satochip-signer/releases)
 - Android relay guide: [docs/ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](docs/ANDROID_RELAY_WALLET_GUIDE.zh-CN.md)
 
+Dense QR scanning tip:
+
+- If a phone wallet shows a very small, high-density signing QR, first try displaying the QR on a computer screen and zooming it larger before scanning with the ESP32-P4 camera.
+- If direct scanning is still unreliable, use the Android relay app to convert the original high-density QR into larger, lower-density QR pages for KernSigner to scan.
+- The relay app does not store private keys and does not sign transactions; it only reformats QR handoff data.
+
 ## Prerequisites
 
 The included firmware was built with ESP-IDF v5.5.4 for ESP32-P4. To reproduce this snapshot as closely as possible, use the same ESP-IDF version:
