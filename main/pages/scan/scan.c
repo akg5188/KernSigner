@@ -10,6 +10,7 @@
 #include "../../../components/cUR/src/types/cbor_encoder.h"
 #include "../../../components/cUR/src/types/psbt.h"
 #include "../../../components/cUR/src/ur_encoder.h"
+#include "../../core/btc_derivation.h"
 #include "../../core/eip712.h"
 #include "../../core/evm.h"
 #include "../../core/key.h"
@@ -1455,37 +1456,6 @@ static lv_obj_t *create_btc_value_row(lv_obj_t *parent, const char *prefix,
   return row;
 }
 
-static bool btc_keypath_to_path(const unsigned char *keypath,
-                                size_t keypath_len, char *out,
-                                size_t out_len) {
-  if (!keypath || keypath_len < BIP32_KEY_FINGERPRINT_LEN ||
-      ((keypath_len - BIP32_KEY_FINGERPRINT_LEN) % 4U) != 0 || !out ||
-      out_len < 2) {
-    return false;
-  }
-
-  size_t pos = 0;
-  int written = snprintf(out, out_len, "m");
-  if (written < 0 || (size_t)written >= out_len)
-    return false;
-  pos = (size_t)written;
-
-  size_t depth = (keypath_len - BIP32_KEY_FINGERPRINT_LEN) / 4U;
-  for (size_t i = 0; i < depth; i++) {
-    const unsigned char *p = keypath + BIP32_KEY_FINGERPRINT_LEN + i * 4U;
-    uint32_t child = (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
-                     ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-    bool hardened = (child & BIP32_INITIAL_HARDENED_CHILD) != 0;
-    child &= ~BIP32_INITIAL_HARDENED_CHILD;
-    written = snprintf(out + pos, out_len - pos, "/%" PRIu32 "%s", child,
-                       hardened ? "'" : "");
-    if (written < 0 || (size_t)written >= out_len - pos)
-      return false;
-    pos += (size_t)written;
-  }
-  return true;
-}
-
 static uint32_t btc_input_sighash_byte(const struct wally_psbt *psbt,
                                        size_t index) {
   size_t sighash = 0;
@@ -1494,6 +1464,47 @@ static uint32_t btc_input_sighash_byte(const struct wally_psbt *psbt,
     return WALLY_SIGHASH_ALL;
   }
   return (uint32_t)(sighash & 0xffU);
+}
+
+static btc_derivation_script_t
+btc_satochip_input_script_type(const struct wally_psbt *psbt, size_t index) {
+  unsigned char script[256];
+  size_t script_len = 0;
+  size_t script_type = 0;
+
+  if (!psbt_input_utxo_script(psbt, index, script, sizeof(script),
+                              &script_len) ||
+      wally_scriptpubkey_get_type(script, script_len, &script_type) !=
+          WALLY_OK) {
+    return BTC_DERIVATION_SCRIPT_UNKNOWN;
+  }
+
+  if (script_type == WALLY_SCRIPT_TYPE_P2PKH)
+    return BTC_DERIVATION_SCRIPT_P2PKH;
+  if (script_type == WALLY_SCRIPT_TYPE_P2WPKH)
+    return BTC_DERIVATION_SCRIPT_P2WPKH;
+  if (script_type != WALLY_SCRIPT_TYPE_P2SH)
+    return BTC_DERIVATION_SCRIPT_UNKNOWN;
+
+  size_t redeem_len = 0;
+  if (wally_psbt_get_input_redeem_script_len(psbt, index, &redeem_len) !=
+          WALLY_OK ||
+      redeem_len == 0 || redeem_len > sizeof(script)) {
+    return BTC_DERIVATION_SCRIPT_UNKNOWN;
+  }
+
+  size_t written = 0;
+  if (wally_psbt_get_input_redeem_script(psbt, index, script, redeem_len,
+                                         &written) != WALLY_OK ||
+      written != redeem_len ||
+      wally_scriptpubkey_get_type(script, redeem_len, &script_type) !=
+          WALLY_OK) {
+    return BTC_DERIVATION_SCRIPT_UNKNOWN;
+  }
+
+  return script_type == WALLY_SCRIPT_TYPE_P2WPKH
+             ? BTC_DERIVATION_SCRIPT_P2SH_P2WPKH
+             : BTC_DERIVATION_SCRIPT_UNKNOWN;
 }
 
 static bool btc_input_signature_hash(struct wally_psbt *psbt,
@@ -1581,6 +1592,8 @@ static size_t psbt_sign_with_satochip(struct wally_psbt *psbt, const char *pin,
 
   size_t signatures_added = 0;
   for (size_t i = 0; i < psbt->num_inputs; i++) {
+    btc_derivation_script_t script_type =
+        btc_satochip_input_script_type(psbt, i);
     const struct wally_map *keypaths = &psbt->inputs[i].keypaths;
     for (size_t j = 0; j < keypaths->num_items; j++) {
       const struct wally_map_item *item = &keypaths->items[j];
@@ -1588,8 +1601,10 @@ static size_t psbt_sign_with_satochip(struct wally_psbt *psbt, const char *pin,
         continue;
 
       char path[96];
-      if (!btc_keypath_to_path(item->value, item->value_len, path,
-                               sizeof(path))) {
+      if (!btc_derivation_satochip_sign_path(item->value, item->value_len,
+                                             script_type, sign_testnet, 0, path,
+                                             sizeof(path))) {
+        snprintf(detail, detail_len, "输入 %zu 无法解析智能卡签名路径。", i);
         continue;
       }
 
@@ -1651,7 +1666,6 @@ static size_t psbt_sign_with_satochip(struct wally_psbt *psbt, const char *pin,
   } else if (detail && detail_len && detail[0] == '\0') {
     snprintf(detail, detail_len, "没有找到当前智能卡可签名的输入。");
   }
-  (void)sign_testnet;
   return signatures_added;
 }
 
@@ -2738,7 +2752,8 @@ static bool web3_store_request_id_from_cbor(cbor_value_t *value,
         (tag == 37 && len == sizeof(req->request_id_uuid))
             ? WEB3_REQUEST_ID_UUID
             : WEB3_REQUEST_ID_BYTES;
-    uint64_t preserved_tag = (kind != WEB3_REQUEST_ID_UUID && tag != 37) ? tag : 0;
+    uint64_t preserved_tag =
+        (kind != WEB3_REQUEST_ID_UUID && tag != 0) ? tag : 0;
     if (!web3_set_request_id_bytes(req, bytes, len, preserved_tag, kind))
       return false;
     if (kind == WEB3_REQUEST_ID_UUID)
@@ -2915,8 +2930,24 @@ static bool web3_build_eth_signature_ur(const web3_sign_request_t *req,
     } else {
       request_id_value = cbor_value_new_string(req->request_id);
     }
-    if (request_id_value && req->request_id_kind != WEB3_REQUEST_ID_UUID &&
-        req->request_id_tag != 0) {
+    if (request_id_value &&
+        (contains_ci(req->origin, "imtoken") ||
+         contains_ci(req->wallet, "imtoken")) &&
+        req->request_id_kind == WEB3_REQUEST_ID_STRING && req->request_id[0]) {
+      cbor_value_free(request_id_value);
+      request_id_value = cbor_value_new_bytes((const uint8_t *)req->request_id,
+                                              strlen(req->request_id));
+      cbor_value_t *tagged =
+          request_id_value ? cbor_value_new_tag(37, request_id_value) : NULL;
+      if (tagged) {
+        request_id_value = tagged;
+      } else {
+        cbor_value_free(request_id_value);
+        request_id_value = NULL;
+      }
+    } else if (request_id_value &&
+               req->request_id_kind != WEB3_REQUEST_ID_UUID &&
+               req->request_id_tag != 0) {
       cbor_value_t *tagged =
           cbor_value_new_tag(req->request_id_tag, request_id_value);
       if (tagged) {
@@ -2935,9 +2966,14 @@ static bool web3_build_eth_signature_ur(const web3_sign_request_t *req,
     ok = cbor_map_set(map, cbor_value_new_unsigned_int(2),
                       cbor_value_new_bytes(signature, signature_len));
   }
-  if (ok && req->origin[0]) {
+  const char *origin_text = req->origin;
+  if (contains_ci(req->origin, "imtoken") ||
+      contains_ci(req->wallet, "imtoken")) {
+    origin_text = "imToken";
+  }
+  if (ok && origin_text[0]) {
     ok = cbor_map_set(map, cbor_value_new_unsigned_int(3),
-                      cbor_value_new_string(req->origin));
+                      cbor_value_new_string(origin_text));
   }
 
   size_t cbor_len = 0;
@@ -2949,10 +2985,14 @@ static bool web3_build_eth_signature_ur(const web3_sign_request_t *req,
   ok = ur_encoder_encode_single("eth-signature", cbor, cbor_len, out_ur);
   if (ok && out_ur && *out_ur)
     web3_uppercase_in_place(*out_ur);
-  ESP_LOGD(TAG,
-           "ETH_SIGNATURE_QR build ok=%d cbor=%u sig=%u req_id_kind=%d len=%u",
+  ESP_LOGI(TAG,
+           "ETH_SIGNATURE_QR ok=%d cbor=%u sig=%u sig_last=%02X "
+           "req_id_kind=%d req_id_tag=%llu req_id_bytes=%u origin='%s' len=%u",
            ok ? 1 : 0, (unsigned)cbor_len, (unsigned)signature_len,
+           signature_len > 0 ? signature[signature_len - 1] : 0,
            (int)req->request_id_kind,
+           (unsigned long long)req->request_id_tag,
+           (unsigned)req->request_id_bytes_len, req->origin,
            (unsigned)(ok && *out_ur ? strlen(*out_ur) : 0));
   free(cbor);
   return ok && *out_ur;

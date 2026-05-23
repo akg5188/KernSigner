@@ -13,7 +13,7 @@
 - 当前开发配置下 `prodcheck` 会提示 Secure Boot / Flash Encryption / NVS 加密 / 调试口与控制台等条件未满足，所以不能标记为商业资金正式版。
 - Waveshare 4.3 寸显示启动路径已经做过商业钱包级防崩溃加固：显示、触摸、LVGL 启动失败会记录日志并可控重启，不再靠 `assert` 或 abort 蓝屏。
 
-本交付包里的 `kern.bin` 是 app 分区升级固件，不是空白板完整 factory 刷机包。不要全擦后只刷这个文件；正常使用下面的 `appflash` 命令升级。
+本交付包里的 `kernsigner.bin` 是 app 分区升级固件，不是空白板完整 factory 刷机包。不要全擦后只刷这个文件；正常使用下面的 `appflash` 命令升级。
 
 ## 明早先看这几个文件
 

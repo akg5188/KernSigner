@@ -31,15 +31,15 @@ idf.py -B build_wave_43_fresh \
   -D SDKCONFIG=build_wave_43_fresh/sdkconfig \
   -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' \
   build
-sha256sum build_wave_43_fresh/kern.bin
+sha256sum build_wave_43_fresh/kernsigner.bin
 sha256sum firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
 ```
 
 Expected included firmware SHA256:
 
 ```text
-285474a6d7b8835b4b932be28572390d1717173394c08977d5644b3bac475a8e  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
-d4301b3b9c7b7f5c27f2f78091799047d243f10dcf331d5ad250bc28d5e54538  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
+4720bc98d51c13a5afb81079873f7a4084878f1637d9af6f29e7c5460c632f53  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
+b4a18710d3520fb47d56600561a60ce92c49180d73220fb8b997053c3953493b  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
 ```
 
 A byte-for-byte match can depend on using the same ESP-IDF, toolchain, submodule commits, generated font assets, and sdkconfig. If the hash differs, compare:

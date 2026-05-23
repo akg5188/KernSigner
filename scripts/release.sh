@@ -13,7 +13,7 @@ fi
 
 RELEASE_DIR="$REPO_ROOT/release/v${VERSION}"
 
-echo "Building Kern v${VERSION} release for: ${DEVICES}"
+echo "Building KernSigner v${VERSION} release for: ${DEVICES}"
 echo "Output: ${RELEASE_DIR}"
 echo
 
@@ -39,26 +39,26 @@ for DEVICE in $DEVICES; do
     # Copy individual binaries
     cp "$BUILD_DIR/bootloader/bootloader.bin" "$DEVICE_DIR/"
     cp "$BUILD_DIR/partition_table/partition-table.bin" "$DEVICE_DIR/"
-    cp "$BUILD_DIR/kern.bin" "$DEVICE_DIR/firmware.bin"
+    cp "$BUILD_DIR/kernsigner.bin" "$DEVICE_DIR/kernsigner-app.bin"
 
     # Create merged binary
     esptool --chip esp32p4 merge-bin \
         --flash-mode dio \
         --flash-freq 80m \
         --flash-size 16MB \
-        -o "$DEVICE_DIR/kern-v${VERSION}.bin" \
+        -o "$DEVICE_DIR/kernsigner-v${VERSION}.bin" \
         0x2000  "$BUILD_DIR/bootloader/bootloader.bin" \
         0x8000  "$BUILD_DIR/partition_table/partition-table.bin" \
         0xf000  "$BUILD_DIR/ota_data_initial.bin" \
-        0x20000 "$BUILD_DIR/kern.bin"
+        0x20000 "$BUILD_DIR/kernsigner.bin"
 
     # Create zip
-    ZIP_NAME="kern-${DEVICE}-v${VERSION}.zip"
+    ZIP_NAME="kernsigner-${DEVICE}-v${VERSION}.zip"
     (cd "$DEVICE_DIR" && zip "$RELEASE_DIR/$ZIP_NAME" \
         bootloader.bin \
         partition-table.bin \
-        firmware.bin \
-        "kern-v${VERSION}.bin")
+        kernsigner-app.bin \
+        "kernsigner-v${VERSION}.bin")
 
     # Clean up loose files
     rm -rf "$DEVICE_DIR"

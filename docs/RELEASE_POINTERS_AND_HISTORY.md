@@ -31,7 +31,7 @@
 
 - git commit 或工作区状态。
 - 固件版本号。
-- `kern.bin` SHA256。
+- `kernsigner.bin` SHA256。
 - 是否 app-only 包。
 - 是否生产候选包。
 - `prodcheck` 结果。

@@ -66,7 +66,7 @@ Get-FileHash .\kernsigner-wave43-0.0.7-rc1-untested-full.bin -Algorithm SHA256
 完整固件 SHA256：
 
 ```text
-d4301b3b9c7b7f5c27f2f78091799047d243f10dcf331d5ad250bc28d5e54538
+b4a18710d3520fb47d56600561a60ce92c49180d73220fb8b997053c3953493b
 ```
 
 ## 编译同样固件
@@ -81,13 +81,13 @@ idf.py -B build_wave_43_fresh \
   -D SDKCONFIG=build_wave_43_fresh/sdkconfig \
   -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' \
   build
-sha256sum build_wave_43_fresh/kern.bin
+sha256sum build_wave_43_fresh/kernsigner.bin
 ```
 
-正常情况下，`build_wave_43_fresh/kern.bin` 应该和 app 固件 SHA256 一致：
+正常情况下，`build_wave_43_fresh/kernsigner.bin` 应该和 app 固件 SHA256 一致：
 
 ```text
-285474a6d7b8835b4b932be28572390d1717173394c08977d5644b3bac475a8e
+4720bc98d51c13a5afb81079873f7a4084878f1637d9af6f29e7c5460c632f53
 ```
 
 ## 注意

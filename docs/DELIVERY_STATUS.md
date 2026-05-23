@@ -34,7 +34,7 @@
 
 2026-05-22 智能卡同步说明：用户确认外接供电后 ACR39U-NF 读卡器可识别，Satochip 卡已可生成 Web3 连接码并完成 OKX/Bitget Web3 转账签名。SeedKeeper 已修正为新版重置流程：旧 `B0 FF` 返回 `9C20` 时不是驱动坏，而是应使用错 PIN/错 PUK 流程直到 `FF00`。当前智能卡菜单包含 Satochip 和 SeedKeeper 两类：Satochip 侧用于连接、签名、地址、公钥、PIN/维护；SeedKeeper 侧用于设置 PIN、改 PIN、保存和查看秘密、导入本机、重置。
 
-交付包中的 `kern.bin` 是 app 分区升级固件，不是空白板完整 factory 刷机包。正常升级请使用本文的 `appflash` 命令，不要全擦后只刷 `kern.bin`。
+交付包中的 `kernsigner.bin` 是 app 分区升级固件，不是空白板完整 factory 刷机包。正常升级请使用本文的 `appflash` 命令，不要全擦后只刷 `kernsigner.bin`。
 
 交付包中的 `PROJECT_PROGRESS_AND_PLAN.md` 是当前总控计划，记录已经完成的硬件底包、中文 UI、低风险工具、旧 Kern 钱包核心接入、自动验收，以及后续 USB CCID、真实钱包真机验收和生产审计阶段。
 
@@ -228,11 +228,11 @@ tools/kern_delivery.sh ship
 - 校验关键页面截图、UI 烟测、滚动截图和按钮导航。
 - 构建最新 ESP32-P4 固件二进制。
 - 生成 `_release/kern_delivery_YYYYMMDD_HHMMSS` 交付目录。
-- 输出 `RELEASE_SUMMARY.txt`、`SHA256SUMS.txt`、`kern.bin`、关键截图拼图、全页面拼图和完整截图目录。
-- 输出 `ACCEPTANCE_REPORT.txt`，并在 `RELEASE_SUMMARY.txt` 写入 `kern.bin SHA256`、源码 git commit 和 worktree 状态。
+- 输出 `RELEASE_SUMMARY.txt`、`SHA256SUMS.txt`、`kernsigner.bin`、关键截图拼图、全页面拼图和完整截图目录。
+- 输出 `ACCEPTANCE_REPORT.txt`，并在 `RELEASE_SUMMARY.txt` 写入 `kernsigner.bin SHA256`、源码 git commit 和 worktree 状态。
 - 输出 `FINAL_READINESS.txt`，集中记录固件、截图、启动日志和安全边界是否满足最终交付。
 - 输出 `README_FIRST.txt`、`FLASH_COMMANDS.txt`、`flash_app_linux.sh`、`flash_app_windows.ps1` 和 `RELEASE_INDEX.tsv`，让交付包打开后就能知道怎么验收、刷机和复核。
-- Linux/Windows 刷机脚本会先校验 `kern.bin` SHA256，校验失败拒绝刷机。
+- Linux/Windows 刷机脚本会先校验 `kernsigner.bin` SHA256，校验失败拒绝刷机。
 - 同时生成 `_release/kern_delivery_YYYYMMDD_HHMMSS.tar.gz`，便于归档或传输。
 - 最后自动执行最终交付校验，必须看到 `final verify: PASS`。
 
@@ -254,7 +254,7 @@ tools/kern_delivery.sh final
 - 校验 `SHA256SUMS.txt`，确认包内文件没有被修改或损坏。
 - 校验 `ACCEPTANCE_REPORT.txt` 必须是 `FINAL: PASS`，且缺字、UI 烟测、滚动、按钮导航失败数均为 0。
 - 校验 `boot.log` 必须包含当前 app 版本、屏幕初始化、GT911 触摸和背光初始化信息。
-- 校验 `kern.bin` 的 SHA256 与 `RELEASE_SUMMARY.txt` 一致。
+- 校验 `kernsigner.bin` 的 SHA256 与 `RELEASE_SUMMARY.txt` 一致。
 - 校验完整截图索引、按钮验收表、全页面拼图和交付文档都存在。
 - 校验 Linux/Windows 刷机脚本存在，确保交付包支持刷前 SHA256 校验。
 

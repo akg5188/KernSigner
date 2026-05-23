@@ -1,6 +1,7 @@
 set(SOURCES
     "main.c"
     "core/base43.c"
+    "core/btc_derivation.c"
     "core/crypto_utils.c"
     "core/custom_derivation.c"
     "core/descriptor_validator.c"

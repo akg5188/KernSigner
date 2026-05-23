@@ -36,7 +36,7 @@ cmake --build build
 构建成功后会生成：
 
 ```text
-build/kern.bin
+build/kernsigner.bin
 ```
 
 ### 使用 ESP-IDF 构建 4.3 寸目标板
@@ -121,14 +121,14 @@ ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
 
 ```bash
 python3 -m esptool --chip esp32p4 -p /dev/ttyACM0 -b 115200 \
-  --before default_reset --after hard_reset write_flash 0x20000 build/kern.bin
+  --before default_reset --after hard_reset write_flash 0x20000 build/kernsigner.bin
 ```
 
 地址 `0x20000` 只适用于当前分区布局。换分区表前必须重新确认。
 
 ## 全量刷机
 
-全量刷机需要 bootloader、partition table、app 等完整镜像。不要把 `kern.bin` 当成 factory 全量包。
+全量刷机需要 bootloader、partition table、app 等完整镜像。不要把 `kernsigner.bin` 当成 factory 全量包。
 
 如果是发布包，优先按发布包里的说明操作。没有明确 factory 包时，不做全擦。
 
@@ -191,7 +191,7 @@ tools/kern_delivery.sh verify
 2. `rg` 能不能搜到你刚改的文字。
 3. 另一个窗口是不是用了另一个 build 目录。
 4. 是否只编译了 simulator，没有编译固件。
-5. 是否刷的是旧发布包，不是当前 `build/kern.bin`。
+5. 是否刷的是旧发布包，不是当前 `build/kernsigner.bin`。
 6. 是否 app-only 刷到了错误分区地址。
 7. 刷完是否设备实际重启。
 
@@ -201,7 +201,7 @@ tools/kern_delivery.sh verify
 cd /home/ak/123/Kern
 rg -n "本机助记词|拍照生成随机熵|pin_unlock_textarea_y" main docs
 cmake --build build
-sha256sum build/kern.bin
+sha256sum build/kernsigner.bin
 ```
 
 刷机后记录新的 SHA256。

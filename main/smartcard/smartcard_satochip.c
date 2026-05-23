@@ -3245,6 +3245,15 @@ esp_err_t smartcard_satochip_get_web3_account(
     goto out;
   }
 
+  smartcard_satochip_account_t master;
+  memset(&master, 0, sizeof(master));
+  if (satochip_read_optional_web3_key(&session, "m", &master, timeout_ms) &&
+      master.has_compressed_pubkey) {
+    out->has_master_fingerprint = satochip_pubkey_fingerprint(
+        master.compressed_pubkey, out->master_fingerprint);
+  }
+  secure_zero(&master, sizeof(master));
+
   if (satochip_read_optional_web3_key(&session, "m/44'/60'",
                                       &out->parent_key, timeout_ms) &&
       out->parent_key.has_compressed_pubkey) {
@@ -3273,8 +3282,6 @@ esp_err_t smartcard_satochip_get_web3_account(
     }
   }
 
-  memset(out->master_fingerprint, 0, sizeof(out->master_fingerprint));
-  out->has_master_fingerprint = true;
   out->err = ESP_OK;
   snprintf(out->detail, sizeof(out->detail),
            "Satochip Web3 账户读取成功：EVM %s，OKX %u，BTC %u。",

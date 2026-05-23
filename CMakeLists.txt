@@ -10,4 +10,4 @@ add_compile_options(-Wno-attributes)
 add_compile_options(-Wno-unused-function)
 
 set(PROJECT_VER "0.0.7-rc1")
-project(kern)
+project(kernsigner)

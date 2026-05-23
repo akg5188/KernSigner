@@ -150,7 +150,7 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 - 全页面拼图。
 - 交付包归档。
 - SHA256SUMS 校验。
-- Linux/Windows 刷机脚本刷前校验 `kern.bin` SHA256。
+- Linux/Windows 刷机脚本刷前校验 `kernsigner.bin` SHA256。
 - 真机启动日志自动判定。
 - `ship` 一键交付。
 - `shipflash` 一键刷机交付。

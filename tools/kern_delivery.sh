@@ -505,7 +505,7 @@ write_final_readiness_file() {
   local output_file="$2"
   local release_class="${KERN_RELEASE_CLASS:-development-acceptance}"
   local require_production="${KERN_REQUIRE_PRODUCTION:-0}"
-  local firmware_file="$release_dir/kern.bin"
+  local firmware_file="$release_dir/kernsigner.bin"
   local acceptance_file="$release_dir/ACCEPTANCE_REPORT.txt"
   local summary_file="$release_dir/RELEASE_SUMMARY.txt"
   local plan_file="$release_dir/PROJECT_PROGRESS_AND_PLAN.md"
@@ -568,7 +568,7 @@ write_final_readiness_file() {
   fi
 
   cat >"$output_file" <<EOF
-Kern Final Readiness
+KernSigner Final Readiness
 ====================
 
 Time: $(date -Iseconds)
@@ -585,7 +585,7 @@ Required artifacts:
 - Screenshots: $screenshots_dir
 
 Verification summary:
-- kern.bin SHA256: $firmware_sha
+- kernsigner.bin SHA256: $firmware_sha
 - BMP screenshots: $bmp_count
 - PNG screenshots: $png_count
 - Missing glyphs: $missing_glyphs
@@ -610,7 +610,7 @@ EOF
 write_build_provenance_file() {
   local release_dir="$1"
   local output_file="$release_dir/BUILD_PROVENANCE.txt"
-  local firmware_file="$release_dir/kern.bin"
+  local firmware_file="$release_dir/kernsigner.bin"
   local sdkconfig_file
   local project_desc="$ROOT_DIR/$BUILD_DIR/project_description.json"
   local firmware_sha="missing"
@@ -714,7 +714,7 @@ verify_release_package() {
   log "final verify release: $release_dir"
 
   local required=(
-    "kern.bin"
+    "kernsigner.bin"
     "README_FIRST.txt"
     "FLASH_COMMANDS.txt"
     "flash_app_linux.sh"
@@ -775,11 +775,11 @@ verify_release_package() {
     }
   fi
 
-  if [[ -s "$release_dir/kern.bin" && -s "$release_dir/RELEASE_SUMMARY.txt" ]]; then
-    actual_sha="$(sha256sum "$release_dir/kern.bin" | awk '{print $1}')"
-    summary_sha="$(awk -F ': ' '/kern.bin SHA256:/ {print $2; exit}' "$release_dir/RELEASE_SUMMARY.txt")"
+  if [[ -s "$release_dir/kernsigner.bin" && -s "$release_dir/RELEASE_SUMMARY.txt" ]]; then
+    actual_sha="$(sha256sum "$release_dir/kernsigner.bin" | awk '{print $1}')"
+    summary_sha="$(awk -F ': ' '/kernsigner.bin SHA256:/ {print $2; exit}' "$release_dir/RELEASE_SUMMARY.txt")"
     if [[ "$actual_sha" != "$summary_sha" ]]; then
-      log "final verify FAIL: kern.bin SHA mismatch"
+      log "final verify FAIL: kernsigner.bin SHA mismatch"
       failures=1
     fi
   fi
@@ -877,9 +877,9 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 ESPPORT=/dev/ttyACM0 tools/kern_delivery.sh monitor
 
 注意：
-- kern.bin 是 app 分区升级固件，不是空白板完整 factory 镜像。
+- kernsigner.bin 是 app 分区升级固件，不是空白板完整 factory 镜像。
 - Linux 可直接运行 release 包内的 ./flash_app_linux.sh；Windows 可右键 PowerShell 运行 flash_app_windows.ps1。
-- 两个脚本都会先校验 kern.bin SHA256，校验失败会拒绝刷机。
+- 两个脚本都会先校验 kernsigner.bin SHA256，校验失败会拒绝刷机。
 - 稳定优先，默认刷写速度使用 115200。
 - 当前是真钱包功能版，但还不是生产资金审计版；不要用真实资产做验收。
 - `ship/shipflash` 只代表开发验收通过，不代表生产资金版。
@@ -926,9 +926,9 @@ if ! command -v sha256sum >/dev/null 2>&1; then
   exit 1
 fi
 
-ACTUAL_SHA="\$(sha256sum kern.bin | awk '{print \$1}')"
+ACTUAL_SHA="\$(sha256sum kernsigner.bin | awk '{print \$1}')"
 if [[ "\$ACTUAL_SHA" != "\$EXPECTED_SHA" ]]; then
-  echo "kern.bin SHA256 不匹配，拒绝刷机。" >&2
+  echo "kernsigner.bin SHA256 不匹配，拒绝刷机。" >&2
   echo "期望: \$EXPECTED_SHA" >&2
   echo "实际: \$ACTUAL_SHA" >&2
   exit 1
@@ -937,7 +937,7 @@ fi
 echo "SHA256 校验通过。"
 echo "刷写 app 分区: \$PORT @ \$BAUD"
 python3 -m esptool --chip esp32p4 -p "\$PORT" -b "\$BAUD" \\
-  --before default_reset --after hard_reset write_flash 0x20000 kern.bin
+  --before default_reset --after hard_reset write_flash 0x20000 kernsigner.bin
 EOF
   chmod +x "$release_dir/flash_app_linux.sh"
 
@@ -959,14 +959,14 @@ if ([string]::IsNullOrWhiteSpace(\$Baud)) { \$Baud = "115200" }
 \$ScriptDir = Split-Path -Parent \$MyInvocation.MyCommand.Path
 Set-Location \$ScriptDir
 
-if (-not (Test-Path ".\\kern.bin")) {
-  Write-Error "找不到 kern.bin，拒绝刷机。"
+if (-not (Test-Path ".\\kernsigner.bin")) {
+  Write-Error "找不到 kernsigner.bin，拒绝刷机。"
   exit 1
 }
 
-\$ActualSha = (Get-FileHash ".\\kern.bin" -Algorithm SHA256).Hash.ToLowerInvariant()
+\$ActualSha = (Get-FileHash ".\\kernsigner.bin" -Algorithm SHA256).Hash.ToLowerInvariant()
 if (\$ActualSha -ne \$ExpectedSha.ToLowerInvariant()) {
-  Write-Error "kern.bin SHA256 不匹配，拒绝刷机。`n期望: \$ExpectedSha`n实际: \$ActualSha"
+  Write-Error "kernsigner.bin SHA256 不匹配，拒绝刷机。`n期望: \$ExpectedSha`n实际: \$ActualSha"
   exit 1
 }
 
@@ -976,11 +976,11 @@ Write-Host "刷写 app 分区: \$Port @ \$Baud"
 \$PythonCmd = "py"
 & \$PythonCmd -3 -m esptool version *> \$null
 if (\$LASTEXITCODE -eq 0) {
-  & \$PythonCmd -3 -m esptool --chip esp32p4 -p \$Port -b \$Baud --before default_reset --after hard_reset write_flash 0x20000 kern.bin
+  & \$PythonCmd -3 -m esptool --chip esp32p4 -p \$Port -b \$Baud --before default_reset --after hard_reset write_flash 0x20000 kernsigner.bin
   if (\$LASTEXITCODE -ne 0) { exit \$LASTEXITCODE }
 } else {
   \$PythonCmd = "python"
-  & \$PythonCmd -m esptool --chip esp32p4 -p \$Port -b \$Baud --before default_reset --after hard_reset write_flash 0x20000 kern.bin
+  & \$PythonCmd -m esptool --chip esp32p4 -p \$Port -b \$Baud --before default_reset --after hard_reset write_flash 0x20000 kernsigner.bin
   if (\$LASTEXITCODE -ne 0) { exit \$LASTEXITCODE }
 }
 EOF
@@ -1007,7 +1007,7 @@ DELIVERY_STATUS.md	完整交付范围、风险边界和验收清单
 MORNING_HANDOVER.md	明早实机验收顺序
 SHA256SUMS.txt	交付包内所有文件的 SHA256
 boot.log	最新真机启动日志
-kern.bin	ESP32-P4 app 分区固件
+kernsigner.bin	ESP32-P4 app 分区固件
 contact_sheet_key_pages.png	关键页面拼图
 screenshots/contact_sheet_all_top.png	全部页面首屏拼图
 screenshots/contact_sheet_all_bottom.png	全部可滚动页面底部拼图
@@ -1027,8 +1027,8 @@ package_release() {
 
   stamp="$(date +%Y%m%d_%H%M%S)"
   release_dir="$ROOT_DIR/_release/kern_delivery_$stamp"
-  firmware_src="$ROOT_DIR/$BUILD_DIR/kern.bin"
-  firmware_dst="$release_dir/kern.bin"
+  firmware_src="$ROOT_DIR/$BUILD_DIR/kernsigner.bin"
+  firmware_dst="$release_dir/kernsigner.bin"
 
   log "prepare non-flashing release package: $release_dir"
   bake_fonts
@@ -1137,7 +1137,7 @@ Release directory: $release_dir
 Firmware:
 - Source: $firmware_src
 - Packaged: $firmware_dst
-- kern.bin SHA256: $firmware_sha
+- kernsigner.bin SHA256: $firmware_sha
 
 Source:
 - Git commit: $git_sha
@@ -1213,7 +1213,7 @@ $firmware_dst
 Project plan:
 $release_dir/PROJECT_PROGRESS_AND_PLAN.md
 
-kern.bin SHA256:
+kernsigner.bin SHA256:
 $firmware_sha
 
 Archive SHA256:

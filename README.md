@@ -14,6 +14,8 @@ KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, 
 
 It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for the Waveshare ESP32-P4 4.3-inch touch-screen device.
 
+**Project identity:** KernSigner is a heavily modified derivative built from the upstream Kern codebase. It is not the official Kern project, not an official Kern firmware release, and should not be confused with upstream Kern.
+
 One of the most important upstream references here is [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner); its wallet flow, UX patterns, and smart-card-adjacent thinking influenced a large part of the project structure.
 
 This repository was largely assembled with AI assistance. It is still unfinished, intended for learning and discussion only, and must not be used to store or sign real funds.
@@ -82,9 +84,17 @@ The current tree is a **test-funds validation build**, not an audited production
 - Bitget Wallet：EVM 连接码和常见测试转账签名已跑通。
 - imToken：电脑端连接码和 TypedData 签名回传已跑通，使用单账户 `crypto-hdkey` + `eth-signature`。
 - MetaMask：电脑端连接码和 TypedData 签名回传已跑通，使用单账户 `crypto-hdkey` + `eth-signature`。
-- Rabby：有连接入口，仍需更多实扫回归。
-- TokenPocket：有连接入口，特殊二维码格式仍需专项样本回归。
+- Rabby：有连接入口，按 Keystone 单账户连接码方向接入，仍需更多实扫回归。
+- TokenPocket：有连接入口，按 Keystone 单账户连接码方向接入，特殊二维码格式仍需专项样本回归。
+- Keystone：作为通用硬件钱包兼容格式使用，不是独立官方适配保证。
 - BlueWallet：BTC `xpub` / `zpub` 观察钱包路径可测，智能卡账户只读观察码可测。
+- Electrum：BTC 扫码签名和观察钱包流程已接入测试路径；常见 PSBT/扩展公钥路径可测，复杂多签、特殊脚本和异常交易仍需更多样本回归。
+
+简短理解：
+
+- Web3 钱包重点是 `OKX / Bitget / MetaMask / imToken / Rabby / TokenPocket / Keystone`。
+- BTC 钱包重点是 `BlueWallet / Electrum`。
+- 每个钱包连接或签名时，都可以按实际情况选择 `助记词` 或 `智能卡` 来源；智能卡需要外接供电 OTG 读卡器。
 
 ## Safety Status
 

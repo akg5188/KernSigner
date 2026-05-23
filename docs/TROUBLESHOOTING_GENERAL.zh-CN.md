@@ -170,7 +170,7 @@ cmake --build build
 按顺序查：
 
 1. 是否在正确目录构建。
-2. 是否刷了刚生成的 `build/kern.bin`。
+2. 是否刷了刚生成的 `build/kernsigner.bin`。
 3. 是否刷到正确串口。
 4. 是否只刷 app，但设备分区表不是同一套。
 5. 是否刷完设备没有重启。
@@ -179,7 +179,7 @@ cmake --build build
 记录：
 
 ```bash
-sha256sum build/kern.bin
+sha256sum build/kernsigner.bin
 ```
 
 把 SHA256 写入交付记录。
