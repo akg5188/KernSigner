@@ -34,7 +34,8 @@
 - 单测：`./scripts/test.sh` 通过。
 - 固件校验：`firmware/wave_43/SHA256SUMS.txt` 全部通过。
 - OKX 桌面样本：静态图 + 1 fps 视频抽帧 `12/12 decoded`。
-- 真机刷写：当前电脑未枚举出 `/dev/ttyACM*` 或 `/dev/ttyUSB*`，需开发板串口重新出现后补刷机和启动日志。
+- 真机刷写：`/dev/ttyACM0` app-only 刷写通过，esptool 显示 `Hash of data verified`。
+- 启动日志：`docs/logs/boot_20260523_182345.log` 通过，屏幕、GT911 触摸、LVGL task 和背光初始化正常。
 
 ## 2026-05-20 状态
 

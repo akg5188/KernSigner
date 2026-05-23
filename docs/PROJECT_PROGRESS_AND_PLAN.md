@@ -8,7 +8,7 @@
 
 当前项目已经完成“Krux 风格中文硬件底包 + 低风险工具 + 旧 Kern 钱包核心接入 + 智能卡测试主线 + 自动交付验收”的测试资金候选闭环。最新固件版本是 `0.0.7-rc1`，目标板是 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3。仓库已包含 `firmware/wave_43/` 下的 untested full/app-only 固件；`_release/LATEST_RELEASE.txt` 只指向上一次脚本生成的交付包，不一定等同于当前源码或预置固件。
 
-2026-05-23 最新预置固件哈希：app-only `733082ea5a4946fccad2ea78ae8fea4cb933f34fcf709de9921f9c4c0b4decd4`，full image `896c00b2cc488fb76d8bf208705ce3b0faa9b51142285b437a57c8a69d6c5c0b`。这版已经本地构建、通过模拟器验收，并通过 OKX 图片/视频桌面解码样本；如果当前电脑看不到 `/dev/ttyACM0` 或实际串口，真机刷写和启动日志要等开发板重新枚举后再补。
+2026-05-23 最新预置固件哈希：app-only `733082ea5a4946fccad2ea78ae8fea4cb933f34fcf709de9921f9c4c0b4decd4`，full image `896c00b2cc488fb76d8bf208705ce3b0faa9b51142285b437a57c8a69d6c5c0b`。这版已经本地构建、通过模拟器验收、通过 OKX 图片/视频桌面解码样本，并在 `/dev/ttyACM0` 上完成 app-only 真机刷写和启动日志检查。
 
 当前版本可以用于验收：
 
@@ -81,7 +81,7 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh shipflash
 - 滚动页截图失败：0。
 - 按钮导航验收：0 个失败。
 - 首页标题：`Home`。
-- 真机启动日志：上一版可用日志包含 app 版本、屏幕初始化、GT911 触摸和背光初始化；当前 `733082...` 固件刷机后必须重新抓日志。
+- 真机启动日志：`docs/logs/boot_20260523_182345.log` 通过，包含 app 版本、屏幕初始化、GT911 触摸、LVGL task 和背光初始化。
 - 模拟器交付验收状态：`FINAL: PASS`。
 - OKX 桌面样本：静态图 + 1 fps 视频抽帧 `12/12 decoded`；全帧压力抽样 `256/257 decoded`，唯一失败帧是过渡/模糊帧。
 

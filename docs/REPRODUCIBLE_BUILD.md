@@ -2,7 +2,7 @@
 
 Status: **untested development firmware**.
 
-This repository currently contains a development snapshot for Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 (`wave_43`). The included firmware has been rebuilt locally and passed simulator delivery acceptance, but this exact snapshot still needs a fresh real-device flash and boot-log capture before it is described as flashed. It is **not audited** and must be treated as **test-funds only** until independent real-device and production-security verification is complete.
+This repository currently contains a development snapshot for Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 (`wave_43`). The included firmware has been rebuilt locally, passed simulator delivery acceptance, and the app-only image was flashed to a real board with a passing boot-log capture on 2026-05-23. It is **not audited** and must be treated as **test-funds only** until independent real-device and production-security verification is complete.
 
 ## Pinned Local Build Inputs
 
@@ -68,6 +68,8 @@ Latest local acceptance checks for this snapshot:
 - `./scripts/test.sh`: PASS
 - `(cd firmware/wave_43 && sha256sum -c SHA256SUMS.txt)`: PASS
 - OKX local sample: static photo + 1 fps video frames `12/12 decoded`
+- App-only real-device flash: PASS on `/dev/ttyACM0`, `Hash of data verified`
+- Boot-log capture: PASS, `docs/logs/boot_20260523_182345.log`
 
 ## Flash The Included Firmware
 
