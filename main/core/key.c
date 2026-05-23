@@ -1,5 +1,6 @@
 #include "key.h"
 #include "../utils/secure_mem.h"
+#include "i18n/i18n.h"
 #include <esp_log.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -490,7 +491,9 @@ void key_set_pending_source_material(const char *label, const char *text,
 
   pending_source_text = dup_trimmed_source_text(text);
   pending_source_mnemonic = strdup(mnemonic);
-  pending_source_label = strdup(label && label[0] ? label : "原始输入");
+  pending_source_label =
+      strdup(label && label[0] ? label : i18n_tr_or("wallet.raw_input",
+                                                    "Raw input"));
 
   if (!pending_source_text || !pending_source_mnemonic ||
       !pending_source_label) {

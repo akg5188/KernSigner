@@ -1,5 +1,6 @@
 #include "mnemonic_entropy.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../qr/encoder.h"
 #include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
@@ -74,13 +75,15 @@ void mnemonic_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   entropy_screen = theme_create_page_container(parent);
   lv_obj_add_flag(entropy_screen, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(entropy_screen, back_cb, LV_EVENT_CLICKED, NULL);
-  theme_create_page_title(entropy_screen, "原始熵");
+  theme_create_page_title(entropy_screen,
+                          i18n_tr_or("wallet.raw_entropy", "Raw entropy"));
   (void)ui_create_back_button(entropy_screen, back_cb);
 
   char fingerprint_hex[9] = "--------";
   key_get_fingerprint_hex(fingerprint_hex);
   char fingerprint_text[32];
-  snprintf(fingerprint_text, sizeof(fingerprint_text), "钱包指纹 %s",
+  snprintf(fingerprint_text, sizeof(fingerprint_text), "%s %s",
+           i18n_tr_or("wallet.wallet_fingerprint", "Wallet fingerprint"),
            fingerprint_hex);
 
   lv_obj_t *card = lv_obj_create(entropy_screen);
@@ -108,7 +111,8 @@ void mnemonic_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   bool has_source = key_get_source_material(&source_label, &source_text);
 
   char bits_text[32];
-  snprintf(bits_text, sizeof(bits_text), "熵：%u位",
+  snprintf(bits_text, sizeof(bits_text),
+           i18n_tr_or("backup.entropy_bits_format", "Entropy: %u bits"),
            (unsigned)(entropy_len * 8));
   lv_obj_t *bits_label = theme_create_label(card, bits_text, false);
   lv_obj_set_style_text_font(bits_label, theme_font_small(), 0);
@@ -117,7 +121,8 @@ void mnemonic_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   if (has_source) {
     char source_title[64];
-    snprintf(source_title, sizeof(source_title), "原始输入：%s",
+    snprintf(source_title, sizeof(source_title),
+             i18n_tr_or("backup.raw_input_format", "Raw input: %s"),
              source_label ? source_label : "");
     lv_obj_t *source_title_label =
         theme_create_label(card, source_title, false);
@@ -144,7 +149,8 @@ void mnemonic_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_text_color(entropy_label, main_color(), 0);
   lv_obj_set_style_text_align(entropy_label, LV_TEXT_ALIGN_CENTER, 0);
 
-  lv_obj_t *raw_label = theme_create_label(card, "十六进制", false);
+  lv_obj_t *raw_label =
+      theme_create_label(card, i18n_tr_or("input.hex", "Hex"), false);
   lv_obj_set_style_text_font(raw_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(raw_label, highlight_color(), 0);
 

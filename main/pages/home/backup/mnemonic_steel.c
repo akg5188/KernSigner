@@ -1,5 +1,6 @@
 #include "mnemonic_steel.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../ui/dialog.h"
 #include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
@@ -44,7 +45,10 @@ void mnemonic_steel_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   return_callback = return_cb;
   if (!key_mnemonic_is_valid()) {
-    dialog_show_error("临时助记词不能显示钢板打孔", return_cb, 0);
+    dialog_show_error(
+        i18n_tr_or("backup.no_temporary_steel_punch",
+                   "Temporary mnemonic cannot show steel punch backup"),
+        return_cb, 0);
     return;
   }
   if (!bip39_filter_init())
@@ -56,7 +60,9 @@ void mnemonic_steel_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
     return;
 
   steel_screen = theme_create_page_container(parent);
-  theme_create_page_title(steel_screen, "钢板打孔位置");
+  theme_create_page_title(steel_screen,
+                          i18n_tr_or("backup.steel_punch_positions",
+                                     "Steel punch positions"));
   (void)ui_create_back_button(steel_screen, back_cb);
 
   lv_obj_t *list = lv_obj_create(steel_screen);

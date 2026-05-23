@@ -2,6 +2,7 @@
 
 #include "backup_menu.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../ui/dialog.h"
 #include "../../../ui/menu.h"
 #include "../../../ui/theme.h"
@@ -147,23 +148,40 @@ void backup_menu_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   return_callback = return_cb;
 
   if (!key_can_backup_mnemonic()) {
-    dialog_show_error("临时助记词不能备份导出", return_cb, 0);
+    dialog_show_error(i18n_tr_or("backup.no_temporary_export",
+                                 "Temporary mnemonic cannot be exported"),
+                      return_cb, 0);
     return;
   }
 
   backup_menu_screen = theme_create_page_container(parent);
 
-  backup_menu = ui_menu_create(backup_menu_screen, "备份", back_cb);
+  backup_menu = ui_menu_create(backup_menu_screen,
+                               i18n_tr_or("backup.backup", "Backup"),
+                               back_cb);
   if (!backup_menu)
     return;
 
-  ui_menu_add_entry(backup_menu, "序号", menu_words_cb);
-  ui_menu_add_entry(backup_menu, "原始熵", menu_entropy_cb);
-  ui_menu_add_entry(backup_menu, "二维码", menu_qr_cb);
-  ui_menu_add_entry(backup_menu, "加密备份", menu_encrypted_backup_cb);
-  ui_menu_add_entry(backup_menu, "点阵板", menu_grid_cb);
-  ui_menu_add_entry(backup_menu, "钢板打孔", menu_steel_cb);
-  ui_menu_add_entry(backup_menu, "1248打孔", menu_1248_cb);
+  ui_menu_add_entry(backup_menu,
+                    i18n_tr_or("backup.word_indexes", "Word indexes"),
+                    menu_words_cb);
+  ui_menu_add_entry(backup_menu,
+                    i18n_tr_or("wallet.raw_entropy", "Raw entropy"),
+                    menu_entropy_cb);
+  ui_menu_add_entry(backup_menu, i18n_tr_or("menu.qr_code", "QR code"),
+                    menu_qr_cb);
+  ui_menu_add_entry(backup_menu,
+                    i18n_tr_or("backup.encrypted_backup",
+                               "Encrypted backup"),
+                    menu_encrypted_backup_cb);
+  ui_menu_add_entry(backup_menu, i18n_tr_or("input.punch_grid", "Punch grid"),
+                    menu_grid_cb);
+  ui_menu_add_entry(backup_menu,
+                    i18n_tr_or("backup.steel_punch", "Steel punch"),
+                    menu_steel_cb);
+  ui_menu_add_entry(backup_menu,
+                    i18n_tr_or("backup.1248_punch", "1248 punch"),
+                    menu_1248_cb);
 }
 
 void backup_menu_page_show(void) {

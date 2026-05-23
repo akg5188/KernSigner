@@ -271,13 +271,13 @@ char *mnemonic_qr_to_mnemonic_unchecked(const char *data, size_t len,
 const char *mnemonic_qr_format_name(mnemonic_qr_format_t format) {
   switch (format) {
   case MNEMONIC_QR_PLAINTEXT:
-    return "明文助记词";
+    return "Plaintext mnemonic";
   case MNEMONIC_QR_COMPACT:
-    return "紧凑助记词二维码";
+    return "Compact mnemonic QR";
   case MNEMONIC_QR_SEEDQR:
-    return "助记词二维码";
+    return "SeedQR";
   default:
-    return "未知格式";
+    return "Unknown format";
   }
 }
 

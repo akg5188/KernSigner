@@ -1,12 +1,14 @@
-# Kern/Krux 项目总进展与详细计划
+# KernSigner 项目总进展与详细计划
 
 > 2026-05-22 智能卡更新：用户确认外接供电后 ACR39U-NF 读卡器可识别，Satochip/SeedKeeper 主线已经跑通。Satochip 已可测 Web3 连接/签名、路径地址和 BTC xpub/ypub/zpub/tpub/upub/vpub；SeedKeeper 已可测设置 PIN、改 PIN、写入助记词、查看/导入条目和重置。新版 SeedKeeper 重置必须用错 PIN/错 PUK 到 `FF00`，旧 `B0 FF` 返回 `9C20` 不是驱动坏。Satochip BTC PSBT/消息签名仍未作为生产能力开放。
 
-本文档是当前项目的总控说明，面向 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 上的 Kern/Krux 移植工作。它回答三个问题：现在做到哪里、哪些边界不能作为已交付能力宣传、下一步怎么按安全顺序推进。
+本文档是当前项目的总控说明，面向 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 上的 KernSigner 验收工作。它回答三个问题：现在做到哪里、哪些边界不能作为已交付能力宣传、下一步怎么按安全顺序推进。
 
 ## 总结结论
 
-当前项目已经完成“Krux 风格中文硬件底包 + 低风险工具 + 旧 Kern 钱包核心接入 + 自动交付验收”的测试资金候选闭环。最新固件版本是 `0.0.7-rc1`，目标板是 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3。`_release/LATEST_RELEASE.txt` 只指向上一次已经生成的交付包；本轮 2026-05-20 的审查和修复没有按用户要求出新固件、没有复制 bin、没有刷机，所以它不代表当前源码的最新可刷包。
+当前项目已经完成“Krux 风格中文硬件底包 + 低风险工具 + 旧 Kern 钱包核心接入 + 智能卡测试主线 + 自动交付验收”的测试资金候选闭环。最新固件版本是 `0.0.7-rc1`，目标板是 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3。仓库已包含 `firmware/wave_43/` 下的 untested full/app-only 固件；`_release/LATEST_RELEASE.txt` 只指向上一次脚本生成的交付包，不一定等同于当前源码或预置固件。
+
+2026-05-23 最新预置固件哈希：app-only `733082ea5a4946fccad2ea78ae8fea4cb933f34fcf709de9921f9c4c0b4decd4`，full image `896c00b2cc488fb76d8bf208705ce3b0faa9b51142285b437a57c8a69d6c5c0b`。这版已经本地构建、通过模拟器验收，并通过 OKX 图片/视频桌面解码样本；如果当前电脑看不到 `/dev/ttyACM0` 或实际串口，真机刷写和启动日志要等开发板重新枚举后再补。
 
 当前版本可以用于验收：
 
@@ -49,41 +51,39 @@ cat /home/ak/123/Kern/_release/LATEST_RELEASE.txt
 
 ```bash
 cd /home/ak/123/Kern
-tools/kern_delivery.sh final
+tools/signer_delivery.sh final
 ```
 
 重新生成交付包并最终校验：
 
 ```bash
 cd /home/ak/123/Kern
-JOBS=2 tools/kern_delivery.sh ship
+JOBS=2 tools/signer_delivery.sh ship
 ```
 
 刷写真机、抓启动日志、重新打包并最终校验：
 
 ```bash
 cd /home/ak/123/Kern
-JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
+JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh shipflash
 ```
 
 ## 当前自动验收结果
 
 最新真钱包功能版已通过以下验收：
 
-- 页面清单：77 页。
-- 首屏截图数量：以当前交付包内 `ACCEPTANCE_REPORT.txt` 为准；本轮未出新包，不能沿用旧截图数量判断当前源码。
-- 可滚动页面底部截图数量：以当前交付包内 `ACCEPTANCE_REPORT.txt` 为准。
-- 总 BMP 截图数量：以当前交付包内 `ACCEPTANCE_REPORT.txt` 为准。
-- PNG/拼图：10 张。
+- 页面清单：最新交付验收批次为 151 个页面，详见 `docs/screens/delivery_20260523_175620/manifest.tsv`。
+- 页面截图：最新交付验收批次共 299 张 BMP 截图，并生成关键页 PNG 与拼图。
+- BMP 截图：本地重复导出文件；GitHub 预览以 PNG 为准。
 - 截图失败：0。
 - 中文/UI 缺字：0。
 - UI 烟测失败：0。
 - 滚动页截图失败：0。
-- 按钮导航验收数量：以当前交付包内 `interaction_check.tsv` 和 `ACCEPTANCE_REPORT.txt` 为准。
-- 按钮导航失败：0。
-- 首页标题：`Krux`。
-- 真机启动日志：包含 app 版本、屏幕初始化、GT911 触摸和背光初始化。
-- 最终交付状态：`Final readiness: PASS`。
+- 按钮导航验收：0 个失败。
+- 首页标题：`Home`。
+- 真机启动日志：上一版可用日志包含 app 版本、屏幕初始化、GT911 触摸和背光初始化；当前 `733082...` 固件刷机后必须重新抓日志。
+- 模拟器交付验收状态：`FINAL: PASS`。
+- OKX 桌面样本：静态图 + 1 fps 视频抽帧 `12/12 decoded`；全帧压力抽样 `256/257 decoded`，唯一失败帧是过渡/模糊帧。
 
 ## 代码结构进展
 
@@ -95,16 +95,16 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 - 启动 Waveshare 4.3 寸显示和触摸。
 - 清空旧 framebuffer，避免热重启残影。
 - 设置背光亮度。
-- 进入 `krux_shell_create()`。
+- 进入 `signer_shell_create()`。
 
 ### UI 与功能目录
 
 主要代码在：
 
-- `main/pages/krux_shell/krux_shell.c`
-- `main/pages/krux_shell/krux_shell.h`
-- `main/krux_port/krux_feature_catalog.c`
-- `main/krux_port/krux_services.c`
+- `main/pages/signer_shell/signer_shell.c`
+- `main/pages/signer_shell/signer_shell.h`
+- `main/signer_port/signer_feature_catalog.c`
+- `main/signer_port/signer_services.c`
 
 当前 UI 是中文 Krux 功能目录，同时增加了旧 Kern 钱包真实入口。每个功能都有迁移状态、风险等级、来源 Krux 路径和下一步提示；真机固件中的 `legacy_*` 入口会跳到旧 Kern 钱包页面，模拟器为稳定验收映射到对应 Krux Shell 页面。
 
@@ -112,10 +112,10 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 
 主要代码在：
 
-- `main/krux_port/krux_hardware_probe.c`
-- `main/krux_port/krux_camera_preview.c`
-- `main/krux_port/krux_qr_decoder.c`
-- `main/krux_port/krux_storage_browser.c`
+- `main/signer_port/signer_hardware_probe.c`
+- `main/signer_port/signer_camera_preview.c`
+- `main/signer_port/signer_qr_decoder.c`
+- `main/signer_port/signer_storage_browser.c`
 - `main/core/settings.c`
 
 当前已经接入：
@@ -134,8 +134,8 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 主要代码在：
 
 - `simulator/src/main_sim.c`
-- `tools/kern_delivery.sh`
-- `tools/bake_krux_cn_fonts.py`
+- `tools/signer_delivery.sh`
+- `tools/bake_signer_cn_fonts.py`
 
 当前已经接入：
 
@@ -216,12 +216,12 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 
 ### 交付自动化
 
-- `tools/kern_delivery.sh check`：非刷机验收。
-- `tools/kern_delivery.sh appflash`：app-only 刷机和启动日志。
-- `tools/kern_delivery.sh release`：打包。
-- `tools/kern_delivery.sh ship`：打包并最终校验。
-- `tools/kern_delivery.sh shipflash`：刷机、启动日志、打包并最终校验。
-- `tools/kern_delivery.sh final`：校验最新交付包。
+- `tools/signer_delivery.sh check`：非刷机验收。
+- `tools/signer_delivery.sh appflash`：app-only 刷机和启动日志。
+- `tools/signer_delivery.sh release`：打包。
+- `tools/signer_delivery.sh ship`：打包并最终校验。
+- `tools/signer_delivery.sh shipflash`：刷机、启动日志、打包并最终校验。
+- `tools/signer_delivery.sh final`：校验最新交付包。
 
 ## 未完成但不能跳过的风险项
 
@@ -290,7 +290,7 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 
 验收标准：
 
-- `tools/kern_delivery.sh final` PASS。
+- `tools/signer_delivery.sh final` PASS。
 - `FINAL_READINESS.txt` 为 PASS。
 - 启动日志包含版本、显示、GT911、背光。
 
@@ -314,7 +314,7 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 验收标准：
 
 - 最新 release 包包含上述文件。
-- `tools/kern_delivery.sh final` 校验这些文件存在。
+- `tools/signer_delivery.sh final` 校验这些文件存在。
 
 ### 阶段 2：真机人工验收
 
@@ -358,7 +358,7 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 - 保留独立 CCID probe 作为排障固件。
 - Kern 内置 `设备检查 -> 智能卡检测`。
 - 继续热插拔、外接供电、Hub、卡片插拔回归。
-- Satochip 路径地址和 BTC 观察公钥已接入；SeedKeeper 仍只做检测识别，未开放列表、导入、导出或写入。
+- Satochip 路径地址和 BTC 观察公钥已接入；SeedKeeper 设置 PIN、改 PIN、写入助记词、查看/导入条目和新版重置流程已进入测试卡验收范围，但仍不能宣传为生产审计能力。
 
 退出条件：
 
@@ -479,7 +479,7 @@ JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
 - `FLASH_COMMANDS.txt` 可指导刷机。
 - `FINAL_READINESS.txt` 显示 PASS。
 - `ACCEPTANCE_REPORT.txt` 显示 FINAL PASS。
-- `tools/kern_delivery.sh final` 显示 PASS。
+- `tools/signer_delivery.sh final` 显示 PASS。
 - 真机启动日志显示版本、屏幕、触摸、背光。
 - 生产审计边界清晰，已接入真钱包能力，但未批准生产资金使用。
 

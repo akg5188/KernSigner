@@ -35,7 +35,7 @@ void dialog_show_danger_confirm(const char *message,
                                 void *user_data, dialog_style_t style);
 
 #define DIALOG_SENSITIVE_DATA_WARNING                                          \
-  "将显示敏感数据，请确认无人旁观。\n继续？"
+  "Sensitive data will be shown. Make sure nobody is watching.\nContinue?"
 
 void dialog_show_message(const char *title, const char *message);
 

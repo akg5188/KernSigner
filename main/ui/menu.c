@@ -1,6 +1,7 @@
 // UI Menu Component - Touch menu for LVGL
 
 #include "menu.h"
+#include "i18n_text.h"
 #include "input_helpers.h"
 #include "theme.h"
 #include <stdint.h>
@@ -57,7 +58,7 @@ ui_menu_t *ui_menu_create(lv_obj_t *parent, const char *title,
   theme_apply_screen(menu->container);
 
   menu->title_label = lv_label_create(menu->container);
-  lv_label_set_text(menu->title_label, title);
+  lv_label_set_text(menu->title_label, ui_i18n_text(title));
   lv_obj_set_width(menu->title_label, LV_PCT(back_cb ? 50 : 88));
   lv_label_set_long_mode(menu->title_label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(menu->title_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -132,7 +133,7 @@ bool ui_menu_add_entry(ui_menu_t *menu, const char *name,
   lv_obj_set_style_radius(menu->buttons[idx], 8, 0);
 
   lv_obj_t *label = lv_label_create(menu->buttons[idx]);
-  lv_label_set_text(label, name);
+  lv_label_set_text(label, ui_i18n_text(name));
   lv_obj_set_width(label, LV_PCT(92));
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
@@ -188,7 +189,7 @@ bool ui_menu_add_entry_with_action(ui_menu_t *menu, const char *name,
 
   /* Label on the left */
   lv_obj_t *label = lv_label_create(menu->buttons[idx]);
-  lv_label_set_text(label, name);
+  lv_label_set_text(label, ui_i18n_text(name));
   lv_obj_set_flex_grow(label, 1);
   lv_obj_set_width(label, LV_PCT(74));
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
@@ -218,6 +219,7 @@ bool ui_menu_add_entry_with_action(ui_menu_t *menu, const char *name,
   lv_label_set_text(icon_label, action_icon);
   lv_obj_center(icon_label);
   lv_obj_set_style_text_color(icon_label, error_color(), 0);
+  lv_obj_set_style_text_font(icon_label, theme_font_medium(), 0);
 
   menu->config.entry_count++;
   return true;

@@ -32,10 +32,7 @@ imToken 和 MetaMask 都使用单账户 `crypto-hdkey`，不要使用 `crypto-mu
 - 不要把 children 改成 `0/0`
 - 不要把连接码当普通地址二维码
 
-本地测试文件：
-
-- `/home/ak/123/Kern/tmp_imtoken_qr/H_known_seed_A_depth.png`
-- `/home/ak/下载/MetaMask_连接码_测试_A_优先扫这个.png`
+本地测试文件说明：早期样本曾放在个人下载目录和临时目录中，公开文档不再引用这些绝对路径。需要复现时，请把样本图或生成脚本整理到仓库内的 `docs/web3_fixtures/` 或 `tmp_imtoken_qr/`，并在提交说明里写明 SHA256。
 
 ## imToken 签名回传金标准
 
@@ -66,10 +63,7 @@ imToken 和 MetaMask 都使用单账户 `crypto-hdkey`，不要使用 `crypto-mu
 - 正确格式示例：`01 d8 25 58 24 ...`，即 key `1` 后面是 `tag 37 + bytes`。
 - 错误格式示例：`01 78 24 ...`，即 key `1` 后面是普通 text string。
 
-电脑端实测输出：
-
-- `/home/ak/下载/imToken_签名回传_测试.png`
-- imToken 扫描后 DApp 成功收到签名
+电脑端实测输出：imToken 扫描后 DApp 成功收到签名。样本图如需入库，应放在 `docs/web3_fixtures/` 并记录 SHA256，不引用个人下载目录。
 
 ## MetaMask 签名回传金标准
 
@@ -92,10 +86,7 @@ imToken 和 MetaMask 都使用单账户 `crypto-hdkey`，不要使用 `crypto-mu
 - recovery id 使用 `0/1`，不要使用 `27/28`
 - 输出二维码内容统一转大写
 
-电脑端实测输出：
-
-- `/home/ak/下载/MetaMask_签名回传_测试.png`
-- MetaMask 扫描后 DApp 成功收到签名
+电脑端实测输出：MetaMask 扫描后 DApp 成功收到签名。样本图如需入库，应放在 `docs/web3_fixtures/` 并记录 SHA256，不引用个人下载目录。
 
 ## TypedData 哈希
 

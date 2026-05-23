@@ -27,8 +27,8 @@ void ui_text_input_destroy(ui_text_input_t *input);
 // Applies the firmware-safe text keyboard maps; no icon glyphs are required.
 void ui_keyboard_apply_safe_text_map(lv_obj_t *keyboard);
 
-// Makes Chinese safe-keyboard labels act as functions if a default LVGL
-// keyboard inserts them before our keyboard callback gets control.
+// Makes safe-keyboard labels act as functions if a default LVGL keyboard
+// inserts them before our keyboard callback gets control.
 void ui_textarea_enable_safe_keyboard_shortcuts(lv_obj_t *textarea);
 
 // Forces the textarea viewport/cursor redraw after on-screen cursor keys.

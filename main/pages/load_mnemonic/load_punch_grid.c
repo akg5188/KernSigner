@@ -1,5 +1,6 @@
 #include "load_punch_grid.h"
 #include "../../core/mnemonic_tools.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
@@ -103,12 +104,17 @@ void load_punch_grid_page_create(lv_obj_t *parent, void (*return_cb)(void),
   return_callback = return_cb;
   success_callback = success_cb;
   punch_screen = theme_create_page_container(parent);
-  punch_menu = ui_menu_create(punch_screen, "点阵/1248", back_cb);
+  punch_menu =
+      ui_menu_create(punch_screen,
+                     i18n_tr_or("input.grid_1248", "Punch Grid / 1248"),
+                     back_cb);
   if (!punch_menu)
     return;
 
-  ui_menu_add_entry(punch_menu, "点阵板", tinyseed_cb);
-  ui_menu_add_entry(punch_menu, "1248打孔", stackbit_cb);
+  ui_menu_add_entry(punch_menu, i18n_tr_or("input.punch_grid", "Punch Grid"),
+                    tinyseed_cb);
+  ui_menu_add_entry(punch_menu, i18n_tr_or("backup.1248_punch", "1248"),
+                    stackbit_cb);
   ui_menu_show(punch_menu);
 }
 

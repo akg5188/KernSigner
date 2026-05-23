@@ -96,15 +96,15 @@
 
 对应代码：
 
-- [sign_psbt_qr](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:340)
-- [sign_psbt_review](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:358)
-- [sign_psbt_export](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:367)
-- [sign_message](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:376)
+- [sign_psbt_qr](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:340)
+- [sign_psbt_review](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:358)
+- [sign_psbt_export](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:367)
+- [sign_message](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:376)
 
 结论：
 
 - `BlueWallet BTC PSBT` 这类本机助记词 BTC 扫码签名主线，已经有基础
-- `TokenPocket`/OKX/Bitget 一类智能卡 Web3 中转签名主线已跑通常见转账，复杂格式继续回归
+- `TokenPocket`/OKX/Bitget 一类智能卡 Web3 扫码签名主线已跑通常见转账，复杂格式继续回归
 
 ### 助记词创建
 
@@ -119,12 +119,12 @@
 
 对应条目：
 
-- [new_cards_entropy](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:156)
-- [new_hex_entropy](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:165)
-- [new_dice_d6](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:183)
-- [new_dice_d20](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:192)
-- [new_words_select](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:174)
-- [new_camera_entropy](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:147)
+- [new_cards_entropy](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:156)
+- [new_hex_entropy](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:165)
+- [new_dice_d6](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:183)
+- [new_dice_d20](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:192)
+- [new_words_select](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:174)
+- [new_camera_entropy](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:147)
 
 结论：
 
@@ -147,11 +147,11 @@
 
 对应条目：
 
-- [load_manual](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:92)
-- [load_digits](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:101)
-- [load_camera](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:74)
-- [load_sd](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:83)
-- [load_encrypted_kef](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:128)
+- [load_manual](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:92)
+- [load_digits](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:101)
+- [load_camera](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:74)
+- [load_sd](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:83)
+- [load_encrypted_kef](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:128)
 
 结论：
 
@@ -176,9 +176,9 @@
 
 对应条目：
 
-- [pi_connect_wallet](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:229)
-- [btc_wallet](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:303)
-- [web3](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:715)
+- [pi_connect_wallet](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:229)
+- [btc_wallet](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:303)
+- [web3](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:715)
 
 结论：
 
@@ -199,10 +199,10 @@
 
 对应条目：
 
-- [pi_self_check](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:238)
-- [device_tests](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:852)
-- [system_overview](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:917)
-- [security_check](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:926)
+- [pi_self_check](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:238)
+- [device_tests](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:852)
+- [system_overview](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:917)
+- [security_check](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:926)
 
 结论：
 
@@ -224,7 +224,7 @@
 
 对应条目：
 
-- [tools_secondary_mnemonic](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:623)
+- [tools_secondary_mnemonic](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:623)
 
 还差：
 
@@ -240,7 +240,7 @@
 
 对应条目：
 
-- [bip85_mnemonic](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:532)
+- [bip85_mnemonic](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:532)
 
 还差：
 
@@ -265,13 +265,13 @@
 
 对应条目：
 
-- [backup_seed_words](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:395)
-- [backup_entropy](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:404)
-- [backup_steel_punch](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:422)
-- [backup_stackbit](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:431)
-- [backup_tinyseed](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:440)
-- [backup_seed_qr](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:440)
-- [backup_kef](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:449)
+- [backup_seed_words](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:395)
+- [backup_entropy](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:404)
+- [backup_steel_punch](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:422)
+- [backup_stackbit](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:431)
+- [backup_tinyseed](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:440)
+- [backup_seed_qr](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:440)
+- [backup_kef](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:449)
 
 还差：
 
@@ -287,12 +287,12 @@
 
 对应条目：
 
-- [web3_okx](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:724)
-- [web3_bitget](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:733)
-- [web3_metamask](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:742)
-- [web3_rabby](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:751)
-- [web3_tokenpocket](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:760)
-- [web3_address](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:769)
+- [web3_okx](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:724)
+- [web3_bitget](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:733)
+- [web3_metamask](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:742)
+- [web3_rabby](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:751)
+- [web3_tokenpocket](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:760)
+- [web3_address](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:769)
 
 还差：
 
@@ -313,8 +313,8 @@
 
 对应条目：
 
-- [addresses](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:477)
-- [custom_derivation](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:330)
+- [addresses](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:477)
+- [custom_derivation](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:330)
 
 还差：
 
@@ -349,13 +349,13 @@
 
 对应条目：
 
-- [smartcard_probe](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c)
-- [smartcard_tools](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:797)
-- [smartcard_reader](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:806)
-- [satochip_xpub](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:815)
-- [satochip_psbt](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:824)
-- [satochip_web3](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:833)
-- [seedkeeper_tools](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:842)
+- [smartcard_probe](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c)
+- [smartcard_tools](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:797)
+- [smartcard_reader](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:806)
+- [satochip_xpub](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:815)
+- [satochip_psbt](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:824)
+- [satochip_web3](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:833)
+- [seedkeeper_tools](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:842)
 
 ### 导入恢复高级链
 
@@ -375,8 +375,8 @@
 
 当前状态：
 
-- [web3_message_sign](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:778)
-- [web3_typed_data](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:787)
+- [web3_message_sign](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:778)
+- [web3_typed_data](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:787)
 
 说明：Satochip Web3 常见转账签名已经跑通；personal_sign、TypedData 和多钱包特殊格式还需要样本回归。
 
@@ -384,15 +384,15 @@
 
 当前没完成：
 
-- [sign_psbt_file](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:349)
+- [sign_psbt_file](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:349)
 
 ### 维护工具 / 加密工具 / 打印机
 
 当前没完成：
 
-- [tools_flash_tools](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:596)
-- [tools_encryption](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:605)
-- [settings_printer](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c:705)
+- [tools_flash_tools](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:596)
+- [tools_encryption](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:605)
+- [settings_printer](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c:705)
 
 ---
 
@@ -415,7 +415,7 @@
 
 对应代码：
 
-- [KRUX_HOME_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:86)
+- [KRUX_HOME_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:86)
 
 ### 助记词工具
 
@@ -431,7 +431,7 @@
 
 对应代码：
 
-- [KRUX_PI_MNEMONIC_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:117)
+- [KRUX_PI_MNEMONIC_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:117)
 
 还差 `satochip-signer` 里常见的：
 
@@ -458,7 +458,7 @@
 
 对应代码：
 
-- [KRUX_PI_CONNECT_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:127)
+- [KRUX_PI_CONNECT_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:127)
 
 还差：
 
@@ -525,22 +525,22 @@
 
 可见菜单入口：
 
-- [KRUX_HOME_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:86)
-- [KRUX_PI_MNEMONIC_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:117)
-- [KRUX_PI_CONNECT_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:127)
-- [KRUX_WEB3_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:135)
-- [KRUX_SETTINGS_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:186)
-- [KRUX_PI_SELF_CHECK_MENU](/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c:144)
+- [KRUX_HOME_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:86)
+- [KRUX_PI_MNEMONIC_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:117)
+- [KRUX_PI_CONNECT_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:127)
+- [KRUX_WEB3_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:135)
+- [KRUX_SETTINGS_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:186)
+- [KRUX_PI_SELF_CHECK_MENU](/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c:144)
 
 功能目录总表：
 
-- [krux_feature_catalog.c](/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c)
+- [signer_feature_catalog.c](/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c)
 
-参考文档：
+参考文档来自外部 `satochip-signer` 项目：
 
-- [/home/ak/123/satochip-signer/docs/离线签名器一页备忘.zh-CN.md](/home/ak/123/satochip-signer/docs/离线签名器一页备忘.zh-CN.md)
-- [/home/ak/123/satochip-signer/docs/树莓派菜单逐项说明.zh-CN.md](/home/ak/123/satochip-signer/docs/树莓派菜单逐项说明.zh-CN.md)
-- [/home/ak/123/satochip-signer/docs/固件与安卓页面功能总览.zh-CN.md](/home/ak/123/satochip-signer/docs/固件与安卓页面功能总览.zh-CN.md)
+- `docs/离线签名器一页备忘.zh-CN.md`
+- `docs/树莓派菜单逐项说明.zh-CN.md`
+- `docs/固件页面功能总览.zh-CN.md`
 
 ---
 

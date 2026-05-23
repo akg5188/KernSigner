@@ -19,6 +19,8 @@ ESP32-P4 USB OTG 口
 
 下载口只用于电脑串口和刷机，不是给 ESP32-P4 当 USB Host 的口。
 
+供电安全提醒：使用合规的带供电 OTG Y 线或真正外接供电 Hub，避免 5V 回灌/反供；不要把外部 5V 打到下载口；接线发热、反复掉电或闻到异味时立即断电。
+
 ## 常见现象
 
 - 读卡器灯只闪一下：供电不足或 VBUS 不稳。
@@ -54,4 +56,4 @@ ESP32-P4 USB OTG 口
 智能卡 -> SeedKeeper -> 重置 -> 错PIN一步 -> 错PUK一步
 ```
 
-直到返回 `FF00`，才代表恢复为空白卡。详细步骤看 [Satochip / SeedKeeper 智能卡实测操作手册](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md)。
+这个流程会消耗 PIN/PUK 重试次数并清空卡内秘密。只在空白卡或确认要清空的测试卡上执行；先确认已有离线备份和剩余次数，真实资产卡不要尝试。直到返回 `FF00`，才代表恢复为空白卡。详细步骤看 [Satochip / SeedKeeper 智能卡实测操作手册](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md)。

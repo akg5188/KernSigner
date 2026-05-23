@@ -11,8 +11,8 @@
 - SeedKeeper 工具：`seedsigner-os/opt/rootfs-overlay/opt/src/seedsigner/helpers/seedkeeper_utils.py`
 - Satochip 签名器：`seedsigner-os/opt/rootfs-overlay/opt/src/seedsigner/helpers/satochip_signer.py`
 - Python CardConnector：`pi-signer-py/vendor/pysatochip/CardConnector.py`
-- Android Satochip 签名器：`app/src/main/java/com/tpsigner/SatochipSigner.kt`
-- Android EVM 编码：`app/src/main/java/com/tpsigner/EvmTxEncoder.kt`
+- Kotlin Satochip 签名参考：`app/src/main/java/com/tpsigner/SatochipSigner.kt`
+- Kotlin EVM 编码参考：`app/src/main/java/com/tpsigner/EvmTxEncoder.kt`
 
 ## Kern 对应文件
 
@@ -20,15 +20,15 @@
 - Satochip 协议：`main/smartcard/smartcard_satochip.c`
 - Satochip 头文件：`main/smartcard/smartcard_satochip.h`
 - Web3 扫码签名：`main/pages/scan/scan.c`
-- Krux 风格菜单和智能卡页：`main/pages/krux_shell/krux_shell.c`
+- Krux 风格菜单和智能卡页：`main/pages/signer_shell/signer_shell.c`
 - Web3 连接码：`main/core/evm.c`
-- 功能目录和文案：`main/krux_port/krux_feature_catalog.c`
+- 功能目录和文案：`main/signer_port/signer_feature_catalog.c`
 
 ## 已迁移方向
 
 - Web3 钱包选择：OKX、Bitget、MetaMask、Rabby、TokenPocket、Keystone。
 - 连接码类型：OKX/Bitget 多账户码，imToken/MetaMask/Rabby/TokenPocket HDKey 码。
-- Web3 请求：`eth-sign-request`、relay 包装、personalSign 基础路径。
+- Web3 请求：`eth-sign-request`、钱包签名请求封装、personalSign 基础路径。
 - 签名结果：`eth-signature`。
 - imToken / MetaMask 已有实测金标准：`docs/WEB3_IMTOKEN_METAMASK_PROVEN_FLOW.zh-CN.md`。
 - Satochip PIN 后签名。

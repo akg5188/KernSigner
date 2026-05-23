@@ -1,4 +1,5 @@
 #include "../../qr/parser.h"
+#include "../../../components/cUR/src/crc32.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -131,6 +132,47 @@ static void test_tp_multifragment_pages(void) {
   qr_parser_destroy(parser);
 }
 
+static void test_tp_multifragment_long_content(void) {
+  const size_t payload_len = 1500;
+  char *payload = malloc(payload_len + 1);
+  ASSERT_TRUE("long tp payload alloc", payload != NULL);
+  memset(payload, 'a', payload_len);
+  payload[payload_len] = '\0';
+
+  uint32_t crc = crc32_calculate((const uint8_t *)payload, payload_len);
+  int needed = snprintf(
+      NULL, 0,
+      "tp:multiFragment-?data=%%7B%%22content%%22%%3A%%22%s_%lu"
+      "%%22%%2C%%22index%%22%%3A%%221%%2F1%%22%%7D",
+      payload, (unsigned long)crc);
+  ASSERT_TRUE("long tp page size", needed > 0);
+
+  char *page = malloc((size_t)needed + 1);
+  ASSERT_TRUE("long tp page alloc", page != NULL);
+  snprintf(page, (size_t)needed + 1,
+           "tp:multiFragment-?data=%%7B%%22content%%22%%3A%%22%s_%lu"
+           "%%22%%2C%%22index%%22%%3A%%221%%2F1%%22%%7D",
+           payload, (unsigned long)crc);
+
+  QRPartParser *parser = qr_parser_create();
+  ASSERT_TRUE("create long tp parser", parser != NULL);
+  int parsed = qr_parser_parse(parser, page);
+  ASSERT_EQ_INT("long tp part index", parsed, 0);
+  ASSERT_EQ_INT("long tp format", qr_parser_get_format(parser), FORMAT_TP_MULTI);
+  ASSERT_TRUE("long tp complete", qr_parser_is_complete(parser));
+
+  size_t result_len = 0;
+  char *result = qr_parser_result(parser, &result_len);
+  ASSERT_TRUE("long tp result", result != NULL);
+  ASSERT_EQ_INT("long tp result len", (int)result_len, (int)payload_len);
+  ASSERT_STREQ("long tp payload", result, payload);
+
+  free(result);
+  qr_parser_destroy(parser);
+  free(page);
+  free(payload);
+}
+
 static void test_non_nul_pmofn_buffer(void) {
   const char payload[] = {'p', '1', 'o', 'f', '1', ' ', 'h', 'e', 'l',
                           'l', 'o', 'p', '2', 'o', 'f', '2', ' ', 'x'};
@@ -176,6 +218,43 @@ static void test_duplicate_pmofn_part_updates(void) {
   qr_parser_destroy(parser);
 }
 
+static void test_uppercase_pmofn_header(void) {
+  QRPartParser *parser = qr_parser_create();
+  ASSERT_TRUE("create parser", parser != NULL);
+  ASSERT_EQ_INT("uppercase pmofn part", qr_parser_parse(parser, "P1OF1 hello"),
+                0);
+  ASSERT_EQ_INT("uppercase pmofn format", qr_parser_get_format(parser),
+                FORMAT_PMOFN);
+  ASSERT_TRUE("uppercase pmofn complete", qr_parser_is_complete(parser));
+
+  size_t result_len = 0;
+  char *result = qr_parser_result(parser, &result_len);
+  ASSERT_TRUE("uppercase pmofn result", result != NULL);
+  ASSERT_EQ_INT("uppercase pmofn result len", (int)result_len, 5);
+  ASSERT_STREQ("uppercase pmofn payload", result, "hello");
+  free(result);
+  qr_parser_destroy(parser);
+}
+
+static void test_invalid_ur_falls_back_to_raw(void) {
+  const char *payload = "ur:eth-sign-request/not-standard";
+  QRPartParser *parser = qr_parser_create();
+  ASSERT_TRUE("create parser", parser != NULL);
+  ASSERT_EQ_INT("invalid ur raw index", qr_parser_parse(parser, payload), 0);
+  ASSERT_EQ_INT("invalid ur raw format", qr_parser_get_format(parser),
+                FORMAT_NONE);
+  ASSERT_TRUE("invalid ur raw complete", qr_parser_is_complete(parser));
+
+  size_t result_len = 0;
+  char *result = qr_parser_result(parser, &result_len);
+  ASSERT_TRUE("invalid ur raw result", result != NULL);
+  ASSERT_EQ_INT("invalid ur raw result len", (int)result_len,
+                (int)strlen(payload));
+  ASSERT_STREQ("invalid ur raw payload", result, payload);
+  free(result);
+  qr_parser_destroy(parser);
+}
+
 static void assert_invalid_pmofn(const char *name, const char *payload) {
   QRPartParser *parser = qr_parser_create();
   ASSERT_TRUE("create parser", parser != NULL);
@@ -198,8 +277,11 @@ int main(void) {
   test_tpr1_relay_pages();
   test_w3r1_relay_pages();
   test_tp_multifragment_pages();
+  test_tp_multifragment_long_content();
   test_non_nul_pmofn_buffer();
   test_duplicate_pmofn_part_updates();
+  test_uppercase_pmofn_header();
+  test_invalid_ur_falls_back_to_raw();
   test_invalid_pmofn_headers();
   puts("PASS: qr relay parser");
   return 0;

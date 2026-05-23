@@ -29,12 +29,21 @@ Compare the digests shown on screen against the values above (and against those 
 Before trusting these keys, verify the GPG signature and checksums:
 
 ```bash
+cd /home/ak/123/Kern/signer_secure_boot
 # 1. Verify the GPG signature on SHA256SUMS
 gpg --verify SHA256SUMS.sig SHA256SUMS
 
 # 2. Verify all file checksums match
 sha256sum -c SHA256SUMS
 ```
+
+Expected signing key fingerprint for this signature:
+
+```text
+CD48 298A 386C E34F 3A9F  EE3E B9AA 47C3 E81D D14C
+```
+
+Import the corresponding public key only from the project release channel you trust, and confirm its UID/fingerprint there before relying on the signature.
 
 You can also compute the hex representation of the `.bin` digest files to compare against the expected values above:
 
@@ -53,6 +62,13 @@ When you navigate to **Settings > Secure Boot > Lock with Developer Keys**, the 
 4. Burn the digests into eFuse KEY0 and KEY1, then set the `SECURE_BOOT_EN` bit.
 
 **Before confirming**, verify that the digests shown on screen match the values in this README and in the release notes. This ensures the firmware you are running contains the authentic developer keys.
+
+Activation checklist before burning eFuses:
+
+- Confirm the bootloader and app you intend to keep using are signed with the matching private keys.
+- Confirm the private keys, recovery plan, and release artifacts are backed up offline.
+- Confirm power is stable and the device is not running an unverified test firmware.
+- Confirm you understand eFuse burning is irreversible and may permanently block unsigned builds.
 
 After lockdown, only firmware signed with the corresponding private keys will boot on the device.
 

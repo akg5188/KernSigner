@@ -14,7 +14,7 @@ KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, 
 
 It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for the Waveshare ESP32-P4 4.3-inch touch-screen device.
 
-**Project identity:** KernSigner is a heavily modified derivative built from the upstream Kern codebase. It is not the official Kern project, not an official Kern firmware release, and should not be confused with upstream KernSigner.
+**Project identity:** KernSigner is a heavily modified derivative built from the upstream Kern codebase. It is not the official Kern project, not an official Kern firmware release, and should not be confused with upstream Kern.
 
 One of the most important upstream references here is [3rdIteration/SeedSigner](https://github.com/3rdIteration/seedsigner); its wallet flow, UX patterns, and smart-card-adjacent thinking influenced a large part of the project structure.
 
@@ -24,31 +24,31 @@ The current tree is a **test-funds validation build**, not an audited production
 
 ## Screenshots / 界面截图
 
-当前 GitHub 截图已经换成 KernSigner 最新界面，不再保留上游 KernSigner 原始截图。
+当前 GitHub 截图已经换成 KernSigner 最新界面，不再保留上游 Kern 原始截图。
 
-最新公开截图批次：[docs/screens/current_20260522_193505](docs/screens/current_20260522_193505)
+最新公开截图批次：[docs/screens/current_20260523_163539](docs/screens/current_20260523_163539)
 
-- PNG 截图：296 张，已入库用于 GitHub 浏览。
+- 页面 PNG 截图：297 张，已入库用于 GitHub 浏览。
+- 拼图 PNG：3 张，包含关键页面、全部首屏、全部底部截图。
 - BMP 截图：本地重复导出文件，不上传，避免仓库过大。
-- 全量 KernSigner 页面：146 个。
-- 自动检查结果：缺字 0，smoke 失败 0，scroll 失败 0，截图生成失败 0。
-- 备注：模拟器交互检查里 `custom_derivation` 有 2 个导航预期不一致，不影响本批截图完整性。
+- 全量 KernSigner 页面：150 个。
+- 自动检查结果：缺字 0，截图失败 0，smoke 失败 0，scroll 失败 0，交互失败 0。
 
 | 首页 | 连接钱包 | OKX 助记词 | OKX 智能卡 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/current_20260522_193505/krux/01_home.png" width="180" alt="KernSigner home screen"> | <img src="docs/screens/current_20260522_193505/krux/02_pi_connect_wallet.png" width="180" alt="Connect wallet menu"> | <img src="docs/screens/current_20260522_193505/krux/08_web3_okx_mnemonic.png" width="180" alt="OKX mnemonic wallet flow"> | <img src="docs/screens/current_20260522_193505/krux/09_web3_okx_satochip.png" width="180" alt="OKX Satochip smart-card flow"> |
+| <img src="docs/screens/current_20260523_163539/krux/01_home.png" width="180" alt="KernSigner home screen"> | <img src="docs/screens/current_20260523_163539/krux/02_pi_connect_wallet.png" width="180" alt="Connect wallet menu"> | <img src="docs/screens/current_20260523_163539/krux/09_web3_okx_mnemonic.png" width="180" alt="OKX mnemonic wallet flow"> | <img src="docs/screens/current_20260523_163539/krux/10_web3_okx_satochip.png" width="180" alt="OKX Satochip smart-card flow"> |
 
 | BTC 钱包 | 自定义派生 | Satochip | SeedKeeper |
 | --- | --- | --- | --- |
-| <img src="docs/screens/current_20260522_193505/krux/18_btc_wallet.png" width="180" alt="Bitcoin wallet menu"> | <img src="docs/screens/current_20260522_193505/krux/25_custom_derivation.png" width="180" alt="Custom derivation menu"> | <img src="docs/screens/current_20260522_193505/krux/29_smartcard_satochip_tools.png" width="180" alt="Satochip tools menu"> | <img src="docs/screens/current_20260522_193505/krux/54_smartcard_seedkeeper_status_page.png" width="180" alt="SeedKeeper status page"> |
+| <img src="docs/screens/current_20260523_163539/krux/21_btc_wallet.png" width="180" alt="Bitcoin wallet menu"> | <img src="docs/screens/current_20260523_163539/krux/28_custom_derivation.png" width="180" alt="Derived address menu"> | <img src="docs/screens/current_20260523_163539/krux/32_smartcard_satochip_tools.png" width="180" alt="Satochip tools menu"> | <img src="docs/screens/current_20260523_163539/krux/57_smartcard_seedkeeper_status_page.png" width="180" alt="SeedKeeper status page"> |
 
-| 扫码签名 | BTC 签名来源 | EVM 转账确认 | EVM DApp 签名 |
+| 扫码签名 | BTC 签名来源 | 助记词派生 | 智能卡派生 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/current_20260522_193505/krux/127_tools_qr_capture.png" width="180" alt="QR signing scanner entry"> | <img src="docs/screens/current_20260522_193505/krux/19_btc_mnemonic.png" width="180" alt="Bitcoin mnemonic signing source"> | <img src="docs/screens/current_20260522_193505/signing/web3_tx_confirm.png" width="180" alt="EVM transfer confirmation screen"> | <img src="docs/screens/current_20260522_193505/signing/web3_dapp_confirm.png" width="180" alt="EVM DApp signature confirmation screen"> |
+| <img src="docs/screens/current_20260523_163539/krux/130_tools_qr_capture.png" width="180" alt="QR signing scanner entry"> | <img src="docs/screens/current_20260523_163539/krux/22_btc_mnemonic.png" width="180" alt="Bitcoin mnemonic signing source"> | <img src="docs/screens/current_20260523_163539/krux/151_custom_derivation_mnemonic.png" width="180" alt="Mnemonic derived address screen"> | <img src="docs/screens/current_20260523_163539/krux/152_custom_derivation_smartcard.png" width="180" alt="Smartcard derived address screen"> |
 
 | 创建助记词 | 骰子熵 | 点阵备份 | 系统检测 |
 | --- | --- | --- | --- |
-| <img src="docs/screens/current_20260522_193505/krux/101_new_mnemonic.png" width="180" alt="Create mnemonic menu"> | <img src="docs/screens/current_20260522_193505/krux/102_new_dice_d6.png" width="180" alt="D6 dice entropy input"> | <img src="docs/screens/current_20260522_193505/krux/119_backup_grid.png" width="180" alt="Mnemonic punch grid backup"> | <img src="docs/screens/current_20260522_193505/krux/140_system_overview.png" width="180" alt="System overview page"> |
+| <img src="docs/screens/current_20260523_163539/krux/104_new_mnemonic.png" width="180" alt="Create mnemonic menu"> | <img src="docs/screens/current_20260523_163539/krux/105_new_dice_d6.png" width="180" alt="D6 dice entropy input"> | <img src="docs/screens/current_20260523_163539/krux/122_backup_grid.png" width="180" alt="Mnemonic punch grid backup"> | <img src="docs/screens/current_20260523_163539/krux/144_system_overview.png" width="180" alt="System overview page"> |
 
 ## What Works
 
@@ -82,8 +82,8 @@ The current tree is a **test-funds validation build**, not an audited production
 
 - OKX Wallet：EVM 连接码和常见测试转账签名已跑通。
 - Bitget Wallet：EVM 连接码和常见测试转账签名已跑通。
-- imToken：电脑端连接码和 TypedData 签名回传已跑通，使用单账户 `crypto-hdkey` + `eth-signature`。
-- MetaMask：电脑端连接码和 TypedData 签名回传已跑通，使用单账户 `crypto-hdkey` + `eth-signature`。
+- imToken：电脑端连接码和单账户 `crypto-hdkey` / `eth-signature` 回传样本已跑通；TypedData/EIP-712 仍按非生产能力处理。
+- MetaMask：电脑端连接码和单账户 `crypto-hdkey` / `eth-signature` 回传样本已跑通；TypedData/EIP-712 仍按非生产能力处理。
 - Rabby：有连接入口，按 Keystone 单账户连接码方向接入，仍需更多实扫回归。
 - TokenPocket：有连接入口，按 Keystone 单账户连接码方向接入，特殊二维码格式仍需专项样本回归。
 - Keystone：作为通用硬件钱包兼容格式使用，不是独立官方适配保证。
@@ -119,7 +119,7 @@ KernSigner currently supports **only** this development board:
 
 Other Waveshare ESP32-P4 display boards are not supported by this project unless you independently port, test, and fix the board-specific display, touch, camera, UI layout, and power paths.
 
-An OV5647 camera module is required for camera and QR workflows.
+An OV5647 camera module is required for camera and QR workflows. On first use, focus the camera manually with a normal QR code at roughly 10-20 cm before testing dense wallet QR codes.
 
 ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board includes an ESP32-C6 companion chip, but KernSigner's signer model treats the firmware as an offline, QR-first device.
 
@@ -179,7 +179,6 @@ simulator/          SDL2 desktop simulator
 scripts/            Format, test, CI, and release helpers
 tools/              Delivery, production-check, and asset-baking helpers
 docs/               Acceptance plans, security gates, and delivery records
-wallet/             Android relay wallet app for high-density QR handoff
 hardware/           3D printed case files, OpenSCAD source, and fit notes
 ```
 
@@ -187,6 +186,7 @@ hardware/           3D printed case files, OpenSCAD source, and fit notes
 
 Prebuilt firmware is included for beginners who only want to flash the supported board:
 
+- Firmware notice: [docs/UNTESTED_FIRMWARE_NOTICE.md](docs/UNTESTED_FIRMWARE_NOTICE.md)
 - Full one-file firmware: [firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin](firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin)
 - App-only firmware: [firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin](firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin)
 - Beginner flashing guide: [firmware/wave_43/README.zh-CN.md](firmware/wave_43/README.zh-CN.md)
@@ -194,17 +194,12 @@ Prebuilt firmware is included for beginners who only want to flash the supported
 
 For a first-time board or a board with unknown firmware, use the full firmware at offset `0x0`. If the board already runs this project and you only want to update the app, use the app-only firmware at offset `0x20000`.
 
-Android relay APK for dense QR handoff:
-
-- Included copy: [wallet/dist/smartcard-compat-v0.1.19-usbt1-release.apk](wallet/dist/smartcard-compat-v0.1.19-usbt1-release.apk)
-- Release download mirror: [akg5188/satochip-signer releases](https://github.com/akg5188/satochip-signer/releases)
-- Android relay guide: [docs/ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](docs/ANDROID_RELAY_WALLET_GUIDE.zh-CN.md)
-
 Dense QR scanning tip:
 
+- First-time ESP32-P4 4.3 camera setup needs manual OV5647 focus: use a normal black/white QR at 10-20 cm, rotate the lens ring gently until module edges are sharp, then test OKX/Bitget/TokenPocket dynamic QR.
 - If a phone wallet shows a very small, high-density signing QR, first try displaying the QR on a computer screen and zooming it larger before scanning with the ESP32-P4 camera.
-- If direct scanning is still unreliable, use the Android relay app to convert the original high-density QR into larger, lower-density QR pages for KernSigner to scan.
-- The relay app does not store private keys and does not sign transactions; it only reformats QR handoff data.
+- If direct scanning is still unreliable, collect a clear photo or short video and validate it on desktop with the ZBar/UR parser workflow before changing firmware.
+- OKX circular/dot QR debugging notes are in [docs/OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md](docs/OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md).
 
 ## Prerequisites
 
@@ -339,6 +334,7 @@ esptool --chip esp32p4 --baud 460800 write-flash 0x0 \
 To preserve NVS data, flash individual binaries instead:
 
 ```bash
+cd firmware/wave_43
 esptool --chip esp32p4 --baud 460800 write-flash \
   0x2000 bootloader.bin \
   0x8000 partition-table.bin \
@@ -360,7 +356,6 @@ esptool --chip esp32p4 --baud 460800 write-flash \
 - [Backup and recovery guide](docs/BACKUP_AND_RECOVERY_GUIDE.zh-CN.md)
 - [Build, flash, and debug guide](docs/BUILD_FLASH_DEBUG_GUIDE.zh-CN.md)
 - [General troubleshooting](docs/TROUBLESHOOTING_GENERAL.zh-CN.md)
-- [Android build environment](docs/安卓构建环境准备.zh-CN.md)
 - [Third-party notices](docs/THIRD_PARTY.md)
 - [Hardware overview and OTG notes](docs/HARDWARE_OVERVIEW_AND_OTG.md)
 - [First delivery note](docs/README_FIRST_DELIVERY.md)

@@ -12,33 +12,27 @@ static void battery_update(lv_obj_t *label) {
   bsp_pmic_chg_t chg = BSP_PMIC_CHG_DISCHARGING;
   bsp_pmic_get_charge_status(&chg);
 
-  const char *battery_icon;
   lv_color_t color;
   if (pct >= 76) {
-    battery_icon = "电池满";
     color = yes_color();
   } else if (pct >= 40) {
-    battery_icon = "电池高";
     color = main_color();
   } else if (pct >= 20) {
-    battery_icon = "电池中";
     color = highlight_color();
   } else if (pct >= 5) {
-    battery_icon = "电池低";
     color = error_color();
   } else {
-    battery_icon = "电池空";
     color = error_color();
   }
 
   char buf[16];
   if (chg == BSP_PMIC_CHG_CHARGING) {
-    snprintf(buf, sizeof(buf), "%s充", battery_icon);
+    snprintf(buf, sizeof(buf), "CHG %u%%", (unsigned)pct);
     color = yes_color();
-    lv_label_set_text(label, buf);
   } else {
-    lv_label_set_text(label, battery_icon);
+    snprintf(buf, sizeof(buf), "BAT %u%%", (unsigned)pct);
   }
+  lv_label_set_text(label, buf);
   lv_obj_set_style_text_color(label, color, 0);
 }
 

@@ -1,4 +1,5 @@
 #include "passphrase.h"
+#include "../i18n/i18n.h"
 #include "../ui/dialog.h"
 #include "../ui/input_helpers.h"
 #include "../ui/theme.h"
@@ -18,7 +19,9 @@ static void back_confirm_cb(bool result, void *user_data) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("放弃输入？", back_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
+  dialog_show_confirm(i18n_tr_or("wallet.discard_passphrase_confirm",
+                                 "Discard input?"),
+                      back_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
 
 static void confirm_passphrase_cb(bool result, void *user_data) {
@@ -29,7 +32,9 @@ static void confirm_passphrase_cb(bool result, void *user_data) {
 
 static void keyboard_ready_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("应用到钱包？", confirm_passphrase_cb, NULL,
+  dialog_show_confirm(i18n_tr_or("wallet.apply_to_wallet_confirm",
+                                 "Apply to wallet?"),
+                      confirm_passphrase_cb, NULL,
                       DIALOG_STYLE_OVERLAY);
 }
 
@@ -46,14 +51,17 @@ void passphrase_page_create(lv_obj_t *parent, void (*return_cb)(void),
   lv_obj_clear_flag(passphrase_screen, LV_OBJ_FLAG_SCROLLABLE);
 
   // Create title label
-  theme_create_page_title(passphrase_screen, "密码短语");
+  theme_create_page_title(passphrase_screen,
+                          i18n_tr_or("wallet.passphrase", "Passphrase"));
 
   // Back button
   ui_create_back_button(passphrase_screen, back_btn_cb);
 
   // Text input (textarea + keyboard)
-  ui_text_input_create(&text_input, passphrase_screen, "输入口令", true,
-                       keyboard_ready_cb);
+  ui_text_input_create(&text_input, passphrase_screen,
+                       i18n_tr_or("wallet.enter_passphrase",
+                                  "Enter passphrase"),
+                       true, keyboard_ready_cb);
 }
 
 void passphrase_page_show(void) {

@@ -1,6 +1,7 @@
 #include "stackbit_restore.h"
 
 #include "../../core/mnemonic_tools.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/menu.h"
@@ -17,6 +18,9 @@
 #include <wally_bip39.h>
 
 #define STACKBIT_MAX_WORDS 24
+#define ACTION_BTN_PREVIOUS 0
+#define ACTION_BTN_CLEAR 1
+#define ACTION_BTN_CONFIRM 2
 
 static lv_obj_t *page_screen = NULL;
 static lv_obj_t *back_btn = NULL;
@@ -38,7 +42,7 @@ static uint16_t entered_indices[STACKBIT_MAX_WORDS] = {0};
 static int current_digits[4] = {0, 0, 0, 0};
 static bool page_ready = false;
 
-static const char *ACTION_MAP[] = {"上个", "清零", "\n", "确认", ""};
+static const char *ACTION_MAP[] = {NULL, NULL, "\n", NULL, ""};
 static const int STACKBIT_TOP_LABELS[7] = {1, 1, 2, 1, 2, 1, 2};
 static const int STACKBIT_BOTTOM_LABELS[7] = {2, 4, 8, 4, 8, 4, 8};
 static const int STACKBIT_CELL_MAP[14][2] = {
@@ -51,6 +55,12 @@ static void render_word_editor(void);
 static void update_word_preview(void);
 static void cleanup_word_editor(void);
 static void abandon_confirm_cb(bool confirmed, void *user_data);
+
+static void update_action_map(void) {
+  ACTION_MAP[0] = i18n_tr_or("dialog.previous", "Previous");
+  ACTION_MAP[1] = i18n_tr_or("dialog.clear", "Clear");
+  ACTION_MAP[3] = i18n_tr_or("common.confirm", "Confirm");
+}
 
 static void back_to_parent(void) {
   stackbit_restore_page_hide();
@@ -111,7 +121,9 @@ static void go_back_event(lv_event_t *e) {
   }
   if (current_word_index > 0 || current_digits[0] || current_digits[1] ||
       current_digits[2] || current_digits[3]) {
-    dialog_show_confirm("放弃恢复？", abandon_confirm_cb, NULL,
+    dialog_show_confirm(i18n_tr_or("input.abandon_restore_confirm",
+                                   "Abandon restore?"),
+                        abandon_confirm_cb, NULL,
                         DIALOG_STYLE_OVERLAY);
   } else {
     back_to_parent();
@@ -133,7 +145,7 @@ static void finish_restore(void) {
   char *mnemonic =
       mnemonic_tools_from_indices(entered_indices, (size_t)total_words);
   if (!mnemonic) {
-    show_error("序号无效");
+    show_error(i18n_tr_or("input.invalid_index", "Invalid index"));
     return;
   }
 
@@ -156,17 +168,22 @@ static void update_word_preview(void) {
     word = bip39_get_word_by_index(wordlist, (size_t)idx);
 
   char status[48];
-  snprintf(status, sizeof(status), "词 %d/%d", current_word_index + 1,
-           total_words);
+  snprintf(status, sizeof(status),
+           i18n_tr_or("wallet.word_format", "Word %d/%d"),
+           current_word_index + 1, total_words);
   lv_label_set_text(status_label, status);
 
   char digits_text[32];
-  snprintf(digits_text, sizeof(digits_text), "序号：%d%d%d%d", current_digits[0],
-           current_digits[1], current_digits[2], current_digits[3]);
+  snprintf(digits_text, sizeof(digits_text),
+           i18n_tr_or("input.index_format", "Index: %d%d%d%d"),
+           current_digits[0], current_digits[1], current_digits[2],
+           current_digits[3]);
   lv_label_set_text(digits_label, digits_text);
 
   char word_text[80];
-  snprintf(word_text, sizeof(word_text), "词：%s", word ? word : "未知");
+  snprintf(word_text, sizeof(word_text),
+           i18n_tr_or("wallet.word_label_format", "Word: %s"),
+           word ? word : i18n_tr_or("common.unknown", "Unknown"));
   lv_label_set_text(word_label, word_text);
 
   for (int i = 0; i < 14; i++) {
@@ -202,16 +219,13 @@ static void digit_toggle_event(lv_event_t *e) {
 static void action_event(lv_event_t *e) {
   lv_obj_t *obj = lv_event_get_target(e);
   uint32_t id = lv_btnmatrix_get_selected_btn(obj);
-  const char *txt = lv_btnmatrix_get_btn_text(obj, id);
-  if (!txt)
-    return;
 
-  if (strcmp(txt, "清零") == 0) {
+  if (id == ACTION_BTN_CLEAR) {
     memset(current_digits, 0, sizeof(current_digits));
     update_word_preview();
     return;
   }
-  if (strcmp(txt, "上个") == 0) {
+  if (id == ACTION_BTN_PREVIOUS) {
     if (current_word_index <= 0)
       return;
     current_word_index--;
@@ -223,12 +237,13 @@ static void action_event(lv_event_t *e) {
     update_word_preview();
     return;
   }
-  if (strcmp(txt, "确认") != 0)
+  if (id != ACTION_BTN_CONFIRM)
     return;
 
   int index = current_index_value();
   if (index < 0 || index > 2047) {
-    show_error("序号超出 0-2047");
+    show_error(i18n_tr_or("input.index_out_of_range",
+                          "Index must be 0-2047"));
     return;
   }
 
@@ -294,7 +309,8 @@ static void render_word_editor(void) {
   destroy_word_count_menu();
   page_ready = true;
 
-  title_label = theme_create_page_title(page_screen, "1248打孔板");
+  title_label = theme_create_page_title(
+      page_screen, i18n_tr_or("input.grid_1248", "1248 punch"));
 
   status_label = theme_create_label(page_screen, "", false);
   lv_obj_set_style_text_font(status_label, theme_font_medium(), 0);
@@ -339,10 +355,14 @@ static void render_word_editor(void) {
                         LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
   lv_obj_t *group_row = create_clean_row(digit_grid);
-  create_label_cell(group_row, "千", 52);
-  create_label_cell(group_row, "百", 109);
-  create_label_cell(group_row, "十", 109);
-  create_label_cell(group_row, "个", 109);
+  create_label_cell(group_row,
+                    i18n_tr_or("input.digit_thousands", "Thou"), 52);
+  create_label_cell(group_row,
+                    i18n_tr_or("input.digit_hundreds", "Hund"), 109);
+  create_label_cell(group_row, i18n_tr_or("input.digit_tens", "Tens"),
+                    109);
+  create_label_cell(group_row, i18n_tr_or("input.digit_ones", "Ones"),
+                    109);
 
   lv_obj_t *top_row = create_clean_row(digit_grid);
   for (int col = 0; col < 7; col++)
@@ -353,6 +373,7 @@ static void render_word_editor(void) {
     create_digit_button(bottom_row, STACKBIT_BOTTOM_LABELS[col], 7 + col);
 
   action_matrix = lv_btnmatrix_create(page_screen);
+  update_action_map();
   lv_btnmatrix_set_map(action_matrix, ACTION_MAP);
   lv_obj_set_size(action_matrix, LV_PCT(92), 112);
   lv_obj_align(action_matrix, LV_ALIGN_BOTTOM_MID, 0, -12);
@@ -381,16 +402,25 @@ static void create_word_count_menu(void) {
   destroy_word_count_menu();
   page_ready = false;
 
-  title_label = theme_create_page_title(page_screen, "1248打孔板");
+  title_label = theme_create_page_title(
+      page_screen, i18n_tr_or("input.grid_1248", "1248 punch"));
 
-  word_count_menu = ui_menu_create(page_screen, "词数", word_count_back_cb);
+  word_count_menu =
+      ui_menu_create(page_screen,
+                     i18n_tr_or("wallet.word_count", "Word count"),
+                     word_count_back_cb);
   if (!word_count_menu)
     return;
-  ui_menu_add_entry(word_count_menu, "12词", select_12_cb);
-  ui_menu_add_entry(word_count_menu, "15词", select_15_cb);
-  ui_menu_add_entry(word_count_menu, "18词", select_18_cb);
-  ui_menu_add_entry(word_count_menu, "21词", select_21_cb);
-  ui_menu_add_entry(word_count_menu, "24词", select_24_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.12_words", "12 words"),
+                    select_12_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.15_words", "15 words"),
+                    select_15_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.18_words", "18 words"),
+                    select_18_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.21_words", "21 words"),
+                    select_21_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.24_words", "24 words"),
+                    select_24_cb);
   ui_menu_show(word_count_menu);
 }
 

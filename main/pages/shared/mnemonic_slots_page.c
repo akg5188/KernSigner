@@ -1,6 +1,7 @@
 #include "mnemonic_slots_page.h"
 #include "../../core/key.h"
 #include "../../core/mnemonic_slots.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
@@ -49,9 +50,20 @@ static void style_slot_button(int index, const mnemonic_slot_info_t *info,
     return;
 
   char text[96];
-  snprintf(text, sizeof(text), "%s助记词 %u\n钱包指纹 %s\n%u 词",
-           current ? "当前 " : "", (unsigned)(slot_index + 1),
-           info->fingerprint, (unsigned)info->word_count);
+  if (current) {
+    snprintf(text, sizeof(text),
+             i18n_tr_or("wallet.current_slot_format",
+                        "Current mnemonic %u\nWallet fingerprint %s\n%u "
+                        "words"),
+             (unsigned)(slot_index + 1), info->fingerprint,
+             (unsigned)info->word_count);
+  } else {
+    snprintf(text, sizeof(text),
+             i18n_tr_or("wallet.slot_format",
+                        "Mnemonic %u\nWallet fingerprint %s\n%u words"),
+             (unsigned)(slot_index + 1), info->fingerprint,
+             (unsigned)info->word_count);
+  }
   lv_label_set_text(label, text);
   lv_obj_set_width(label, LV_PCT(96));
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
@@ -75,7 +87,8 @@ static void select_slot_cb(void) {
   (void)key_get_session_passphrase(&passphrase);
   if (!mnemonic_slots_load(slot, passphrase)) {
     SECURE_FREE_STRING(passphrase);
-    dialog_show_error("切换失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("wallet.switch_failed", "Switch failed"),
+                      NULL, 0);
     return;
   }
   SECURE_FREE_STRING(passphrase);
@@ -94,7 +107,10 @@ void mnemonic_slots_page_create(lv_obj_t *parent, void (*return_cb)(void),
   displayed_count = 0;
 
   slots_screen = theme_create_page_container(parent);
-  slots_menu = ui_menu_create(slots_screen, "选择助记词", back_cb);
+  slots_menu =
+      ui_menu_create(slots_screen,
+                     i18n_tr_or("wallet.select_mnemonic", "Select Mnemonic"),
+                     back_cb);
   if (!slots_menu)
     return;
   style_slots_menu_layout();
@@ -112,12 +128,15 @@ void mnemonic_slots_page_create(lv_obj_t *parent, void (*return_cb)(void),
     bool current = has_current && strcmp(current_fp, info.fingerprint) == 0;
     int entry_index = slots_menu->config.entry_count;
     displayed_slots[displayed_count++] = i;
-    ui_menu_add_entry(slots_menu, "助记词", select_slot_cb);
+    ui_menu_add_entry(slots_menu, i18n_tr_or("menu.mnemonic", "Mnemonic"),
+                      select_slot_cb);
     style_slot_button(entry_index, &info, current, i);
   }
 
   if (displayed_count == 0) {
-    dialog_show_error("没有会话助记词", return_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.no_session_mnemonic",
+                                 "No session mnemonics"),
+                      return_cb, 0);
     return;
   }
 }

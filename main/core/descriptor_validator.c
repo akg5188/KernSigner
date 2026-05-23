@@ -2,6 +2,7 @@
 #include "key.h"
 #include "wallet.h"
 #include "../utils/secure_mem.h"
+#include "i18n/i18n.h"
 #include <esp_log.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -456,36 +457,51 @@ static void check_attributes_and_verify(struct wally_descriptor *descriptor,
   char message[512];
   int offset = 0;
   offset += snprintf(message + offset, sizeof(message) - offset,
-                     "Descriptor requires different settings:\n\n");
+                     "%s\n\n",
+                     i18n_tr_or("descriptor.requires_different_settings",
+                                "Descriptor requires different settings:"));
 
   if (network_mismatch) {
     const char *current_net =
-        (wallet_network == WALLET_NETWORK_MAINNET) ? "主网" : "测试网";
+        (wallet_network == WALLET_NETWORK_MAINNET)
+            ? i18n_tr_or("settings.mainnet", "Mainnet")
+            : i18n_tr_or("settings.testnet", "Testnet");
     const char *target_net =
-        (desc_network == WALLET_NETWORK_MAINNET) ? "主网" : "测试网";
+        (desc_network == WALLET_NETWORK_MAINNET)
+            ? i18n_tr_or("settings.mainnet", "Mainnet")
+            : i18n_tr_or("settings.testnet", "Testnet");
     offset += snprintf(message + offset, sizeof(message) - offset,
-                       "#FFFFFF   Network: %s -> ##FF6600 %s#\n", current_net,
+                       "#FFFFFF   %s: %s -> ##FF6600 %s#\n",
+                       i18n_tr_or("settings.network", "Network"), current_net,
                        target_net);
   }
 
   if (policy_mismatch) {
     const char *current_pol =
-        (wallet_policy == WALLET_POLICY_SINGLESIG) ? "Single-sig" : "Multisig";
+        (wallet_policy == WALLET_POLICY_SINGLESIG)
+            ? i18n_tr_or("settings.single_sig", "Single-sig")
+            : i18n_tr_or("settings.multi_sig", "Multisig");
     const char *target_pol =
-        (desc_policy == WALLET_POLICY_SINGLESIG) ? "Single-sig" : "Multisig";
+        (desc_policy == WALLET_POLICY_SINGLESIG)
+            ? i18n_tr_or("settings.single_sig", "Single-sig")
+            : i18n_tr_or("settings.multi_sig", "Multisig");
     offset += snprintf(message + offset, sizeof(message) - offset,
-                       "#FFFFFF   Policy: %s -> ##FF6600 %s#\n", current_pol,
+                       "#FFFFFF   %s: %s -> ##FF6600 %s#\n",
+                       i18n_tr_or("settings.policy", "Policy"), current_pol,
                        target_pol);
   }
 
   if (account_mismatch) {
     offset += snprintf(message + offset, sizeof(message) - offset,
-                       "#FFFFFF   Account: %u -> ##FF6600 %u#\n",
+                       "#FFFFFF   %s: %u -> ##FF6600 %u#\n",
+                       i18n_tr_or("settings.account", "Account"),
                        wallet_account, desc_account);
   }
 
   snprintf(message + offset, sizeof(message) - offset,
-           "\nApply these changes?");
+           "\n%s",
+           i18n_tr_or("descriptor.apply_setting_changes",
+                      "Apply these changes?"));
 
   // Request confirmation via callback (UI-agnostic)
   if (current_ctx->confirm_cb) {

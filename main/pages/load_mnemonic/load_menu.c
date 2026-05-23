@@ -5,6 +5,7 @@
 #include "../../core/kef.h"
 #include "../../core/key.h"
 #include "../../core/storage.h"
+#include "../../i18n/i18n.h"
 #include "../../qr/encoder.h"
 #include "../../qr/scanner.h"
 #include "../../ui/menu.h"
@@ -250,17 +251,29 @@ void load_menu_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   return_callback = return_cb;
   load_menu_screen = theme_create_page_container(parent);
 
-  load_menu = ui_menu_create(load_menu_screen, "导入", back_cb);
+  load_menu = ui_menu_create(load_menu_screen,
+                             i18n_tr_or("menu.import", "Import"), back_cb);
   if (!load_menu)
     return;
 
-  ui_menu_add_entry(load_menu, "二维码", from_qr_code_cb);
-  ui_menu_add_entry(load_menu, "手动输入", from_manual_input_cb);
-  ui_menu_add_entry(load_menu, "序号", from_index_import_cb);
-  ui_menu_add_entry(load_menu, "存储卡", from_sd_cb);
-  ui_menu_add_entry(load_menu, "加密备份", from_encrypted_backup_cb);
-  ui_menu_add_entry(load_menu, "钢板打孔", from_steel_restore_cb);
-  ui_menu_add_entry(load_menu, "点阵/1248", from_punch_grid_cb);
+  ui_menu_add_entry(load_menu, i18n_tr_or("input.qr_code", "QR code"),
+                    from_qr_code_cb);
+  ui_menu_add_entry(load_menu,
+                    i18n_tr_or("input.manual_input", "Manual input"),
+                    from_manual_input_cb);
+  ui_menu_add_entry(load_menu, i18n_tr_or("input.index_import", "Index"),
+                    from_index_import_cb);
+  ui_menu_add_entry(load_menu, i18n_tr_or("storage.storage_card", "SD card"),
+                    from_sd_cb);
+  ui_menu_add_entry(load_menu,
+                    i18n_tr_or("backup.encrypted_backup",
+                               "Encrypted backup"),
+                    from_encrypted_backup_cb);
+  ui_menu_add_entry(load_menu, i18n_tr_or("input.steel_restore", "Steel"),
+                    from_steel_restore_cb);
+  ui_menu_add_entry(load_menu,
+                    i18n_tr_or("input.grid_1248", "Punch Grid / 1248"),
+                    from_punch_grid_cb);
   ui_menu_show(load_menu);
 }
 

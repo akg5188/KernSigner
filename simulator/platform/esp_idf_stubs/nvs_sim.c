@@ -8,7 +8,7 @@
  *   [key_len : 1 byte][key : key_len bytes][type : 1 byte]
  *   [value_len_lo : 1 byte][value_len_hi : 1 byte][value : value_len bytes]
  *
- * Types: 0x01 = u8, 0x02 = u16, 0x03 = blob
+ * Types: 0x01 = u8, 0x02 = u16, 0x03 = blob, 0x04 = string
  */
 
 #include "nvs.h"
@@ -41,6 +41,7 @@ static const char *nvs_dir(void) {
 #define NVS_TYPE_U8      0x01
 #define NVS_TYPE_U16     0x02
 #define NVS_TYPE_BLOB    0x03
+#define NVS_TYPE_STR     0x04
 
 /* -------------------------------------------------------------------------- */
 /* In-memory key-value list                                                    */
@@ -299,6 +300,15 @@ esp_err_t nvs_set_blob(nvs_handle_t handle, const char *key, const void *value,
                        (uint16_t)length);
 }
 
+esp_err_t nvs_set_str(nvs_handle_t handle, const char *key,
+                      const char *value) {
+    if (!value) return ESP_ERR_INVALID_ARG;
+    size_t length = strlen(value) + 1;
+    if (length > 65535) return ESP_ERR_INVALID_SIZE;
+    return nvs_set_raw(handle, key, NVS_TYPE_STR, (const uint8_t *)value,
+                       (uint16_t)length);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Typed getters                                                               */
 /* -------------------------------------------------------------------------- */
@@ -349,6 +359,31 @@ esp_err_t nvs_get_blob(nvs_handle_t handle, const char *key, void *out_value,
         return ESP_ERR_INVALID_SIZE;
     }
     memcpy(out_value, e->value, e->value_len);
+    *length = e->value_len;
+    return ESP_OK;
+}
+
+esp_err_t nvs_get_str(nvs_handle_t handle, const char *key, char *out_value,
+                      size_t *length) {
+    if (!length) return ESP_ERR_INVALID_ARG;
+    int idx = (int)handle - 1;
+    if (idx < 0 || idx >= NVS_MAX_HANDLES || !s_handles[idx].used)
+        return ESP_ERR_NVS_INVALID_HANDLE;
+    if (!key) return ESP_ERR_INVALID_ARG;
+    nvs_entry_t *e = find_entry(&s_handles[idx], key);
+    if (!e) return ESP_ERR_NVS_NOT_FOUND;
+    if (e->type != NVS_TYPE_STR) return ESP_FAIL;
+    if (!out_value) {
+        *length = e->value_len;
+        return ESP_OK;
+    }
+    if (*length < e->value_len) {
+        *length = e->value_len;
+        return ESP_ERR_INVALID_SIZE;
+    }
+    memcpy(out_value, e->value, e->value_len);
+    if (e->value_len > 0 && out_value[e->value_len - 1] != '\0')
+        out_value[e->value_len - 1] = '\0';
     *length = e->value_len;
     return ESP_OK;
 }

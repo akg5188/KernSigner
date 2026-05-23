@@ -1,6 +1,7 @@
 #include "public_key.h"
 #include "../../core/key.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/battery.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/key_info.h"
@@ -53,12 +54,13 @@ static void settings_button_cb(lv_event_t *e) {
 static const char *export_title(public_key_export_mode_t mode) {
   switch (mode) {
   case PUBLIC_KEY_EXPORT_BLUEWALLET_XPUB:
-    return "传统账户";
+    return i18n_tr_or("address.legacy_account", "Legacy account");
   case PUBLIC_KEY_EXPORT_BLUEWALLET_ZPUB:
-    return "隔离账户";
+    return i18n_tr_or("address.segwit_account", "SegWit account");
   case PUBLIC_KEY_EXPORT_STANDARD:
   default:
-    return "扩展公钥";
+    return i18n_tr_or("address.extended_public_key",
+                      "Extended public key");
   }
 }
 
@@ -142,9 +144,13 @@ void public_key_page_create_with_mode(lv_obj_t *parent, void (*return_cb)(void),
 
     char subtitle[192];
     if (export_is_bluewallet(current_export_mode)) {
-      snprintf(subtitle, sizeof(subtitle), "用于观察钱包导入");
+      snprintf(subtitle, sizeof(subtitle), "%s",
+               i18n_tr_or("address.watch_only_import_hint",
+                          "For watch-only wallet import"));
     } else {
-      snprintf(subtitle, sizeof(subtitle), "钱包指纹 %s / 路径 %s", fingerprint_hex,
+      snprintf(subtitle, sizeof(subtitle), "%s %s / %s %s",
+               i18n_tr_or("wallet.wallet_fingerprint", "Wallet fingerprint"),
+               fingerprint_hex, i18n_tr_or("address.path", "Path"),
                derivation_compact);
     }
     lv_obj_t *subtitle_label =
@@ -187,7 +193,10 @@ void public_key_page_create_with_mode(lv_obj_t *parent, void (*return_cb)(void),
     wally_free_string(export_str);
   } else {
     lv_obj_t *error_value =
-        theme_create_label(content_wrapper, "错误：扩展公钥读取失败", false);
+        theme_create_label(content_wrapper,
+                           i18n_tr_or("address.xpub_read_failed",
+                                      "Error: failed to read extended public key"),
+                           false);
     lv_obj_set_style_text_color(error_value, error_color(), 0);
     lv_obj_set_width(error_value, LV_PCT(100));
   }

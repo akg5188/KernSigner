@@ -1,0 +1,25 @@
+KernSigner English Screenshot Report
+====================================
+
+Time: 2026-05-23T16:38:44+08:00
+Screenshot directory: docs/screens/english_20260523_163539
+Simulator binary: simulator/build/signer_simulator
+Language: English default, fresh simulator data dir
+
+Results:
+- Manifest pages: 150
+- BMP screenshots: 297
+- PNG/contact images: 16
+- Missing glyphs: 0
+- Capture failures: 0
+- UI smoke failures: 0
+- Scroll failures: 0
+- Interaction failures: 0
+- Image checks: PASS
+
+Contact sheets:
+- contact_sheet_key_pages.png
+- contact_sheet_all_top.png
+- contact_sheet_all_bottom.png
+
+FINAL: PASS

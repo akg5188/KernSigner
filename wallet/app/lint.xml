@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<lint>
-    <issue id="ObsoleteSdkInt">
-        <ignore regexp=".*src/main/res/mipmap-anydpi-v26/.*" />
-    </issue>
-    <issue id="MergeRootFrame">
-        <ignore regexp=".*src/main/res/layout/activity_qr_scan.xml" />
-    </issue>
-</lint>

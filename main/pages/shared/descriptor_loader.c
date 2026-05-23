@@ -2,6 +2,7 @@
 #include "../../../components/cUR/src/types/bytes_type.h"
 #include "../../../components/cUR/src/types/output.h"
 #include "../../core/key.h"
+#include "../../i18n/i18n.h"
 #include "../../qr/parser.h"
 #include "../../qr/scanner.h"
 #include "../../ui/assets/icons_24.h"
@@ -177,20 +178,29 @@ bool descriptor_loader_show_error(descriptor_validation_result_t result) {
     return false;
 
   case VALIDATION_FINGERPRINT_NOT_FOUND:
-    dialog_show_error("描述符里没有找到本机密钥", NULL, 2000);
+    dialog_show_error(i18n_tr_or("descriptor.local_key_not_found",
+                                 "Local key not found in descriptor"),
+                      NULL, 2000);
     return true;
 
   case VALIDATION_XPUB_MISMATCH:
-    dialog_show_error("扩展公钥不匹配，请检查附加口令", NULL, 2000);
+    dialog_show_error(i18n_tr_or("descriptor.xpub_mismatch",
+                                 "Extended public key mismatch; check the "
+                                 "passphrase"),
+                      NULL, 2000);
     return true;
 
   case VALIDATION_PARSE_ERROR:
-    dialog_show_error("描述符格式无效", NULL, 2000);
+    dialog_show_error(i18n_tr_or("descriptor.invalid_format",
+                                 "Invalid descriptor format"),
+                      NULL, 2000);
     return true;
 
   case VALIDATION_INTERNAL_ERROR:
   default:
-    dialog_show_error("验证失败", NULL, 2000);
+    dialog_show_error(i18n_tr_or("descriptor.validation_failed",
+                                 "Validation failed"),
+                      NULL, 2000);
     return true;
   }
 }
@@ -261,10 +271,14 @@ static void descriptor_info_confirm_wrapper(const descriptor_info_t *info,
   // Title with "Load?" prompt
   char title[48];
   if (info->is_multisig) {
-    snprintf(title, sizeof(title), "多签（%u/%u）- 加载？",
+    snprintf(title, sizeof(title),
+             i18n_tr_or("descriptor.load_multisig_confirm_format",
+                        "Multisig (%u/%u) - Load?"),
              info->threshold, info->num_keys);
   } else {
-    snprintf(title, sizeof(title), "单签 - 加载？");
+    snprintf(title, sizeof(title),
+             i18n_tr_or("descriptor.load_singlesig_confirm",
+                        "Single-sig - Load?"));
   }
   lv_obj_t *title_label = theme_create_label(root, title, false);
   lv_obj_set_style_text_font(title_label, theme_font_medium(), 0);
@@ -322,7 +336,8 @@ static void descriptor_info_confirm_wrapper(const descriptor_info_t *info,
   }
 
   // Button row (fixed at bottom)
-  lv_obj_t *no_btn = theme_create_button(root, "否", false);
+  lv_obj_t *no_btn =
+      theme_create_button(root, i18n_tr_or("common.no", "No"), false);
   lv_obj_set_size(no_btn, LV_PCT(50), theme_get_button_height());
   lv_obj_align(no_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
   lv_obj_add_event_cb(no_btn, info_confirm_no_cb, LV_EVENT_CLICKED, ctx);
@@ -332,7 +347,8 @@ static void descriptor_info_confirm_wrapper(const descriptor_info_t *info,
     lv_obj_set_style_text_font(no_label, theme_font_medium(), 0);
   }
 
-  lv_obj_t *yes_btn = theme_create_button(root, "是", true);
+  lv_obj_t *yes_btn =
+      theme_create_button(root, i18n_tr_or("common.yes", "Yes"), true);
   lv_obj_set_size(yes_btn, LV_PCT(50), theme_get_button_height());
   lv_obj_align(yes_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
   lv_obj_add_event_cb(yes_btn, info_confirm_yes_cb, LV_EVENT_CLICKED, ctx);
@@ -362,7 +378,9 @@ void descriptor_loader_process_scanner(validation_complete_cb validation_cb,
     free(converted);
     free(descriptor_str);
   } else {
-    dialog_show_error("不支持的描述符格式", NULL, 2000);
+    dialog_show_error(i18n_tr_or("descriptor.unsupported_format",
+                                 "Unsupported descriptor format"),
+                      NULL, 2000);
     if (error_cb) {
       error_cb();
     }
@@ -398,13 +416,19 @@ void descriptor_loader_show_source_menu(lv_obj_t *parent, void (*qr_cb)(void),
                                         void (*back_cb)(void)) {
   descriptor_loader_destroy_source_menu();
 
-  source_menu = ui_menu_create(parent, "加载描述符", back_cb);
+  source_menu = ui_menu_create(
+      parent, i18n_tr_or("descriptor.load_descriptor", "Load Descriptor"),
+      back_cb);
   if (!source_menu)
     return;
 
-  ui_menu_add_entry(source_menu, "从二维码", qr_cb);
-  ui_menu_add_entry(source_menu, "从闪存", flash_cb);
-  ui_menu_add_entry(source_menu, "从存储卡", sd_cb);
+  ui_menu_add_entry(source_menu,
+                    i18n_tr_or("descriptor.from_qr", "From QR code"), qr_cb);
+  ui_menu_add_entry(source_menu,
+                    i18n_tr_or("storage.load_from_flash", "Load from Flash"),
+                    flash_cb);
+  ui_menu_add_entry(source_menu,
+                    i18n_tr_or("storage.load_from_sd", "Load from SD"), sd_cb);
   ui_menu_show(source_menu);
 }
 

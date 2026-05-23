@@ -1,4 +1,6 @@
 #include "dialog.h"
+#include "../i18n/i18n.h"
+#include "i18n_text.h"
 #include "theme.h"
 #include <lvgl.h>
 #include <stdlib.h>
@@ -151,9 +153,12 @@ void dialog_show_info(const char *title, const char *message,
 
   lv_obj_t *dialog = create_dialog_container(style, &ctx->root);
 
+  const char *display_title = title ? ui_i18n_text(title) : NULL;
+  const char *display_message = ui_i18n_text(message);
+
   int32_t msg_y = 10;
-  if (title) {
-    lv_obj_t *title_label = theme_create_label(dialog, title, false);
+  if (display_title) {
+    lv_obj_t *title_label = theme_create_label(dialog, display_title, false);
     lv_obj_set_width(title_label, LV_PCT(90));
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(title_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -164,7 +169,7 @@ void dialog_show_info(const char *title, const char *message,
     msg_y = lv_obj_get_height(title_label) + 10;
   }
 
-  lv_obj_t *msg_label = theme_create_label(dialog, message, false);
+  lv_obj_t *msg_label = theme_create_label(dialog, display_message, false);
   lv_obj_set_width(msg_label, LV_PCT(90));
   lv_label_set_long_mode(msg_label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -178,12 +183,12 @@ void dialog_show_info(const char *title, const char *message,
   lv_obj_add_event_cb(ok_btn, info_ok_cb, LV_EVENT_CLICKED, ctx);
 
   lv_obj_t *ok_label = lv_label_create(ok_btn);
-  lv_label_set_text(ok_label, "确定");
+  lv_label_set_text(ok_label, i18n_tr_or("common.ok", "OK"));
   lv_obj_center(ok_label);
   lv_obj_set_style_text_color(ok_label, main_color(), 0);
   lv_obj_set_style_text_font(ok_label, theme_font_medium(), 0);
 
-  dialog_fit_overlay(dialog, style, message,
+  dialog_fit_overlay(dialog, style, display_message,
                      msg_y + theme_get_button_height() + 10);
 }
 
@@ -199,17 +204,21 @@ void dialog_show_error(const char *message, dialog_simple_callback_t callback,
   if (!ctx)
     return;
 
+  const char *display_message = ui_i18n_text(message);
+
   ctx->callback = callback;
   ctx->modal = lv_obj_create(lv_screen_active());
   lv_obj_set_size(ctx->modal, LV_PCT(80), LV_PCT(80));
   lv_obj_center(ctx->modal);
   theme_apply_frame(ctx->modal);
 
-  lv_obj_t *title = theme_create_label(ctx->modal, "错误", false);
+  lv_obj_t *title =
+      theme_create_label(ctx->modal, i18n_tr_or("common.error", "Error"),
+                         false);
   theme_apply_label(title, true);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 10);
 
-  lv_obj_t *error = theme_create_label(ctx->modal, message, false);
+  lv_obj_t *error = theme_create_label(ctx->modal, display_message, false);
   theme_apply_label(error, false);
   lv_obj_set_style_text_color(error, error_color(), 0);
   lv_obj_set_width(error, LV_PCT(90));
@@ -217,7 +226,9 @@ void dialog_show_error(const char *message, dialog_simple_callback_t callback,
   lv_obj_set_style_text_align(error, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(error, LV_ALIGN_CENTER, 0, 0);
 
-  lv_obj_t *hint = theme_create_label(ctx->modal, "正在返回...", false);
+  lv_obj_t *hint =
+      theme_create_label(ctx->modal, i18n_tr_or("dialog.processing", "Returning..."),
+                         false);
   theme_apply_label(hint, false);
   lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -10);
 
@@ -231,6 +242,7 @@ static void show_confirm_internal(const char *message,
                                   bool danger) {
   if (!message)
     return;
+  const char *display_message = ui_i18n_text(message);
 
   confirm_context_t *ctx = malloc(sizeof(confirm_context_t));
   if (!ctx)
@@ -244,7 +256,7 @@ static void show_confirm_internal(const char *message,
   if (danger && style == DIALOG_STYLE_OVERLAY)
     lv_obj_set_style_border_color(dialog, error_color(), 0);
 
-  lv_obj_t *msg_label = theme_create_label(dialog, message, false);
+  lv_obj_t *msg_label = theme_create_label(dialog, display_message, false);
   lv_label_set_recolor(msg_label, true);
   lv_obj_set_width(msg_label, LV_PCT(90));
   lv_label_set_long_mode(msg_label, LV_LABEL_LONG_WRAP);
@@ -252,7 +264,8 @@ static void show_confirm_internal(const char *message,
   lv_obj_set_style_text_font(msg_label, theme_font_medium(), 0);
   lv_obj_align(msg_label, LV_ALIGN_TOP_MID, 0, 10);
 
-  lv_obj_t *no_btn = theme_create_button(dialog, "否", false);
+  lv_obj_t *no_btn =
+      theme_create_button(dialog, i18n_tr_or("common.no", "No"), false);
   lv_obj_set_size(no_btn, LV_PCT(40), theme_get_button_height());
   lv_obj_align(no_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);
   lv_obj_add_event_cb(no_btn, confirm_no_cb, LV_EVENT_CLICKED, ctx);
@@ -262,7 +275,8 @@ static void show_confirm_internal(const char *message,
     lv_obj_set_style_text_font(no_label, theme_font_medium(), 0);
   }
 
-  lv_obj_t *yes_btn = theme_create_button(dialog, "是", true);
+  lv_obj_t *yes_btn =
+      theme_create_button(dialog, i18n_tr_or("common.yes", "Yes"), true);
   lv_obj_set_size(yes_btn, LV_PCT(40), theme_get_button_height());
   lv_obj_align(yes_btn, LV_ALIGN_BOTTOM_RIGHT, 0, 0);
   lv_obj_add_event_cb(yes_btn, confirm_yes_cb, LV_EVENT_CLICKED, ctx);
@@ -273,7 +287,8 @@ static void show_confirm_internal(const char *message,
     lv_obj_set_style_text_font(yes_label, theme_font_medium(), 0);
   }
 
-  dialog_fit_overlay(dialog, style, message, theme_get_button_height() + 20);
+  dialog_fit_overlay(dialog, style, display_message,
+                     theme_get_button_height() + 20);
 }
 
 void dialog_show_confirm(const char *message,
@@ -293,9 +308,12 @@ lv_obj_t *dialog_show_progress(const char *title, const char *message,
   lv_obj_t *root;
   lv_obj_t *dialog = create_dialog_container(style, &root);
 
+  const char *display_title = title ? ui_i18n_text(title) : NULL;
+  const char *display_message = message ? ui_i18n_text(message) : NULL;
+
   int32_t msg_y = 5;
-  if (title) {
-    lv_obj_t *title_label = theme_create_label(dialog, title, false);
+  if (display_title) {
+    lv_obj_t *title_label = theme_create_label(dialog, display_title, false);
     lv_obj_set_width(title_label, LV_PCT(90));
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(title_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -306,8 +324,8 @@ lv_obj_t *dialog_show_progress(const char *title, const char *message,
     msg_y = lv_obj_get_height(title_label) + 10;
   }
 
-  if (message) {
-    lv_obj_t *msg_label = theme_create_label(dialog, message, false);
+  if (display_message) {
+    lv_obj_t *msg_label = theme_create_label(dialog, display_message, false);
     lv_obj_set_width(msg_label, LV_PCT(90));
     lv_label_set_long_mode(msg_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_CENTER, 0);
@@ -315,7 +333,8 @@ lv_obj_t *dialog_show_progress(const char *title, const char *message,
     lv_obj_align(msg_label, LV_ALIGN_TOP_MID, 0, msg_y);
   }
 
-  dialog_fit_overlay(dialog, style, message ? message : "", msg_y + 5);
+  dialog_fit_overlay(dialog, style, display_message ? display_message : "",
+                     msg_y + 5);
 
   return root;
 }
@@ -326,17 +345,18 @@ void dialog_show_message(const char *title, const char *message) {
   lv_obj_center(modal);
   theme_apply_frame(modal);
 
-  lv_obj_t *title_label = theme_create_label(modal, title, false);
+  lv_obj_t *title_label = theme_create_label(modal, ui_i18n_text(title), false);
   lv_obj_set_style_text_font(title_label, theme_font_small(), 0);
   lv_obj_align(title_label, LV_ALIGN_TOP_MID, 0, 0);
 
-  lv_obj_t *msg_label = theme_create_label(modal, message, false);
+  lv_obj_t *msg_label = theme_create_label(modal, ui_i18n_text(message), false);
   lv_obj_set_width(msg_label, 340);
   lv_label_set_long_mode(msg_label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(msg_label, LV_ALIGN_CENTER, 0, -10);
 
-  lv_obj_t *btn = theme_create_button(modal, "确定", true);
+  lv_obj_t *btn =
+      theme_create_button(modal, i18n_tr_or("common.ok", "OK"), true);
   lv_obj_set_size(btn, 100, theme_get_min_touch_size());
   lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_obj_add_event_cb(btn, message_close_cb, LV_EVENT_CLICKED, modal);

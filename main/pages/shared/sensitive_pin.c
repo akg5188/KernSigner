@@ -1,5 +1,6 @@
 #include "sensitive_pin.h"
 #include "../../core/pin.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../pin/pin_page.h"
 #include <lvgl.h>
@@ -36,7 +37,9 @@ bool sensitive_pin_require(sensitive_pin_cb_t success_cb,
   if (!pin_is_configured()) {
     pending_success_cb = NULL;
     pending_cancel_cb = NULL;
-    dialog_show_error("请先在设置里创建 PIN 码", cancel_cb, 0);
+    dialog_show_error(i18n_tr_or("dialog.create_pin_first",
+                                 "Create a PIN in Settings first"),
+                      cancel_cb, 0);
     return false;
   }
 

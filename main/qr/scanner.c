@@ -3,6 +3,7 @@
 #include "scanner.h"
 #include "../components/cUR/src/ur_decoder.h"
 #include "../core/settings.h"
+#include "../i18n/i18n.h"
 #include "../ui/input_helpers.h"
 #include "../ui/theme.h"
 #include "../utils/memory_utils.h"
@@ -18,6 +19,9 @@
 #include <freertos/task.h>
 #include <k_quirc.h>
 #include <lvgl.h>
+#include <zbar_qr.h>
+#include <inttypes.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -49,9 +53,20 @@
 #define CAMERA_SCREEN_SIZE ((CAMERA_INPUT_CROP * CAMERA_PPA_FRAG) / 16)
 #define CAMERA_SCREEN_WIDTH CAMERA_SCREEN_SIZE
 #define CAMERA_SCREEN_HEIGHT CAMERA_SCREEN_SIZE
+// Decode from a larger square than the on-screen preview, but keep it light
+// enough for animated QR sampling. 480px is the speed-first profile for phone
+// wallet screens held close to the camera.
+#define CAMERA_DECODE_SIZE 480
+#define CAMERA_DECODE_WIDTH CAMERA_DECODE_SIZE
+#define CAMERA_DECODE_HEIGHT CAMERA_DECODE_SIZE
+#define CAMERA_PREVIEW_FRAME_PERIOD 30
+#define CAMERA_PREVIEW_AFTER_PAYLOAD_FRAME_PERIOD 60
 #define QR_FRAME_QUEUE_SIZE 1
 #define QR_DECODE_TASK_STACK_SIZE 12288
 #define QR_DECODE_TASK_PRIORITY 5
+#define QR_DOT_RETRY_DILATE_RADIUS_MAX 3
+#define QR_SLOW_FALLBACK_PERIOD 12
+#define QR_UR_SLOW_FALLBACK_PERIOD 5
 #define PROGRESS_BAR_HEIGHT 20
 #define PROGRESS_FRAME_PADD 2
 #define PROGRESS_BLOC_PAD 1
@@ -76,6 +91,7 @@ typedef struct {
   uint8_t *frame_data;
   uint32_t width;
   uint32_t height;
+  bool uses_decode_slot;
 } qr_frame_data_t;
 
 static const char *TAG = "QR_SCANNER";
@@ -100,8 +116,15 @@ static uint8_t *display_buffer_b = NULL;
 static uint8_t *current_display_buffer = NULL;
 static size_t display_buffer_size = 0;
 static volatile bool buffer_swap_needed = false;
+static uint8_t *decode_buffer = NULL;
+static size_t decode_buffer_size = 0;
+static volatile bool decode_frame_in_flight = false;
+static uint8_t *qr_preprocess_buffer = NULL;
+static size_t qr_preprocess_buffer_size = 0;
 
 static k_quirc_t *qr_decoder = NULL;
+static zbar_qr_decoder_t *qr_zbar_decoder = NULL;
+static k_quirc_result_t *qr_decode_result = NULL;
 static TaskHandle_t qr_decode_task_handle = NULL;
 static bool qr_decode_task_with_caps = false;
 static QueueHandle_t qr_frame_queue = NULL;
@@ -116,11 +139,13 @@ static volatile bool closing = false;
 static volatile bool scan_completed = false;
 static volatile bool is_fully_initialized = false;
 static volatile bool destruction_in_progress = false;
+static volatile bool preview_paused_for_payload = false;
 
 // Camera settings overlay
 static lv_obj_t *settings_overlay = NULL;
 static lv_obj_t *ae_slider = NULL;
 static lv_obj_t *focus_slider = NULL;
+static lv_obj_t *scan_status_label = NULL;
 static bool has_focus_motor = false;
 static volatile bool settings_active = false;
 
@@ -153,9 +178,40 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
                                          uint32_t camera_buf_ves,
                                          size_t camera_buf_len);
 static bool allocate_display_buffers(uint32_t width, uint32_t height);
+static bool allocate_decode_buffer(void);
+static bool allocate_qr_preprocess_buffer(uint32_t width, uint32_t height);
 static void free_display_buffers(void);
-static void rgb565_to_grayscale(const uint8_t *rgb565_data, uint8_t *gray_data,
-                                uint32_t width, uint32_t height);
+static void free_decode_buffer(void);
+static void free_qr_preprocess_buffer(void);
+static void rgb565_crop_to_grayscale(const uint8_t *rgb565_data,
+                                     uint8_t *gray_data, uint32_t src_w,
+                                     uint32_t src_h, uint32_t crop,
+                                     uint32_t crop_ox, uint32_t crop_oy,
+                                     uint32_t dst_size);
+static void dilate_dark_grayscale(uint8_t *gray_data, uint8_t *scratch,
+                                  uint32_t width, uint32_t height,
+                                  uint32_t radius);
+
+typedef struct {
+  int capstones;
+  int grids;
+  uint32_t radius;
+  int grid_size;
+  int timing_bias;
+  k_quirc_error_t last_error;
+  uint32_t last_error_radius;
+  int last_error_grid_size;
+  int last_error_timing_bias;
+  int decode_attempts;
+} qr_scan_diag_t;
+
+static bool process_quirc_results(qr_scan_diag_t *diag, uint32_t radius,
+                                  const k_quirc_debug_info_t *debug);
+static bool process_zbar_result(const uint8_t *gray_data, uint32_t width,
+                                uint32_t height);
+static bool should_run_slow_fallback(uint32_t frame_seq);
+static bool handle_decoded_qr_payload(const uint8_t *payload,
+                                      int payload_len);
 static void qr_decode_task(void *pvParameters);
 static bool qr_decoder_init(uint32_t width, uint32_t height);
 static void qr_decoder_cleanup(void);
@@ -167,6 +223,7 @@ static void cleanup_progress_indicators(void);
 static void create_ur_progress_bar(void);
 static void update_ur_progress_bar(double percent_complete);
 static void cleanup_ur_progress_bar(void);
+static void update_scan_status(const char *text);
 
 #ifdef QR_PERF_DEBUG
 static void log_perf_metrics(void);
@@ -213,7 +270,7 @@ static void log_perf_metrics(void) {
            avg_grayscale_ms, avg_quirc_ms);
 
   if (fps_label && bsp_display_lock(20)) {
-    lv_label_set_text_fmt(fps_label, "相机:%.0f 识别:%.0f", camera_fps,
+    lv_label_set_text_fmt(fps_label, "Camera:%.0f Decode:%.0f", camera_fps,
                           decode_fps);
     bsp_display_unlock();
   }
@@ -285,6 +342,12 @@ static void update_progress_indicator(int part_index) {
       lv_obj_set_style_bg_color(progress_rectangles[previously_parsed],
                                 main_color(), 0);
     }
+    if (scan_status_label) {
+      char text[64];
+      snprintf(text, sizeof(text), "%d/%d", part_index + 1,
+               progress_rectangles_count);
+      lv_label_set_text(scan_status_label, text);
+    }
     previously_parsed = part_index;
     bsp_display_unlock();
   }
@@ -336,6 +399,11 @@ static void update_ur_progress_bar(double percent_complete) {
     indicator_width = ur_progress_bar_inner_width;
 
   lv_obj_set_width(ur_progress_indicator, indicator_width);
+  if (scan_status_label) {
+    char text[64];
+    snprintf(text, sizeof(text), "UR %.0f%%", percent_complete * 100.0);
+    lv_label_set_text(scan_status_label, text);
+  }
   bsp_display_unlock();
 }
 
@@ -343,6 +411,15 @@ static void cleanup_ur_progress_bar(void) {
   ur_progress_bar = NULL;
   ur_progress_indicator = NULL;
   ur_progress_bar_inner_width = 0;
+}
+
+static void update_scan_status(const char *text) {
+  if (!scan_status_label || !text)
+    return;
+  if (!bsp_display_lock(DISPLAY_LOCK_TIMEOUT_MS))
+    return;
+  lv_label_set_text(scan_status_label, text);
+  bsp_display_unlock();
 }
 
 static void completion_timer_cb(lv_timer_t *timer) {
@@ -441,7 +518,7 @@ static void create_settings_overlay(void) {
 
   // Exposure label + slider
   lv_obj_t *ae_title = lv_label_create(panel);
-  lv_label_set_text(ae_title, "曝光");
+  lv_label_set_text(ae_title, i18n_tr_or("camera.exposure", "Exposure"));
   lv_obj_set_style_text_font(ae_title, theme_font_small(), 0);
   lv_obj_set_style_text_color(ae_title, main_color(), 0);
 
@@ -455,7 +532,7 @@ static void create_settings_overlay(void) {
   // right=far)
   if (has_focus_motor) {
     lv_obj_t *focus_title = lv_label_create(panel);
-    lv_label_set_text(focus_title, "焦点");
+    lv_label_set_text(focus_title, i18n_tr_or("camera.focus", "Focus"));
     lv_obj_set_style_text_font(focus_title, theme_font_small(), 0);
     lv_obj_set_style_text_color(focus_title, main_color(), 0);
 
@@ -470,7 +547,8 @@ static void create_settings_overlay(void) {
   }
 
   // Close button
-  lv_obj_t *close_btn = theme_create_button(panel, "关闭", true);
+  lv_obj_t *close_btn =
+      theme_create_button(panel, i18n_tr_or("dialog.close", "Close"), true);
   lv_obj_set_width(close_btn, LV_PCT(60));
   lv_obj_set_style_bg_opa(close_btn, LV_OPA_COVER, 0);
   lv_obj_set_style_margin_top(close_btn, 16, 0);
@@ -517,6 +595,36 @@ static bool allocate_display_buffers(uint32_t width, uint32_t height) {
   return true;
 }
 
+static bool allocate_decode_buffer(void) {
+  decode_buffer_size = CAMERA_DECODE_WIDTH * CAMERA_DECODE_HEIGHT;
+  decode_buffer_size =
+      (decode_buffer_size + CONFIG_CACHE_L2_CACHE_LINE_SIZE - 1) &
+      ~(CONFIG_CACHE_L2_CACHE_LINE_SIZE - 1);
+
+  decode_buffer = allocate_buffer_with_fallback(decode_buffer_size);
+  if (!decode_buffer) {
+    ESP_LOGE(TAG, "Failed to allocate high-resolution decode buffer");
+    decode_buffer_size = 0;
+    return false;
+  }
+  return true;
+}
+
+static bool allocate_qr_preprocess_buffer(uint32_t width, uint32_t height) {
+  qr_preprocess_buffer_size = width * height;
+  qr_preprocess_buffer_size =
+      (qr_preprocess_buffer_size + CONFIG_CACHE_L2_CACHE_LINE_SIZE - 1) &
+      ~(CONFIG_CACHE_L2_CACHE_LINE_SIZE - 1);
+
+  qr_preprocess_buffer = allocate_buffer_with_fallback(qr_preprocess_buffer_size);
+  if (!qr_preprocess_buffer) {
+    ESP_LOGW(TAG, "Failed to allocate QR dot-code preprocessing buffer");
+    qr_preprocess_buffer_size = 0;
+    return false;
+  }
+  return true;
+}
+
 static void free_display_buffers(void) {
   current_display_buffer = NULL;
   SAFE_FREE_STATIC(display_buffer_a);
@@ -524,32 +632,253 @@ static void free_display_buffers(void) {
   display_buffer_size = 0;
 }
 
-static void rgb565_to_grayscale(const uint8_t *rgb565_data, uint8_t *gray_data,
-                                uint32_t width, uint32_t height) {
-  const uint16_t *pixels = (const uint16_t *)rgb565_data;
-  uint32_t total = width * height;
+static void free_decode_buffer(void) {
+  __atomic_store_n(&decode_frame_in_flight, false, __ATOMIC_RELEASE);
+  SAFE_FREE_STATIC(decode_buffer);
+  decode_buffer_size = 0;
+}
 
-  if (rgb565_gray_lut) {
-    for (uint32_t i = 0; i < total; i++) {
-      gray_data[i] = rgb565_gray_lut[pixels[i]];
+static void free_qr_preprocess_buffer(void) {
+  SAFE_FREE_STATIC(qr_preprocess_buffer);
+  qr_preprocess_buffer_size = 0;
+}
+
+static uint8_t rgb565_luma_fallback(uint16_t pixel) {
+  uint8_t r5 = (pixel >> 11) & 0x1F;
+  uint8_t g6 = (pixel >> 5) & 0x3F;
+  uint8_t b5 = pixel & 0x1F;
+  uint8_t r8 = (r5 * 255 + 15) / 31;
+  uint8_t g8 = (g6 * 255 + 31) / 63;
+  uint8_t b8 = (b5 * 255 + 15) / 31;
+  return (uint8_t)((77 * r8 + 150 * g8 + 29 * b8) >> 8);
+}
+
+static void rgb565_crop_to_grayscale(const uint8_t *rgb565_data,
+                                     uint8_t *gray_data, uint32_t src_w,
+                                     uint32_t src_h, uint32_t crop,
+                                     uint32_t crop_ox, uint32_t crop_oy,
+                                     uint32_t dst_size) {
+  if (!rgb565_data || !gray_data || src_w == 0 || src_h == 0 || crop == 0 ||
+      dst_size == 0)
+    return;
+
+  if (crop_ox >= src_w || crop_oy >= src_h)
+    return;
+  if (crop_ox + crop > src_w)
+    crop = src_w - crop_ox;
+  if (crop_oy + crop > src_h)
+    crop = src_h - crop_oy;
+
+  static uint16_t x_offsets[CAMERA_DECODE_WIDTH];
+  static uint16_t y_offsets[CAMERA_DECODE_HEIGHT];
+  static uint32_t cached_src_w;
+  static uint32_t cached_src_h;
+  static uint32_t cached_crop;
+  static uint32_t cached_crop_ox;
+  static uint32_t cached_crop_oy;
+  static uint32_t cached_dst_size;
+
+  if (dst_size == CAMERA_DECODE_WIDTH &&
+      (cached_src_w != src_w || cached_src_h != src_h ||
+       cached_crop != crop || cached_crop_ox != crop_ox ||
+       cached_crop_oy != crop_oy || cached_dst_size != dst_size)) {
+    for (uint32_t x = 0; x < dst_size; x++) {
+      uint32_t sx = crop_ox + (x * crop) / dst_size;
+      if (sx >= src_w)
+        sx = src_w - 1;
+      x_offsets[x] = (uint16_t)sx;
     }
-  } else {
-    for (uint32_t i = 0; i < total; i++) {
-      uint16_t pixel = pixels[i];
-      uint8_t r5 = (pixel >> 11) & 0x1F;
-      uint8_t g6 = (pixel >> 5) & 0x3F;
-      uint8_t b5 = pixel & 0x1F;
-      uint8_t r8 = (r5 * 255 + 15) / 31;
-      uint8_t g8 = (g6 * 255 + 31) / 63;
-      uint8_t b8 = (b5 * 255 + 15) / 31;
-      gray_data[i] = (uint8_t)((77 * r8 + 150 * g8 + 29 * b8) >> 8);
+    for (uint32_t y = 0; y < dst_size; y++) {
+      uint32_t sy = crop_oy + (y * crop) / dst_size;
+      if (sy >= src_h)
+        sy = src_h - 1;
+      y_offsets[y] = (uint16_t)sy;
+    }
+    cached_src_w = src_w;
+    cached_src_h = src_h;
+    cached_crop = crop;
+    cached_crop_ox = crop_ox;
+    cached_crop_oy = crop_oy;
+    cached_dst_size = dst_size;
+  }
+
+  const uint16_t *pixels = (const uint16_t *)rgb565_data;
+  for (uint32_t y = 0; y < dst_size; y++) {
+    const uint16_t *src_row = pixels + y_offsets[y] * src_w;
+    uint8_t *dst_row = gray_data + y * dst_size;
+    for (uint32_t x = 0; x < dst_size; x++) {
+      uint16_t pixel = src_row[x_offsets[x]];
+      dst_row[x] = rgb565_gray_lut ? rgb565_gray_lut[pixel]
+                                   : rgb565_luma_fallback(pixel);
     }
   }
 }
 
+static void dilate_dark_grayscale(uint8_t *gray_data, uint8_t *scratch,
+                                  uint32_t width, uint32_t height,
+                                  uint32_t radius) {
+  if (!gray_data || !scratch || width == 0 || height == 0 || radius == 0)
+    return;
+
+  for (uint32_t y = 0; y < height; y++) {
+    const uint8_t *row = gray_data + y * width;
+    uint8_t *out = scratch + y * width;
+    for (uint32_t x = 0; x < width; x++) {
+      uint32_t x0 = (x > radius) ? x - radius : 0;
+      uint32_t x1 = x + radius;
+      if (x1 >= width)
+        x1 = width - 1;
+      uint8_t min_gray = 255;
+      for (uint32_t sx = x0; sx <= x1; sx++) {
+        if (row[sx] < min_gray)
+          min_gray = row[sx];
+      }
+      out[x] = min_gray;
+    }
+  }
+
+  for (uint32_t y = 0; y < height; y++) {
+    uint32_t y0 = (y > radius) ? y - radius : 0;
+    uint32_t y1 = y + radius;
+    if (y1 >= height)
+      y1 = height - 1;
+    uint8_t *out = gray_data + y * width;
+    for (uint32_t x = 0; x < width; x++) {
+      uint8_t min_gray = 255;
+      for (uint32_t sy = y0; sy <= y1; sy++) {
+        uint8_t value = scratch[sy * width + x];
+        if (value < min_gray)
+          min_gray = value;
+      }
+      out[x] = min_gray;
+    }
+  }
+}
+
+static bool handle_decoded_qr_payload(const uint8_t *payload, int payload_len) {
+  if (!payload || payload_len <= 0 || !qr_parser)
+    return false;
+
+#ifdef QR_PERF_DEBUG
+  __atomic_add_fetch(&perf_metrics.qr_detections, 1, __ATOMIC_RELAXED);
+#endif
+
+  int part_index =
+      qr_parser_parse_with_len(qr_parser, (const char *)payload, payload_len);
+
+  if (part_index >= 0 || qr_parser->total == 1) {
+    if (qr_parser->format == FORMAT_UR || qr_parser->total > 1)
+      preview_paused_for_payload = true;
+    if (qr_parser->format != FORMAT_UR)
+      update_scan_status("QR detected");
+    if (qr_parser->format == FORMAT_PMOFN) {
+      if (qr_parser->total > 1 && !progress_frame)
+        create_progress_indicators(qr_parser->total);
+      if (part_index >= 0 && qr_parser->total > 1)
+        update_progress_indicator(part_index);
+    } else if (qr_parser->format == FORMAT_UR && qr_parser->ur_decoder) {
+      if (!ur_progress_bar)
+        create_ur_progress_bar();
+      double percent_complete = ur_decoder_estimated_percent_complete(
+          (ur_decoder_t *)qr_parser->ur_decoder);
+      update_ur_progress_bar(percent_complete);
+    } else if (qr_parser->format == FORMAT_BBQR) {
+      if (qr_parser->total > 1 && !progress_frame)
+        create_progress_indicators(qr_parser->total);
+      if (part_index >= 0 && qr_parser->total > 1)
+        update_progress_indicator(part_index);
+    } else if (qr_parser->format == FORMAT_RELAY ||
+               qr_parser->format == FORMAT_TP_MULTI) {
+      if (qr_parser->total > 1 && !progress_frame)
+        create_progress_indicators(qr_parser->total);
+      if (part_index >= 0 && qr_parser->total > 1)
+        update_progress_indicator(part_index);
+    }
+
+    if (qr_parser_is_complete(qr_parser))
+      scan_completed = true;
+  } else {
+    update_scan_status("QR detected");
+  }
+
+  return true;
+}
+
+static bool process_zbar_result(const uint8_t *gray_data, uint32_t width,
+                                uint32_t height) {
+  if (!qr_zbar_decoder || !qr_decode_result || !gray_data || width == 0 ||
+      height == 0)
+    return false;
+
+  if (!zbar_qr_decode_grayscale(qr_zbar_decoder, gray_data, (int)width,
+                                (int)height, qr_decode_result))
+    return false;
+
+  return handle_decoded_qr_payload(qr_decode_result->data.payload,
+                                   qr_decode_result->data.payload_len);
+}
+
+static bool should_run_slow_fallback(uint32_t frame_seq) {
+  if (!qr_zbar_decoder || !qr_parser)
+    return true;
+
+  // Once an animated UR sequence has started, prefer sampling more fresh frames.
+  // ZBar handles OKX-style round/dot QR well; quirc + dilation is more useful
+  // before the format is known.
+  if (qr_parser->format == FORMAT_UR)
+    return false;
+
+  if (qr_parser->format > FORMAT_NONE)
+    return true;
+
+  return (frame_seq % QR_SLOW_FALLBACK_PERIOD) == 0;
+}
+
+static bool process_quirc_results(qr_scan_diag_t *diag, uint32_t radius,
+                                  const k_quirc_debug_info_t *debug) {
+  if (!qr_decoder)
+    return false;
+
+  bool got_payload = false;
+  if (!qr_decode_result)
+    return false;
+
+  int num_codes = k_quirc_count(qr_decoder);
+  for (int i = 0; i < num_codes; i++) {
+    if (closing || destruction_in_progress)
+      break;
+
+    k_quirc_error_t err = k_quirc_decode(qr_decoder, i, qr_decode_result);
+    if (diag) {
+      diag->decode_attempts++;
+      if (err != K_QUIRC_SUCCESS) {
+        diag->last_error = err;
+        diag->last_error_radius = radius;
+#ifdef K_QUIRC_DEBUG
+        if (debug && i < debug->num_grids) {
+          diag->last_error_grid_size = debug->grids[i].grid_size;
+          diag->last_error_timing_bias = debug->grids[i].timing_bias;
+        }
+#else
+        (void)debug;
+#endif
+      }
+    }
+    if (err != K_QUIRC_SUCCESS || !qr_decode_result->valid)
+      continue;
+
+    got_payload =
+        handle_decoded_qr_payload(qr_decode_result->data.payload,
+                                  qr_decode_result->data.payload_len);
+    if (scan_completed)
+      break;
+  }
+
+  return got_payload;
+}
+
 static void qr_decode_task(void *pvParameters) {
   qr_frame_data_t frame_data;
-  k_quirc_result_t qr_result;
 
   while (true) {
     if (closing || destruction_in_progress)
@@ -563,25 +892,80 @@ static void qr_decode_task(void *pvParameters) {
         pdTRUE)
       continue;
 
-    if (closing || destruction_in_progress)
+    if (closing || destruction_in_progress) {
+      if (frame_data.uses_decode_slot)
+        __atomic_store_n(&decode_frame_in_flight, false, __ATOMIC_RELEASE);
       break;
+    }
 
     // Skip decoding while settings panel is open (camera feed continues)
-    if (settings_active)
+    if (settings_active) {
+      if (frame_data.uses_decode_slot)
+        __atomic_store_n(&decode_frame_in_flight, false, __ATOMIC_RELEASE);
       continue;
+    }
 
 #ifdef QR_PERF_DEBUG
     int64_t frame_start = esp_timer_get_time();
-    int64_t gray_start, gray_end, quirc_start, quirc_end;
+    int64_t gray_start = frame_start;
+    int64_t gray_end = frame_start;
+    int64_t quirc_start = frame_start;
+    int64_t quirc_end = frame_start;
 #endif
 
-    uint8_t *qr_buf = k_quirc_begin(qr_decoder, NULL, NULL);
-    if (qr_buf) {
+    static uint32_t dot_retry_frame = 0;
+    static uint32_t decode_frame_seq = 0;
+    uint32_t frame_seq = decode_frame_seq++;
+    bool got_payload = false;
+    bool run_slow_fallback = should_run_slow_fallback(frame_seq);
+    uint32_t retry_radius = 0;
+    if (run_slow_fallback && qr_preprocess_buffer) {
+      retry_radius =
+          (dot_retry_frame++ % QR_DOT_RETRY_DILATE_RADIUS_MAX) + 1;
+    }
+
+    for (int pass = 0; pass < (retry_radius ? 2 : 1) && !got_payload; pass++) {
+      uint32_t dot_radius = pass == 0 ? 0 : retry_radius;
+
 #ifdef QR_PERF_DEBUG
       gray_start = esp_timer_get_time();
 #endif
-      rgb565_to_grayscale(frame_data.frame_data, qr_buf, frame_data.width,
-                          frame_data.height);
+      const uint8_t *zbar_buf = frame_data.frame_data;
+      uint8_t *qr_buf = NULL;
+      if (dot_radius > 0 && qr_preprocess_buffer) {
+        qr_buf = k_quirc_begin(qr_decoder, NULL, NULL);
+        if (!qr_buf)
+          break;
+        memcpy(qr_buf, frame_data.frame_data,
+               (size_t)frame_data.width * frame_data.height);
+        dilate_dark_grayscale(qr_buf, qr_preprocess_buffer, frame_data.width,
+                              frame_data.height, dot_radius);
+        zbar_buf = qr_buf;
+      } else if (dot_radius > 0) {
+        break;
+      }
+
+      got_payload =
+          process_zbar_result(zbar_buf, frame_data.width, frame_data.height);
+      if (got_payload || closing || destruction_in_progress || scan_completed)
+        break;
+
+      if (!run_slow_fallback) {
+        break;
+      }
+
+      if (dot_radius > 0) {
+        if (got_payload || closing || destruction_in_progress ||
+            scan_completed)
+          break;
+      }
+      if (!qr_buf) {
+        qr_buf = k_quirc_begin(qr_decoder, NULL, NULL);
+        if (!qr_buf)
+          break;
+        memcpy(qr_buf, frame_data.frame_data,
+               (size_t)frame_data.width * frame_data.height);
+      }
 #ifdef QR_PERF_DEBUG
       gray_end = esp_timer_get_time();
       quirc_start = esp_timer_get_time();
@@ -591,55 +975,10 @@ static void qr_decode_task(void *pvParameters) {
       quirc_end = esp_timer_get_time();
 #endif
 
-      int num_codes = k_quirc_count(qr_decoder);
-      for (int i = 0; i < num_codes; i++) {
-        if (closing || destruction_in_progress)
-          break;
-
-        k_quirc_error_t err = k_quirc_decode(qr_decoder, i, &qr_result);
-        if (err == K_QUIRC_SUCCESS && qr_result.valid && qr_parser) {
-#ifdef QR_PERF_DEBUG
-          __atomic_add_fetch(&perf_metrics.qr_detections, 1, __ATOMIC_RELAXED);
-#endif
-
-          int part_index = qr_parser_parse_with_len(
-              qr_parser, (const char *)qr_result.data.payload,
-              qr_result.data.payload_len);
-
-          if (part_index >= 0 || qr_parser->total == 1) {
-            if (qr_parser->format == FORMAT_PMOFN) {
-              if (qr_parser->total > 1 && !progress_frame)
-                create_progress_indicators(qr_parser->total);
-              if (part_index >= 0 && qr_parser->total > 1)
-                update_progress_indicator(part_index);
-            } else if (qr_parser->format == FORMAT_UR &&
-                       qr_parser->ur_decoder) {
-              if (!ur_progress_bar)
-                create_ur_progress_bar();
-              double percent_complete = ur_decoder_estimated_percent_complete(
-                  (ur_decoder_t *)qr_parser->ur_decoder);
-              update_ur_progress_bar(percent_complete);
-            } else if (qr_parser->format == FORMAT_BBQR) {
-              // BBQr multi-part progress
-              if (qr_parser->total > 1 && !progress_frame)
-                create_progress_indicators(qr_parser->total);
-              if (part_index >= 0 && qr_parser->total > 1)
-                update_progress_indicator(part_index);
-            } else if (qr_parser->format == FORMAT_RELAY ||
-                       qr_parser->format == FORMAT_TP_MULTI) {
-              if (qr_parser->total > 1 && !progress_frame)
-                create_progress_indicators(qr_parser->total);
-              if (part_index >= 0 && qr_parser->total > 1)
-                update_progress_indicator(part_index);
-            }
-
-            if (qr_parser_is_complete(qr_parser)) {
-              scan_completed = true;
-              break;
-            }
-          }
-        }
-      }
+      got_payload = process_quirc_results(NULL, dot_radius, NULL);
+      if (closing || destruction_in_progress || scan_completed)
+        break;
+    }
 
 #ifdef QR_PERF_DEBUG
       int64_t frame_end = esp_timer_get_time();
@@ -651,7 +990,9 @@ static void qr_decode_task(void *pvParameters) {
       __atomic_add_fetch(&perf_metrics.total_decode_time_us,
                          (frame_end - frame_start), __ATOMIC_RELAXED);
 #endif
-    }
+
+    if (frame_data.uses_decode_slot)
+      __atomic_store_n(&decode_frame_in_flight, false, __ATOMIC_RELEASE);
   }
 
   if (qr_task_done_sem)
@@ -661,7 +1002,7 @@ static void qr_decode_task(void *pvParameters) {
 
 static bool qr_decoder_init(uint32_t width, uint32_t height) {
 
-  // Build direct RGB565->grayscale LUT (64KB) for single-lookup conversion
+  // Build direct RGB565->grayscale LUT (64KB) for single-lookup conversion.
   if (!rgb565_gray_lut) {
     rgb565_gray_lut = heap_caps_malloc(65536, MALLOC_CAP_SPIRAM);
     if (rgb565_gray_lut) {
@@ -687,10 +1028,28 @@ static bool qr_decoder_init(uint32_t width, uint32_t height) {
     goto error;
   }
 
+  qr_zbar_decoder = zbar_qr_decoder_create();
+  if (!qr_zbar_decoder)
+    ESP_LOGW(TAG, "Failed to create zbar QR fallback decoder");
+
   if (k_quirc_resize(qr_decoder, width, height) < 0) {
     ESP_LOGE(TAG, "Failed to resize QR decoder");
     goto error;
   }
+
+  qr_decode_result =
+      heap_caps_calloc(1, sizeof(*qr_decode_result),
+                       MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!qr_decode_result)
+    qr_decode_result = heap_caps_calloc(1, sizeof(*qr_decode_result),
+                                        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  if (!qr_decode_result) {
+    ESP_LOGE(TAG, "Failed to allocate QR decode result buffer");
+    goto error;
+  }
+
+  if (!qr_preprocess_buffer)
+    (void)allocate_qr_preprocess_buffer(width, height);
 
   qr_frame_queue = xQueueCreate(QR_FRAME_QUEUE_SIZE, sizeof(qr_frame_data_t));
   if (!qr_frame_queue) {
@@ -759,6 +1118,15 @@ error:
     k_quirc_destroy(qr_decoder);
     qr_decoder = NULL;
   }
+  if (qr_zbar_decoder) {
+    zbar_qr_decoder_destroy(qr_zbar_decoder);
+    qr_zbar_decoder = NULL;
+  }
+  if (qr_decode_result) {
+    heap_caps_free(qr_decode_result);
+    qr_decode_result = NULL;
+  }
+  free_qr_preprocess_buffer();
   return false;
 }
 
@@ -784,6 +1152,8 @@ static void qr_decoder_cleanup(void) {
   if (qr_frame_queue) {
     qr_frame_data_t frame_data;
     while (xQueueReceive(qr_frame_queue, &frame_data, 0) == pdTRUE) {
+      if (frame_data.uses_decode_slot)
+        __atomic_store_n(&decode_frame_in_flight, false, __ATOMIC_RELEASE);
     }
     vQueueDelete(qr_frame_queue);
     qr_frame_queue = NULL;
@@ -793,6 +1163,15 @@ static void qr_decoder_cleanup(void) {
     k_quirc_destroy(qr_decoder);
     qr_decoder = NULL;
   }
+  if (qr_zbar_decoder) {
+    zbar_qr_decoder_destroy(qr_zbar_decoder);
+    qr_zbar_decoder = NULL;
+  }
+  if (qr_decode_result) {
+    heap_caps_free(qr_decode_result);
+    qr_decode_result = NULL;
+  }
+  free_qr_preprocess_buffer();
 
   if (qr_parser) {
     qr_parser_destroy(qr_parser);
@@ -829,7 +1208,7 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
   __atomic_add_fetch(&perf_metrics.camera_frames, 1, __ATOMIC_RELAXED);
 #endif
 
-  if (!display_buffer_a || !display_buffer_b || !current_display_buffer) {
+  if (!decode_buffer) {
     __atomic_sub_fetch(&active_frame_operations, 1, __ATOMIC_SEQ_CST);
     return;
   }
@@ -850,22 +1229,40 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
     resolution_mismatch_logged = true;
   }
 
-  uint8_t *back_buffer = (current_display_buffer == display_buffer_a)
-                             ? display_buffer_b
-                             : display_buffer_a;
+  uint32_t in_w = camera_buf_hes;
+  uint32_t in_h = camera_buf_ves;
+  uint32_t crop = (in_w < in_h) ? in_w : in_h;
+  if (crop > CAMERA_INPUT_CROP) {
+    crop = CAMERA_INPUT_CROP;
+  }
+  uint32_t crop_ox = (in_w - crop) / 2;
+  uint32_t crop_oy = (in_h - crop) / 2;
 
-  // Single PPA pass: centered square crop -> screen-size scale +
-  // counter-rotation
-  uint8_t *display_src = back_buffer;
-  if (cam_ppa_client && !closing) {
-    uint32_t in_w = camera_buf_hes;
-    uint32_t in_h = camera_buf_ves;
-    uint32_t crop = (in_w < in_h) ? in_w : in_h;
-    if (crop > CAMERA_INPUT_CROP) {
-      crop = CAMERA_INPUT_CROP;
-    }
-    uint32_t crop_ox = (in_w - crop) / 2;
-    uint32_t crop_oy = (in_h - crop) / 2;
+  bool decode_ready = false;
+  if (qr_frame_queue && !settings_active && !closing &&
+      !__atomic_load_n(&decode_frame_in_flight, __ATOMIC_ACQUIRE)) {
+    __atomic_store_n(&decode_frame_in_flight, true, __ATOMIC_RELEASE);
+    rgb565_crop_to_grayscale(camera_buf, decode_buffer, in_w, in_h, crop,
+                             crop_ox, crop_oy, CAMERA_DECODE_WIDTH);
+    decode_ready = true;
+  }
+
+  // Preview is intentionally low-frequency in scan mode. It is useful for
+  // aiming, but refreshing it every camera frame steals PPA/display bandwidth
+  // from animated QR decoding.
+  static uint32_t preview_frame_seq = 0;
+  uint32_t preview_period = preview_paused_for_payload
+                                ? CAMERA_PREVIEW_AFTER_PAYLOAD_FRAME_PERIOD
+                                : CAMERA_PREVIEW_FRAME_PERIOD;
+  bool refresh_preview =
+      cam_ppa_client &&
+      (settings_active || ((preview_frame_seq++ % preview_period) == 0));
+  if (refresh_preview && display_buffer_a && display_buffer_b &&
+      current_display_buffer && !closing) {
+    uint8_t *back_buffer = (current_display_buffer == display_buffer_a)
+                               ? display_buffer_b
+                               : display_buffer_a;
+    uint8_t *display_src = back_buffer;
     float sim_scale = (float)CAMERA_SCREEN_WIDTH / (float)crop;
     ppa_srm_oper_config_t srm = {
         .in.buffer = camera_buf,
@@ -888,39 +1285,37 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
         .scale_y = sim_scale,
         .mode = PPA_TRANS_MODE_BLOCKING,
     };
-    if (ppa_do_scale_rotate_mirror(cam_ppa_client, &srm) != ESP_OK) {
-      __atomic_sub_fetch(&active_frame_operations, 1, __ATOMIC_SEQ_CST);
-      return;
-    }
-  } else {
-    __atomic_sub_fetch(&active_frame_operations, 1, __ATOMIC_SEQ_CST);
-    return;
-  }
-  buffer_swap_needed = true;
 
-  if (buffer_swap_needed && !closing && !destruction_in_progress &&
-      bsp_display_lock(10)) {
-    // Re-check after taking lock — destroy may have run between the check
-    // above and acquiring the lock, nulling camera_img
-    if (!closing && !destruction_in_progress && camera_img) {
-      current_display_buffer = back_buffer;
-      img_refresh_dsc.data = display_src;
-      lv_img_set_src(camera_img, &img_refresh_dsc);
+    if (ppa_do_scale_rotate_mirror(cam_ppa_client, &srm) == ESP_OK) {
+      buffer_swap_needed = true;
+      if (!closing && !destruction_in_progress && bsp_display_lock(1)) {
+        if (!closing && !destruction_in_progress && camera_img) {
+          current_display_buffer = back_buffer;
+          img_refresh_dsc.data = display_src;
+          lv_img_set_src(camera_img, &img_refresh_dsc);
+        }
+        buffer_swap_needed = false;
+        bsp_display_unlock();
+      }
     }
-    buffer_swap_needed = false;
-    bsp_display_unlock();
   }
 
-  // QR decoder gets un-rotated buffer (QR codes are orientation-invariant,
-  // but using original data avoids unnecessary processing)
-  if (qr_frame_queue) {
+  // QR decoder gets only the high-resolution crop. When that slot is still
+  // being decoded, keep the queued frame instead of replacing it with the
+  // lower-resolution preview.
+  if (qr_frame_queue && decode_ready) {
     qr_frame_data_t dummy;
     while (xQueueReceive(qr_frame_queue, &dummy, 0) == pdTRUE) {
+      if (dummy.uses_decode_slot)
+        __atomic_store_n(&decode_frame_in_flight, false, __ATOMIC_RELEASE);
     }
-    qr_frame_data_t frame_data = {.frame_data = current_display_buffer,
-                                  .width = CAMERA_SCREEN_WIDTH,
-                                  .height = CAMERA_SCREEN_HEIGHT};
-    xQueueSend(qr_frame_queue, &frame_data, 0);
+    qr_frame_data_t frame_data = {.frame_data = decode_buffer,
+                                  .width = CAMERA_DECODE_WIDTH,
+                                  .height = CAMERA_DECODE_HEIGHT,
+                                  .uses_decode_slot = true};
+    if (xQueueSend(qr_frame_queue, &frame_data, 0) != pdTRUE) {
+      __atomic_store_n(&decode_frame_in_flight, false, __ATOMIC_RELEASE);
+    }
   }
 
   __atomic_sub_fetch(&active_frame_operations, 1, __ATOMIC_SEQ_CST);
@@ -934,8 +1329,11 @@ static void camera_init(void) {
       xEventGroupClearBits(camera_event_group, CAMERA_EVENT_DELETE);
       xEventGroupSetBits(camera_event_group, CAMERA_EVENT_TASK_RUN);
     }
+    if (!decode_buffer && !allocate_decode_buffer()) {
+      ESP_LOGE(TAG, "Failed to reallocate high-resolution decode buffer");
+    }
     if (!qr_decode_task_handle || !qr_parser || !qr_frame_queue) {
-      if (!qr_decoder_init(CAMERA_SCREEN_WIDTH, CAMERA_SCREEN_HEIGHT)) {
+      if (!qr_decoder_init(CAMERA_DECODE_WIDTH, CAMERA_DECODE_HEIGHT)) {
         ESP_LOGE(TAG, "Failed to initialize QR decoder on active camera");
       }
     }
@@ -1013,6 +1411,10 @@ static void camera_init(void) {
     ESP_LOGE(TAG, "Failed to allocate display buffers");
     return;
   }
+  if (!allocate_decode_buffer()) {
+    free_display_buffers();
+    return;
+  }
 
   current_display_buffer = display_buffer_a;
   img_refresh_dsc.data = current_display_buffer;
@@ -1039,7 +1441,7 @@ static void camera_init(void) {
     app_video_set_focus(camera_ctlr_handle, settings_get_focus_position());
   }
 
-  if (!qr_decoder_init(CAMERA_SCREEN_WIDTH, CAMERA_SCREEN_HEIGHT)) {
+  if (!qr_decoder_init(CAMERA_DECODE_WIDTH, CAMERA_DECODE_HEIGHT)) {
     ESP_LOGE(TAG, "Failed to initialize QR decoder");
     (void)app_video_register_frame_operation_cb(NULL);
     (void)app_video_stream_task_stop(camera_ctlr_handle);
@@ -1052,6 +1454,8 @@ static void camera_init(void) {
     (void)app_video_close(camera_ctlr_handle);
     camera_ctlr_handle = -1;
     video_stream_stopped_for_destroy = false;
+    free_decode_buffer();
+    free_display_buffers();
     return;
   }
 
@@ -1067,7 +1471,7 @@ static bool camera_run(void) {
   if (camera_ctlr_handle < 0 || !video_system_initialized) {
     camera_init();
   } else if (!qr_decode_task_handle || !qr_parser || !qr_frame_queue ||
-             !cam_ppa_client) {
+             !cam_ppa_client || !decode_buffer) {
     camera_init();
   } else {
     closing = false;
@@ -1100,6 +1504,7 @@ void qr_scanner_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   scan_completed = false;
   is_fully_initialized = false;
   active_frame_operations = 0;
+  preview_paused_for_payload = false;
 
   qr_scanner_screen = lv_obj_create(lv_screen_active());
   lv_obj_set_size(qr_scanner_screen, LV_PCT(100), LV_PCT(100));
@@ -1130,16 +1535,13 @@ void qr_scanner_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_bg_color(camera_img, bg_color(), 0);
   lv_obj_set_style_bg_opa(camera_img, LV_OPA_COVER, 0);
 
-  lv_obj_t *settings_btn =
-      ui_create_settings_button(qr_scanner_screen, settings_btn_cb);
-  lv_obj_set_style_bg_opa(settings_btn, LV_OPA_COVER, 0);
-  lv_obj_set_style_bg_color(settings_btn, bg_color(), 0);
+  scan_status_label = NULL;
 
 #ifdef QR_PERF_DEBUG
   fps_label = lv_label_create(qr_scanner_screen);
-  lv_label_set_text(fps_label, "相机:-- 识别:--");
+  lv_label_set_text(fps_label, "Camera:-- Decode:--");
   lv_obj_set_style_text_color(fps_label, lv_color_hex(0x00FF00), 0);
-  lv_obj_set_style_text_font(fps_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_font(fps_label, theme_font_small(), 0);
   lv_obj_align(fps_label, LV_ALIGN_TOP_LEFT, 10, 8);
   reset_perf_metrics();
 #endif
@@ -1220,6 +1622,7 @@ void qr_scanner_page_destroy(void) {
     ESP_LOGW(TAG, "Failed to lock display for UI cleanup");
 
   camera_img = NULL;
+  scan_status_label = NULL;
 #ifdef QR_PERF_DEBUG
   fps_label = NULL;
 #endif
@@ -1234,6 +1637,7 @@ void qr_scanner_page_destroy(void) {
     bsp_display_unlock();
 
   free_display_buffers();
+  free_decode_buffer();
 
   if (cam_ppa_client) {
     ppa_unregister_client(cam_ppa_client);
@@ -1255,6 +1659,7 @@ void qr_scanner_page_destroy(void) {
   destruction_in_progress = false;
   closing = false;
   active_frame_operations = 0;
+  preview_paused_for_payload = false;
 }
 
 char *qr_scanner_get_completed_content(void) {

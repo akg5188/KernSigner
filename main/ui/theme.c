@@ -1,5 +1,6 @@
 #include "theme.h"
 #include "font_policy.h"
+#include "i18n_text.h"
 #if !defined(ICONS_16) || ICONS_16
 #include "assets/icons_16.h"
 #endif
@@ -49,8 +50,6 @@ typedef struct {
 } theme_font_pair_t;
 
 static theme_font_pair_t font_pair_for_size(uint16_t size) {
-  // The LVGL built-in CJK font is a limited subset. Use the generated KernSigner
-  // Chinese UI subset first so visible Chinese text does not render as boxes.
   switch (size) {
 #if !defined(ICONS_16) || ICONS_16
   case 16:
@@ -68,7 +67,7 @@ static theme_font_pair_t font_pair_for_size(uint16_t size) {
 #if !defined(ICONS_24) || ICONS_24
     return (theme_font_pair_t){&signer_cn_28, &icons_24};
 #else
-    return (theme_font_pair_t){&signer_cn_20, NULL};
+    return (theme_font_pair_t){&signer_cn_28, NULL};
 #endif
   }
 }
@@ -110,6 +109,7 @@ void theme_init(void) {
 
   font_medium = *medium.text;
   font_medium.fallback = medium.icon;
+
 }
 
 lv_color_t bg_color(void) { return COLOR_BG; }
@@ -170,6 +170,8 @@ lv_obj_t *theme_create_page_container(lv_obj_t *parent) {
   lv_obj_set_size(container, LV_PCT(100), LV_PCT(100));
   lv_obj_set_style_bg_color(container, COLOR_BG, 0);
   lv_obj_set_style_bg_opa(container, LV_OPA_COVER, 0);
+  lv_obj_set_style_text_color(container, COLOR_WHITE, 0);
+  lv_obj_set_style_text_font(container, theme_font_small(), 0);
   lv_obj_set_style_border_width(container, 0, 0);
   lv_obj_set_style_pad_all(container, 0, 0);
   lv_obj_set_style_radius(container, 0, 0);
@@ -185,6 +187,8 @@ void theme_apply_frame(lv_obj_t *target_frame) {
 
   lv_obj_set_style_bg_color(target_frame, COLOR_BG, 0);
   lv_obj_set_style_bg_opa(target_frame, LV_OPA_COVER, 0);
+  lv_obj_set_style_text_color(target_frame, COLOR_WHITE, 0);
+  lv_obj_set_style_text_font(target_frame, theme_font_small(), 0);
   lv_obj_set_style_border_color(target_frame, COLOR_ORANGE, 0);
   lv_obj_set_style_border_width(target_frame, 2, 0);
   lv_obj_set_style_radius(target_frame, 8, 0);
@@ -234,6 +238,7 @@ void theme_apply_touch_button(lv_obj_t *btn, bool is_primary) {
   lv_obj_set_style_bg_color(btn, COLOR_BG, LV_STATE_DEFAULT);
   lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_STATE_DEFAULT);
   lv_obj_set_style_text_color(btn, COLOR_WHITE, LV_STATE_DEFAULT);
+  lv_obj_set_style_text_font(btn, theme_font_medium(), LV_STATE_DEFAULT);
   lv_obj_set_style_border_color(btn, COLOR_ORANGE, LV_STATE_DEFAULT);
   lv_obj_set_style_border_width(btn, 2, LV_STATE_DEFAULT);
   lv_obj_set_style_radius(btn, 8, LV_STATE_DEFAULT);
@@ -300,6 +305,26 @@ void theme_apply_btnmatrix(lv_obj_t *btnmatrix) {
   lv_btnmatrix_set_btn_ctrl_all(btnmatrix, LV_BTNMATRIX_CTRL_CLICK_TRIG);
 }
 
+void theme_apply_textarea(lv_obj_t *textarea, bool use_medium_font) {
+  if (!textarea)
+    return;
+
+  const lv_font_t *font =
+      use_medium_font ? theme_font_medium() : theme_font_small();
+  lv_obj_set_style_text_font(textarea, font, 0);
+  lv_obj_set_style_text_font(textarea, font, LV_PART_TEXTAREA_PLACEHOLDER);
+  lv_obj_set_style_text_color(textarea, COLOR_WHITE, 0);
+  lv_obj_set_style_text_color(textarea, COLOR_WHITE,
+                              LV_PART_TEXTAREA_PLACEHOLDER);
+  lv_obj_set_style_bg_color(textarea, COLOR_BG, 0);
+  lv_obj_set_style_bg_opa(textarea, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_color(textarea, COLOR_ORANGE, 0);
+  lv_obj_set_style_border_width(textarea, 2, 0);
+  lv_obj_set_style_radius(textarea, 8, 0);
+  lv_obj_set_style_bg_color(textarea, COLOR_ORANGE, LV_PART_CURSOR);
+  lv_obj_set_style_bg_opa(textarea, LV_OPA_COVER, LV_PART_CURSOR);
+}
+
 lv_obj_t *theme_create_button(lv_obj_t *parent, const char *text,
                               bool is_primary) {
   if (!parent)
@@ -310,7 +335,7 @@ lv_obj_t *theme_create_button(lv_obj_t *parent, const char *text,
 
   if (text) {
     lv_obj_t *label = lv_label_create(btn);
-    lv_label_set_text(label, text);
+    lv_label_set_text(label, ui_i18n_text(text));
     lv_obj_center(label);
     theme_apply_button_label(label, false);
   }
@@ -325,7 +350,7 @@ lv_obj_t *theme_create_label(lv_obj_t *parent, const char *text,
 
   lv_obj_t *label = lv_label_create(parent);
   if (text) {
-    lv_label_set_text(label, text);
+    lv_label_set_text(label, ui_i18n_text(text));
   }
   theme_apply_label(label, is_secondary);
 
@@ -333,7 +358,7 @@ lv_obj_t *theme_create_label(lv_obj_t *parent, const char *text,
 }
 
 lv_obj_t *theme_create_page_title(lv_obj_t *parent, const char *text) {
-  lv_obj_t *label = theme_create_label(parent, text ? text : "", false);
+  lv_obj_t *label = theme_create_label(parent, ui_i18n_text(text), false);
   lv_obj_set_width(label, LV_PCT(theme_get_screen_width() <= 520 ? 50 : 56));
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
@@ -348,6 +373,8 @@ void theme_apply_transparent_container(lv_obj_t *obj) {
     return;
 
   lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_text_color(obj, COLOR_WHITE, 0);
+  lv_obj_set_style_text_font(obj, theme_font_small(), 0);
   lv_obj_set_style_border_width(obj, 0, 0);
   lv_obj_set_style_pad_all(obj, 0, 0);
 }
@@ -386,6 +413,7 @@ static void dropdown_open_cb(lv_event_t *e) {
     lv_obj_set_style_bg_color(list, COLOR_BG, 0);
     lv_obj_set_style_bg_opa(list, LV_OPA_COVER, 0);
     lv_obj_set_style_text_color(list, COLOR_WHITE, 0);
+    lv_obj_set_style_text_font(list, theme_font_small(), 0);
     lv_obj_set_style_border_color(list, COLOR_ORANGE, 0);
     lv_obj_set_style_border_width(list, 2, 0);
     lv_obj_set_style_radius(list, 8, 0);
@@ -402,7 +430,7 @@ lv_obj_t *theme_create_dropdown(lv_obj_t *parent, const char *options) {
 
   lv_obj_t *dd = lv_dropdown_create(parent);
   if (options)
-    lv_dropdown_set_options(dd, options);
+    lv_dropdown_set_options(dd, ui_i18n_text(options));
   lv_obj_set_style_bg_color(dd, COLOR_BG, 0);
   lv_obj_set_style_bg_opa(dd, LV_OPA_COVER, 0);
   lv_obj_set_style_text_color(dd, COLOR_WHITE, 0);

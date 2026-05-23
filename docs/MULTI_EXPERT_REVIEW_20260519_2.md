@@ -54,7 +54,7 @@ P2：
 
 - EVM 地址派生方向正确：`m/44'/60'/0'/0/0`、uncompressed pubkey、Keccak-256、EIP-55 checksum。
 - OKX/Bitget/MetaMask/Rabby/TokenPocket 缺少 golden vector、CBOR/UR 解码断言和手机钱包实扫记录。
-- Web3 relay 当前只识别并提示“暂不盲签”，不进入 EVM 签名，安全边界正确。
+- Web3 签名请求当前只识别并提示“暂不盲签”，不进入 EVM 签名，安全边界正确。
 
 建议：
 
@@ -149,7 +149,7 @@ P1：
 P2：
 
 - PSBT 审查、QR 分片、descriptor UR、加密备份路径有较多大内存分配，需要低内存压测。
-- Web3 relay 目前安全地只识别不签名，但错误二维码和超长 payload 需要真机压测。
+- Web3 签名请求目前安全地只识别不签名，但错误二维码和超长 payload 需要真机压测。
 
 ## 总体结论
 

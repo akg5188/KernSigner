@@ -3,6 +3,7 @@
 #include "store_descriptor.h"
 #include "../core/storage.h"
 #include "../core/wallet.h"
+#include "../i18n/i18n.h"
 #include "../ui/dialog.h"
 #include "../ui/input_helpers.h"
 #include "../ui/theme.h"
@@ -61,14 +62,19 @@ static void do_save_encrypted(void) {
   kef_encrypt_page_destroy();
 
   if (ret == ESP_OK) {
-    const char *loc_name =
-        (target_location == STORAGE_FLASH) ? "闪存" : "存储卡";
+    const char *loc_name = (target_location == STORAGE_FLASH)
+                               ? i18n_tr_or("storage.flash_storage", "Flash")
+                               : i18n_tr_or("storage.storage_card", "SD card");
     char msg[64];
-    snprintf(msg, sizeof(msg), "描述符已保存到%s", loc_name);
-    dialog_show_info("已保存", msg, save_success_dialog_cb, NULL,
-                     DIALOG_STYLE_OVERLAY);
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("descriptor.saved_to_location_format",
+                        "Descriptor saved to %s"),
+             loc_name);
+    dialog_show_info(i18n_tr_or("common.success", "Saved"), msg,
+                     save_success_dialog_cb, NULL, DIALOG_STYLE_OVERLAY);
   } else {
-    dialog_show_error("保存失败", go_back, 0);
+    dialog_show_error(i18n_tr_or("dialog.save_failed", "Save failed"), go_back,
+                      0);
   }
 }
 
@@ -83,14 +89,19 @@ static void do_save_plaintext(const char *id) {
   }
 
   if (ret == ESP_OK) {
-    const char *loc_name =
-        (target_location == STORAGE_FLASH) ? "闪存" : "存储卡";
+    const char *loc_name = (target_location == STORAGE_FLASH)
+                               ? i18n_tr_or("storage.flash_storage", "Flash")
+                               : i18n_tr_or("storage.storage_card", "SD card");
     char msg[64];
-    snprintf(msg, sizeof(msg), "描述符已保存到%s", loc_name);
-    dialog_show_info("已保存", msg, save_success_dialog_cb, NULL,
-                     DIALOG_STYLE_OVERLAY);
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("descriptor.saved_to_location_format",
+                        "Descriptor saved to %s"),
+             loc_name);
+    dialog_show_info(i18n_tr_or("common.success", "Saved"), msg,
+                     save_success_dialog_cb, NULL, DIALOG_STYLE_OVERLAY);
   } else {
-    dialog_show_error("保存失败", go_back, 0);
+    dialog_show_error(i18n_tr_or("dialog.save_failed", "Save failed"), go_back,
+                      0);
   }
 }
 
@@ -133,7 +144,8 @@ static void deferred_save_encrypted_cb(lv_timer_t *timer) {
       progress_dialog = NULL;
     }
     dialog_show_danger_confirm(
-        "同名描述符已经存在，是否覆盖？",
+        i18n_tr_or("descriptor.overwrite_confirm",
+                   "A descriptor with this name already exists. Overwrite?"),
         overwrite_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
     return;
   }
@@ -153,7 +165,10 @@ static void encrypt_success_cb(const char *id, const uint8_t *envelope,
   pending_id = id;
 
   progress_dialog =
-      dialog_show_progress("加密备份", "正在保存...", DIALOG_STYLE_OVERLAY);
+      dialog_show_progress(i18n_tr_or("backup.encrypted_backup",
+                                      "Encrypted backup"),
+                           i18n_tr_or("storage.saving", "Saving..."),
+                           DIALOG_STYLE_OVERLAY);
   save_timer = lv_timer_create(deferred_save_encrypted_cb, 50, NULL);
   lv_timer_set_repeat_count(save_timer, 1);
 }
@@ -170,7 +185,8 @@ static void deferred_save_plaintext_cb(lv_timer_t *timer) {
       progress_dialog = NULL;
     }
     dialog_show_danger_confirm(
-        "同名描述符已经存在，是否覆盖？",
+        i18n_tr_or("descriptor.overwrite_confirm",
+                   "A descriptor with this name already exists. Overwrite?"),
         overwrite_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
     return;
   }
@@ -182,15 +198,19 @@ static void id_input_ready_cb(lv_event_t *e) {
   (void)e;
   const char *text = lv_textarea_get_text(id_input.textarea);
   if (!text || strlen(text) == 0) {
-    dialog_show_error("请输入名称", NULL, 2000);
+    dialog_show_error(i18n_tr_or("storage.enter_name", "Enter a name"), NULL,
+                      2000);
     return;
   }
 
   snprintf(pending_plaintext_id, sizeof(pending_plaintext_id), "%s", text);
   ui_text_input_hide(&id_input);
 
-  progress_dialog = dialog_show_progress("保存", "正在保存描述符...",
-                                         DIALOG_STYLE_OVERLAY);
+  progress_dialog =
+      dialog_show_progress(i18n_tr_or("action.save", "Save"),
+                           i18n_tr_or("descriptor.saving",
+                                      "Saving descriptor..."),
+                           DIALOG_STYLE_OVERLAY);
   save_timer = lv_timer_create(deferred_save_plaintext_cb, 50, NULL);
   lv_timer_set_repeat_count(save_timer, 1);
 }
@@ -208,12 +228,16 @@ void store_descriptor_page_create(lv_obj_t *parent, void (*return_cb)(void),
 
   /* Get descriptor string */
   if (!wallet_get_descriptor_string(&descriptor_text) || !descriptor_text) {
-    dialog_show_error("还没有加载描述符", return_cb, 0);
+    dialog_show_error(i18n_tr_or("descriptor.no_descriptor_loaded",
+                                 "No descriptor loaded"),
+                      return_cb, 0);
     return;
   }
 
-  const char *title =
-      (location == STORAGE_FLASH) ? "保存到闪存" : "保存到存储卡";
+  const char *title = (location == STORAGE_FLASH)
+                          ? i18n_tr_or("storage.save_to_flash",
+                                       "Save to Flash")
+                          : i18n_tr_or("storage.save_to_sd", "Save to SD");
   main_screen = theme_create_page_container(parent);
   lv_obj_t *title_label = lv_label_create(main_screen);
   lv_label_set_text(title_label, title);
@@ -232,8 +256,9 @@ void store_descriptor_page_create(lv_obj_t *parent, void (*return_cb)(void),
     free(checksum);
   } else {
     /* Show ID text input for plaintext save */
-    ui_text_input_create(&id_input, parent, "描述符名称", false,
-                         id_input_ready_cb);
+    ui_text_input_create(&id_input, parent,
+                         i18n_tr_or("descriptor.name", "Descriptor name"),
+                         false, id_input_ready_cb);
     id_input_created = true;
   }
 }

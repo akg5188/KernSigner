@@ -1,6 +1,7 @@
 // Dice Rolls Page - Generate mnemonic entropy from dice rolls
 
 #include "dice_rolls.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/theme.h"
@@ -16,6 +17,9 @@
 #include "../../utils/secure_mem.h"
 
 #define MAX_ROLLS 256
+#define DICE_BTN_LEFT 6
+#define DICE_BTN_SPACE 7
+#define DICE_BTN_RIGHT 8
 #define DICE_BTN_DELETE 9
 #define DICE_BTN_DONE 10
 
@@ -47,11 +51,9 @@ static void confirm_finish_cb(bool confirmed, void *user_data);
 static void back_btn_cb(lv_event_t *e);
 static void back_confirm_cb(bool confirmed, void *user_data);
 
-static const char *dice_map[] = {
-    "1", "2", "3", "\n",
-    "4", "5", "6", "\n",
-    "<", "空", ">", "\n",
-    "删", "完成", ""};
+static const char *dice_map[] = {"1", "2", "3", "\n", "4", "5", "6",
+                                 "\n", "<", NULL, ">", "\n", NULL, NULL,
+                                 ""};
 
 static const lv_buttonmatrix_ctrl_t dice_ctrl_map[] = {
     LV_BUTTONMATRIX_CTRL_WIDTH_1,
@@ -66,6 +68,12 @@ static const lv_buttonmatrix_ctrl_t dice_ctrl_map[] = {
     LV_BUTTONMATRIX_CTRL_WIDTH_2,
     LV_BUTTONMATRIX_CTRL_WIDTH_3,
 };
+
+static void update_dice_map(void) {
+  dice_map[9] = i18n_tr_or("dialog.keyboard_space", "Space");
+  dice_map[12] = i18n_tr_or("action.delete_short", "Del");
+  dice_map[13] = i18n_tr_or("dialog.keyboard_done", "Done");
+}
 
 static int entropy_len_for_word_count(int word_count) {
   switch (word_count) {
@@ -151,7 +159,8 @@ static void back_confirm_cb(bool confirmed, void *user_data) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("确定返回？", back_confirm_cb, NULL,
+  dialog_show_confirm(i18n_tr_or("common.back_confirm", "Go back?"),
+                      back_confirm_cb, NULL,
                       DIALOG_STYLE_OVERLAY);
 }
 
@@ -163,6 +172,7 @@ static void create_dice_input(void) {
   back_btn = ui_create_back_button(dice_rolls_screen, back_btn_cb);
 
   dice_btnmatrix = lv_buttonmatrix_create(dice_rolls_screen);
+  update_dice_map();
   lv_buttonmatrix_set_map(dice_btnmatrix, dice_map);
   lv_buttonmatrix_set_ctrl_map(dice_btnmatrix, dice_ctrl_map);
   lv_obj_align(dice_btnmatrix, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -183,6 +193,7 @@ static void create_dice_input(void) {
   lv_textarea_set_accepted_chars(rolls_textarea, "123456 ");
   lv_textarea_set_placeholder_text(rolls_textarea, "12345 61234 56123");
   lv_textarea_set_cursor_click_pos(rolls_textarea, true);
+  theme_apply_textarea(rolls_textarea, true);
   lv_obj_set_style_text_color(rolls_textarea, main_color(), 0);
   lv_obj_set_style_text_font(rolls_textarea, theme_font_medium(), 0);
   lv_obj_set_style_bg_color(rolls_textarea, bg_color(), 0);
@@ -215,13 +226,19 @@ static void update_display(void) {
   rolls_count = count_roll_digits(rolls_textarea ? lv_textarea_get_text(rolls_textarea)
                                                  : rolls_string);
   char title[64];
-  snprintf(title, sizeof(title), "%d 词 - %d/%d 个骰子点数", total_words,
+  snprintf(title, sizeof(title),
+           i18n_tr_or("input.dice_rolls_title_format",
+                      "%d words - %d/%d dice rolls"),
+           total_words,
            rolls_count, min_rolls);
   lv_label_set_text(title_label, title);
 
   if (count_label) {
     char status[96];
-    snprintf(status, sizeof(status), "%d/%d，5 个一组", rolls_count,
+    snprintf(status, sizeof(status),
+             i18n_tr_or("input.grouped_count_format",
+                        "%d/%d, groups of 5"),
+             rolls_count,
              min_rolls);
     lv_label_set_text(count_label, status);
     lv_obj_set_style_text_color(count_label,
@@ -257,33 +274,33 @@ static void dice_btnmatrix_event_cb(lv_event_t *e) {
   if (id == LV_BUTTONMATRIX_BUTTON_NONE)
     return;
 
-  const char *txt = lv_buttonmatrix_get_button_text(obj, id);
-
-  if (!txt)
-    return;
-
-  if (strcmp(txt, "完成") == 0) {
+  if (id == DICE_BTN_DONE) {
     if (rolls_count >= min_rolls) {
       char msg[64];
-      snprintf(msg, sizeof(msg), "用 %d 个点数生成 %d 词助记词？",
-               rolls_count, total_words);
+      snprintf(msg, sizeof(msg),
+               i18n_tr_or("input.dice_generate_confirm_format",
+                          "Generate a %d-word mnemonic from %d rolls?"),
+               total_words, rolls_count);
       dialog_show_confirm(msg, confirm_finish_cb, NULL, DIALOG_STYLE_OVERLAY);
     }
-  } else if (strcmp(txt, "删") == 0) {
+  } else if (id == DICE_BTN_DELETE) {
     if (rolls_textarea)
       lv_textarea_delete_char(rolls_textarea);
     update_display();
-  } else if (strcmp(txt, "<") == 0) {
+  } else if (id == DICE_BTN_LEFT) {
     if (rolls_textarea)
       lv_textarea_cursor_left(rolls_textarea);
-  } else if (strcmp(txt, ">") == 0) {
+  } else if (id == DICE_BTN_RIGHT) {
     if (rolls_textarea)
       lv_textarea_cursor_right(rolls_textarea);
-  } else if (strcmp(txt, "空") == 0) {
+  } else if (id == DICE_BTN_SPACE) {
     if (rolls_textarea)
       lv_textarea_add_char(rolls_textarea, ' ');
     update_display();
   } else {
+    const char *txt = lv_buttonmatrix_get_button_text(obj, id);
+    if (!txt)
+      return;
     char dice_value = txt[0];
     if (dice_value >= '1' && dice_value <= '6' && rolls_count < MAX_ROLLS &&
         rolls_textarea) {
@@ -357,7 +374,9 @@ static bool generate_mnemonic_from_rolls(void) {
 
 static void finish_dice_rolls(void) {
   if (!generate_mnemonic_from_rolls()) {
-    dialog_show_error("助记词生成失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("wallet.mnemonic_generation_failed",
+                                 "Mnemonic generation failed"),
+                      NULL, 0);
     return;
   }
 

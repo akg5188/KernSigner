@@ -1,0 +1,151 @@
+index	id	title	filename	width	height	capture_status	missing_glyphs
+1	home	Home	01_home.bmp	480	800	ok	0
+2	pi_connect_wallet	Connect Wallet	02_pi_connect_wallet.bmp	480	800	ok	0
+3	connect_okx	OKX	03_connect_okx.bmp	480	800	ok	0
+4	connect_bitget	Bitget	04_connect_bitget.bmp	480	800	ok	0
+5	connect_metamask	MetaMask	05_connect_metamask.bmp	480	800	ok	0
+6	connect_rabby	Rabby	06_connect_rabby.bmp	480	800	ok	0
+7	connect_tokenpocket	TokenPocket	07_connect_tokenpocket.bmp	480	800	ok	0
+8	connect_imtoken	imToken	08_connect_imtoken.bmp	480	800	ok	0
+9	web3_okx_mnemonic	Mnemonic	09_web3_okx_mnemonic.bmp	480	800	ok	0
+10	web3_okx_satochip	Smartcard	10_web3_okx_satochip.bmp	480	800	ok	0
+11	web3_bitget_mnemonic	Mnemonic	11_web3_bitget_mnemonic.bmp	480	800	ok	0
+12	web3_bitget_satochip	Smartcard	12_web3_bitget_satochip.bmp	480	800	ok	0
+13	web3_metamask_mnemonic	Mnemonic	13_web3_metamask_mnemonic.bmp	480	800	ok	0
+14	web3_metamask_satochip	Smartcard	14_web3_metamask_satochip.bmp	480	800	ok	0
+15	web3_rabby_mnemonic	Mnemonic	15_web3_rabby_mnemonic.bmp	480	800	ok	0
+16	web3_rabby_satochip	Smartcard	16_web3_rabby_satochip.bmp	480	800	ok	0
+17	web3_tokenpocket_mnemonic	Mnemonic	17_web3_tokenpocket_mnemonic.bmp	480	800	ok	0
+18	web3_tokenpocket_satochip	Smartcard	18_web3_tokenpocket_satochip.bmp	480	800	ok	0
+19	web3_imtoken_mnemonic	Mnemonic	19_web3_imtoken_mnemonic.bmp	480	800	ok	0
+20	web3_imtoken_satochip	Smartcard	20_web3_imtoken_satochip.bmp	480	800	ok	0
+21	btc_wallet	BTC	21_btc_wallet.bmp	480	800	ok	0
+22	btc_mnemonic	Mnemonic	22_btc_mnemonic.bmp	480	800	ok	0
+23	btc_satochip	Smartcard	23_btc_satochip.bmp	480	800	ok	0
+24	btc_bluewallet_zpub	zpub	24_btc_bluewallet_zpub.bmp	480	800	ok	0
+25	btc_bluewallet_xpub	xpub	25_btc_bluewallet_xpub.bmp	480	800	ok	0
+26	btc_satochip_zpub	Smartcard	26_btc_satochip_zpub.bmp	480	800	ok	0
+27	btc_satochip_xpub	Smartcard	27_btc_satochip_xpub.bmp	480	800	ok	0
+28	custom_derivation	Derived Address	28_custom_derivation.bmp	480	800	ok	0
+29	pi_mnemonic_tools	Mnemonic	29_pi_mnemonic_tools.bmp	480	800	ok	0
+30	mnemonic_write_smartcard	Write Card	30_mnemonic_write_smartcard.bmp	480	800	ok	0
+31	smartcard_tools	Smartcard	31_smartcard_tools.bmp	480	800	ok	0
+32	smartcard_satochip_tools	Satochip	32_smartcard_satochip_tools.bmp	480	800	ok	0
+33	smartcard_satochip_write_mnemonic	Write Card	33_smartcard_satochip_write_mnemonic.bmp	480	800	ok	0
+34	smartcard_satochip_maint	Maintenance	34_smartcard_satochip_maint.bmp	480	800	ok	0
+35	smartcard_satochip_advanced_tools	Advanced	35_smartcard_satochip_advanced_tools.bmp	480	800	ok	0
+36	smartcard_satochip_pubkey_tools	Public Key	36_smartcard_satochip_pubkey_tools.bmp	480	800	ok	0
+37	smartcard_satochip_2fa_tools	Smartcard	37_smartcard_satochip_2fa_tools.bmp	480	800	ok	0
+38	smartcard_satochip_session_tools	Smartcard	38_smartcard_satochip_session_tools.bmp	480	800	ok	0
+39	smartcard_satochip_seedkeeper_tools	SeedKeeper	39_smartcard_satochip_seedkeeper_tools.bmp	480	800	ok	0
+40	smartcard_satochip_certificate_tools	Certificate	40_smartcard_satochip_certificate_tools.bmp	480	800	ok	0
+41	smartcard_satochip_change_pin	Change card PIN	41_smartcard_satochip_change_pin.bmp	480	800	ok	0
+42	smartcard_satochip_unblock_pin	Unlock card	42_smartcard_satochip_unblock_pin.bmp	480	800	ok	0
+43	smartcard_satochip_set_label	Secret label	43_smartcard_satochip_set_label.bmp	480	800	ok	0
+44	smartcard_satochip_nfc_policy	Policy	44_smartcard_satochip_nfc_policy.bmp	480	800	ok	0
+45	smartcard_satochip_feature_policy	Policy	45_smartcard_satochip_feature_policy.bmp	480	800	ok	0
+46	smartcard_satochip_reset_seed	Reset	46_smartcard_satochip_reset_seed.bmp	480	800	ok	0
+47	smartcard_satochip_reset_factory	Factory	47_smartcard_satochip_reset_factory.bmp	480	800	ok	0
+48	smartcard_satochip_authenticity	Authenticity	48_smartcard_satochip_authenticity.bmp	480	800	ok	0
+49	smartcard_satochip_setup_pin	Set up card PIN	49_smartcard_satochip_setup_pin.bmp	480	800	ok	0
+50	smartcard_satochip_export_authentikey	Export public key	50_smartcard_satochip_export_authentikey.bmp	480	800	ok	0
+51	smartcard_satochip_import_ndef_authentikey	Import	51_smartcard_satochip_import_ndef_authentikey.bmp	480	800	ok	0
+52	smartcard_satochip_import_trusted_pubkey	Import	52_smartcard_satochip_import_trusted_pubkey.bmp	480	800	ok	0
+53	smartcard_satochip_export_trusted_pubkey	Export	53_smartcard_satochip_export_trusted_pubkey.bmp	480	800	ok	0
+54	smartcard_satochip_set_2fa_key	Save	54_smartcard_satochip_set_2fa_key.bmp	480	800	ok	0
+55	smartcard_satochip_reset_2fa_key	Clear	55_smartcard_satochip_reset_2fa_key.bmp	480	800	ok	0
+56	smartcard_satochip_logout_all	Clear Session	56_smartcard_satochip_logout_all.bmp	480	800	ok	0
+57	smartcard_seedkeeper_status_page	Status	57_smartcard_seedkeeper_status_page.bmp	480	800	ok	0
+58	smartcard_seedkeeper_free_space	Free space	58_smartcard_seedkeeper_free_space.bmp	480	800	ok	0
+59	smartcard_seedkeeper_list_page	List	59_smartcard_seedkeeper_list_page.bmp	480	800	ok	0
+60	smartcard_seedkeeper_advanced_tools	Advanced	60_smartcard_seedkeeper_advanced_tools.bmp	480	800	ok	0
+61	smartcard_seedkeeper_setup_pin	Set up card PIN	61_smartcard_seedkeeper_setup_pin.bmp	480	800	ok	0
+62	smartcard_seedkeeper_create_mnemonic	Create	62_smartcard_seedkeeper_create_mnemonic.bmp	480	800	ok	0
+63	smartcard_seedkeeper_write_mnemonic	Write Card	63_smartcard_seedkeeper_write_mnemonic.bmp	480	800	ok	0
+64	smartcard_seedkeeper_view_mnemonic	View	64_smartcard_seedkeeper_view_mnemonic.bmp	480	800	ok	0
+65	smartcard_seedkeeper_load_mnemonic	Import	65_smartcard_seedkeeper_load_mnemonic.bmp	480	800	ok	0
+66	smartcard_seedkeeper_save_password	Save	66_smartcard_seedkeeper_save_password.bmp	480	800	ok	0
+67	smartcard_seedkeeper_load_descriptor	Load descriptor	67_smartcard_seedkeeper_load_descriptor.bmp	480	800	ok	0
+68	smartcard_seedkeeper_save_descriptor	Save descriptor	68_smartcard_seedkeeper_save_descriptor.bmp	480	800	ok	0
+69	smartcard_seedkeeper_clone	Clone	69_smartcard_seedkeeper_clone.bmp	480	800	ok	0
+70	smartcard_seedkeeper_change_pin	Change card PIN	70_smartcard_seedkeeper_change_pin.bmp	480	800	ok	0
+71	smartcard_seedkeeper_reset	Reset	71_smartcard_seedkeeper_reset.bmp	480	800	ok	0
+72	smartcard_seedkeeper_generate_masterseed	New	72_smartcard_seedkeeper_generate_masterseed.bmp	480	800	ok	0
+73	smartcard_seedkeeper_generate_2fa_secret	New	73_smartcard_seedkeeper_generate_2fa_secret.bmp	480	800	ok	0
+74	smartcard_seedkeeper_derive_master_password	Load	74_smartcard_seedkeeper_derive_master_password.bmp	480	800	ok	0
+75	smartcard_seedkeeper_reset_secret	Reset	75_smartcard_seedkeeper_reset_secret.bmp	480	800	ok	0
+76	new_seedkeeper_create_mnemonic	Smartcard	76_new_seedkeeper_create_mnemonic.bmp	480	800	ok	0
+77	load_seedkeeper_mnemonic	Smartcard	77_load_seedkeeper_mnemonic.bmp	480	800	ok	0
+78	smartcard_certificate_import	Import certificate	78_smartcard_certificate_import.bmp	480	800	ok	0
+79	satochip_btc_pubkeys	Public Key	79_satochip_btc_pubkeys.bmp	480	800	ok	0
+80	satochip_btc_ypub	ypub	80_satochip_btc_ypub.bmp	480	800	ok	0
+81	satochip_btc_tpub	tpub	81_satochip_btc_tpub.bmp	480	800	ok	0
+82	satochip_btc_upub	upub	82_satochip_btc_upub.bmp	480	800	ok	0
+83	satochip_btc_vpub	vpub	83_satochip_btc_vpub.bmp	480	800	ok	0
+84	pi_self_check	Self Check	84_pi_self_check.bmp	480	800	ok	0
+85	tools	Tools	85_tools.bmp	480	800	ok	0
+86	pi_features	Features	86_pi_features.bmp	480	800	ok	0
+87	settings	Settings	87_settings.bmp	480	800	ok	0
+88	about	About	88_about.bmp	480	800	ok	0
+89	boot_login	Boot and Login	89_boot_login.bmp	480	800	ok	0
+90	login_pin	PIN Unlock	90_login_pin.bmp	480	800	ok	0
+91	login_passphrase	Passphrase	91_login_passphrase.bmp	480	800	ok	0
+92	login_encrypted_backup	Encrypted Backup Unlock	92_login_encrypted_backup.bmp	480	800	ok	0
+93	login_clear_session	Clear Session	93_login_clear_session.bmp	480	800	ok	0
+94	load_mnemonic	Load mnemonic	94_load_mnemonic.bmp	480	800	ok	0
+95	load_camera	QR Code	95_load_camera.bmp	480	800	ok	0
+96	load_manual	Manual	96_load_manual.bmp	480	800	ok	0
+97	load_digits	Index import	97_load_digits.bmp	480	800	ok	0
+98	load_steel_restore	Steel restore	98_load_steel_restore.bmp	480	800	ok	0
+99	load_punch_grid	Punch grid	99_load_punch_grid.bmp	480	800	ok	0
+102	load_sd	Storage Card	102_load_sd.bmp	480	800	ok	0
+103	load_encrypted_kef	Encrypted	103_load_encrypted_kef.bmp	480	800	ok	0
+104	new_mnemonic	New mnemonic	104_new_mnemonic.bmp	480	800	ok	0
+105	new_dice_d6	Dice	105_new_dice_d6.bmp	480	800	ok	0
+106	new_coin_entropy	Coin flip	106_new_coin_entropy.bmp	480	800	ok	0
+107	new_dice_d20	D20	107_new_dice_d20.bmp	480	800	ok	0
+108	new_cards_entropy	Cards	108_new_cards_entropy.bmp	480	800	ok	0
+109	new_hex_entropy	Hex	109_new_hex_entropy.bmp	480	800	ok	0
+110	new_words_select	Manual	110_new_words_select.bmp	480	800	ok	0
+111	new_camera_entropy	Camera	111_new_camera_entropy.bmp	480	800	ok	0
+112	bip39_check_tools	Self Check	112_bip39_check_tools.bmp	480	800	ok	0
+113	pi_mnemonic_advanced	Advanced	113_pi_mnemonic_advanced.bmp	480	800	ok	0
+114	bip85_mnemonic	BIP85 mnemonic	114_bip85_mnemonic.bmp	480	800	ok	0
+115	tools_secondary_mnemonic	Mnemonic encryption	115_tools_secondary_mnemonic.bmp	480	800	ok	0
+116	wallet_home	Wallet	116_wallet_home.bmp	480	800	ok	0
+117	backup_export	Backup	117_backup_export.bmp	480	800	ok	0
+118	backup_seed_words	Index import	118_backup_seed_words.bmp	480	800	ok	0
+119	backup_entropy	Hex	119_backup_entropy.bmp	480	800	ok	0
+120	backup_steel_punch	Steel restore	120_backup_steel_punch.bmp	480	800	ok	0
+121	backup_stackbit	1248 grid	121_backup_stackbit.bmp	480	800	ok	0
+122	backup_grid	Punch grid	122_backup_grid.bmp	480	800	ok	0
+123	backup_seed_qr	QR Code	123_backup_seed_qr.bmp	480	800	ok	0
+124	backup_kef	Encrypted	124_backup_kef.bmp	480	800	ok	0
+125	smartcard_card_info	Info	125_smartcard_card_info.bmp	480	800	ok	0
+126	satochip_path_address	Derive address	126_satochip_path_address.bmp	480	800	ok	0
+127	satochip_btc_zpub	zpub	127_satochip_btc_zpub.bmp	480	800	ok	0
+128	satochip_btc_xpub	xpub	128_satochip_btc_xpub.bmp	480	800	ok	0
+129	tools_create_qr	QR Code	129_tools_create_qr.bmp	480	800	ok	0
+130	tools_qr_capture	Scan	130_tools_qr_capture.bmp	480	800	ok	0
+131	tools_file_manager	Files	131_tools_file_manager.bmp	480	800	ok	0
+132	settings_pin	PIN Settings	132_settings_pin.bmp	480	800	ok	0
+133	settings_locale	Language	133_settings_locale.bmp	480	800	ok	0
+134	settings_display	Display	134_settings_display.bmp	480	800	ok	0
+135	settings_camera	Camera	135_settings_camera.bmp	480	800	ok	0
+136	settings_wallet	Wallet	136_settings_wallet.bmp	480	800	ok	0
+137	settings_security	Security	137_settings_security.bmp	480	800	ok	0
+138	device_tests	Device Tests	138_device_tests.bmp	480	800	ok	0
+139	test_screen_touch	Touch test	139_test_screen_touch.bmp	480	800	ok	0
+140	test_camera	Camera test	140_test_camera.bmp	480	800	ok	0
+141	test_storage	Storage test	141_test_storage.bmp	480	800	ok	0
+142	test_power	Power test	142_test_power.bmp	480	800	ok	0
+143	smartcard_probe	Smartcard	143_smartcard_probe.bmp	480	800	ok	0
+144	system_overview	System overview	144_system_overview.bmp	480	800	ok	0
+145	security_check	Security check	145_security_check.bmp	480	800	ok	0
+146	delivery_check	Delivery check	146_delivery_check.bmp	480	800	ok	0
+147	load_punch_grid_menu	Punch grid	147_load_punch_grid_menu.bmp	480	800	ok	0
+148	load_tinyseed_restore	Punch Grid Recovery	148_load_tinyseed_restore.bmp	480	800	ok	0
+149	load_stackbit_restore	1248 Recovery	149_load_stackbit_restore.bmp	480	800	ok	0
+150	backup_kef	Encrypted backup	150_backup_kef.bmp	480	800	ok	0
+151	custom_derivation_mnemonic	Derived Address - Mnemonic	151_custom_derivation_mnemonic.bmp	480	800	ok	0
+152	custom_derivation_smartcard	Derived Address - Smartcard	152_custom_derivation_smartcard.bmp	480	800	ok	0

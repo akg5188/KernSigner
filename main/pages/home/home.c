@@ -1,6 +1,7 @@
 #include "home.h"
 #include "../../core/key.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/assets/icons_24.h"
 #include "../../ui/battery.h"
 #include "../../ui/dialog.h"
@@ -115,7 +116,9 @@ static void menu_scan_entry_cb(void) { require_home_pin(menu_scan_cb); }
 static void power_button_cb(lv_event_t *e) {
   (void)e;
   const char *msg =
-      bsp_pmic_is_available() ? "确定关机？" : "卸载密钥并重启？";
+      bsp_pmic_is_available()
+          ? i18n_tr_or("settings.power_off_confirm", "Power off?")
+          : "Unload key and restart?";
   // Pass non-NULL user_data to signal "unload key before power-off"
   static const bool unload = true;
   dialog_show_confirm(msg, ui_power_off_confirmed_cb, (void *)&unload,
@@ -206,11 +209,16 @@ void home_page_create(lv_obj_t *parent) {
   lv_obj_move_to_index(header, 0);
   ui_battery_create(header);
 
-  ui_menu_add_entry(main_menu, "扫码签名", menu_scan_entry_cb);
-  ui_menu_add_entry(main_menu, "助记词", menu_slots_entry_cb);
-  ui_menu_add_entry(main_menu, "公钥", menu_xpub_entry_cb);
-  ui_menu_add_entry(main_menu, "地址", menu_addresses_entry_cb);
-  ui_menu_add_entry(main_menu, "备份", menu_backup_entry_cb);
+  ui_menu_add_entry(main_menu, i18n_tr_or("menu.scan_sign", "Scan Sign"),
+                    menu_scan_entry_cb);
+  ui_menu_add_entry(main_menu, i18n_tr_or("menu.mnemonic", "Mnemonic"),
+                    menu_slots_entry_cb);
+  ui_menu_add_entry(main_menu, i18n_tr_or("menu.public_key", "Public Key"),
+                    menu_xpub_entry_cb);
+  ui_menu_add_entry(main_menu, i18n_tr_or("menu.addresses", "Addresses"),
+                    menu_addresses_entry_cb);
+  ui_menu_add_entry(main_menu, i18n_tr_or("menu.backup", "Backup"),
+                    menu_backup_entry_cb);
 
   // Always provide a way back to the KernSigner shell home.
   home_button = ui_create_home_button(home_screen, home_button_cb);

@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="Theme.Satochip.Scanner" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#05070B</item>
-        <item name="android:statusBarColor">#05070B</item>
-        <item name="android:navigationBarColor">#05070B</item>
-    </style>
-</resources>

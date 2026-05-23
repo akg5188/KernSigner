@@ -3,6 +3,7 @@
 #include "descriptor_manager.h"
 #include "../../core/storage.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../qr/encoder.h"
 #include "../../qr/scanner.h"
 #include "../../ui/dialog.h"
@@ -14,6 +15,7 @@
 #include "../store_descriptor.h"
 #include <bbqr.h>
 #include <lvgl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <types/output.h>
@@ -244,7 +246,12 @@ static void show_qr_export(void) {
   lv_obj_set_style_pad_all(top_bar, 0, 0);
   lv_obj_clear_flag(top_bar, LV_OBJ_FLAG_SCROLLABLE);
 
-  qr_type_dropdown = theme_create_dropdown(top_bar, "明文\n分片码\n统一码");
+  char qr_type_options[64];
+  snprintf(qr_type_options, sizeof(qr_type_options), "%s\n%s\n%s",
+           i18n_tr_or("descriptor.plaintext_qr", "Plaintext"),
+           i18n_tr_or("descriptor.bbqr", "BBQR"),
+           i18n_tr_or("descriptor.ur", "UR"));
+  qr_type_dropdown = theme_create_dropdown(top_bar, qr_type_options);
   lv_obj_set_width(qr_type_dropdown, LV_PCT(40));
   lv_obj_align(qr_type_dropdown, LV_ALIGN_CENTER, 0, 0);
   lv_obj_add_event_cb(qr_type_dropdown, dropdown_cb, LV_EVENT_VALUE_CHANGED,
@@ -404,15 +411,23 @@ static void save_type_back_cb(void) {
 
 static void show_save_type_menu(storage_location_t loc) {
   pending_save_location = loc;
-  const char *title =
-      (loc == STORAGE_FLASH) ? "保存到闪存" : "保存到存储卡";
+  const char *title = (loc == STORAGE_FLASH)
+                          ? i18n_tr_or("storage.save_to_flash",
+                                       "Save to flash")
+                          : i18n_tr_or("storage.save_to_sd", "Save to SD");
 
   save_type_menu = ui_menu_create(manager_screen, title, save_type_back_cb);
   if (!save_type_menu)
     return;
 
-  ui_menu_add_entry(save_type_menu, "加密保存", save_encrypted_cb);
-  ui_menu_add_entry(save_type_menu, "明文保存", save_plaintext_cb);
+  ui_menu_add_entry(save_type_menu,
+                    i18n_tr_or("descriptor.encrypted_save",
+                               "Encrypted save"),
+                    save_encrypted_cb);
+  ui_menu_add_entry(save_type_menu,
+                    i18n_tr_or("descriptor.plaintext_save",
+                               "Plaintext save"),
+                    save_plaintext_cb);
   ui_menu_show(save_type_menu);
 }
 
@@ -437,25 +452,38 @@ static void build_main_menu(void) {
     main_menu = NULL;
   }
 
-  main_menu =
-      ui_menu_create(manager_screen, "描述符管理", main_menu_back_cb);
+  main_menu = ui_menu_create(
+      manager_screen, i18n_tr_or("descriptor.manager", "Descriptor manager"),
+      main_menu_back_cb);
   if (!main_menu)
     return;
 
   bool has_desc = wallet_has_descriptor();
 
   ui_menu_add_entry(main_menu,
-                    has_desc ? "加载其他描述符" : "加载描述符",
+                    has_desc ? i18n_tr_or("descriptor.load_other_descriptor",
+                                          "Load other descriptor")
+                             : i18n_tr_or("descriptor.load_descriptor",
+                                          "Load descriptor"),
                     load_descriptor_cb);
   idx_load = 0;
 
-  ui_menu_add_entry(main_menu, "保存到闪存", save_to_flash_cb);
+  ui_menu_add_entry(main_menu,
+                    i18n_tr_or("descriptor.save_to_flash",
+                               "Save descriptor to flash"),
+                    save_to_flash_cb);
   idx_save_flash = 1;
 
-  ui_menu_add_entry(main_menu, "保存到存储卡", save_to_sd_cb);
+  ui_menu_add_entry(main_menu,
+                    i18n_tr_or("descriptor.save_to_sd",
+                               "Save descriptor to SD"),
+                    save_to_sd_cb);
   idx_save_sd = 2;
 
-  ui_menu_add_entry(main_menu, "导出二维码", export_qr_cb);
+  ui_menu_add_entry(main_menu,
+                    i18n_tr_or("descriptor.export_qr",
+                               "Export descriptor QR"),
+                    export_qr_cb);
   idx_export_qr = 3;
 
   /* Hide save/export entries when no descriptor is loaded */
@@ -476,8 +504,12 @@ static void refresh_menu_visibility(void) {
     if (idx_load >= 0 && main_menu->buttons[idx_load]) {
       lv_obj_t *label = lv_obj_get_child(main_menu->buttons[idx_load], 0);
       if (label)
-        lv_label_set_text(label, has_desc ? "加载其他描述符"
-                                          : "加载描述符");
+        lv_label_set_text(label,
+                          has_desc
+                              ? i18n_tr_or("descriptor.load_other_descriptor",
+                                           "Load other descriptor")
+                              : i18n_tr_or("descriptor.load_descriptor",
+                                           "Load descriptor"));
     }
 
     /* Toggle save/export visibility */

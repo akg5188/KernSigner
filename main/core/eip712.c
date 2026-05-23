@@ -1,5 +1,6 @@
 #include "eip712.h"
 #include "evm.h"
+#include "i18n/i18n.h"
 
 #include <cJSON.h>
 #include <ctype.h>
@@ -192,7 +193,9 @@ static bool eip712_type_list_add(eip712_ctx_t *ctx, eip712_type_list_t *list,
   if (eip712_type_list_contains(list, name))
     return true;
   if (list->count >= EIP712_MAX_TYPES) {
-    eip712_set_error(ctx, "TypedData 类型太多");
+    eip712_set_error(
+        ctx, i18n_tr_or("eip712.error.too_many_types",
+                        "Too many TypedData types"));
     return false;
   }
   snprintf(list->names[list->count], sizeof(list->names[list->count]), "%s",
@@ -212,7 +215,8 @@ static bool eip712_find_dependencies(eip712_ctx_t *ctx, const cJSON *types,
                                      eip712_type_list_t *results) {
   char core[EIP712_MAX_TYPE_NAME];
   if (!eip712_core_type(type_name, core, sizeof(core))) {
-    eip712_set_error(ctx, "类型名无效");
+    eip712_set_error(ctx, i18n_tr_or("eip712.error.invalid_type_name",
+                                     "Invalid type name"));
     return false;
   }
   if (eip712_is_solidity_type(core) || eip712_type_list_contains(results, core))
@@ -220,7 +224,10 @@ static bool eip712_find_dependencies(eip712_ctx_t *ctx, const cJSON *types,
 
   const cJSON *fields = eip712_type_fields(types, core);
   if (!fields) {
-    eip712_set_error(ctx, "缺少类型定义: %s", core);
+    eip712_set_error(ctx,
+                     i18n_tr_or("eip712.error.missing_type_definition_format",
+                                "Missing type definition: %s"),
+                     core);
     return false;
   }
   if (!eip712_type_list_add(ctx, results, core))
@@ -234,7 +241,8 @@ static bool eip712_find_dependencies(eip712_ctx_t *ctx, const cJSON *types,
     if (!child_type || !eip712_find_dependencies(ctx, types, child_type,
                                                  results)) {
       if (!ctx->err || !ctx->err[0])
-        eip712_set_error(ctx, "类型字段无效");
+        eip712_set_error(ctx, i18n_tr_or("eip712.error.invalid_type_field",
+                                         "Invalid type field"));
       return false;
     }
   }
@@ -273,7 +281,10 @@ static bool eip712_encode_type(eip712_ctx_t *ctx, const cJSON *types,
   for (size_t i = 0; i < order_count; i++) {
     const cJSON *fields = eip712_type_fields(types, order[i]);
     if (!fields) {
-      eip712_set_error(ctx, "缺少类型定义: %s", order[i]);
+      eip712_set_error(ctx,
+                       i18n_tr_or("eip712.error.missing_type_definition_format",
+                                  "Missing type definition: %s"),
+                       order[i]);
       free(sb.buf);
       return false;
     }
@@ -291,7 +302,9 @@ static bool eip712_encode_type(eip712_ctx_t *ctx, const cJSON *types,
           eip712_json_string(cJSON_GetObjectItemCaseSensitive((cJSON *)field,
                                                               "type"));
       if (!name || !type) {
-        eip712_set_error(ctx, "类型字段缺少 name/type");
+        eip712_set_error(
+            ctx, i18n_tr_or("eip712.error.type_field_missing_name_type",
+                            "Type field is missing name/type"));
         free(sb.buf);
         return false;
       }
@@ -502,11 +515,13 @@ static bool eip712_parse_json_integer(const cJSON *value, uint8_t out[32],
     ok = eip712_parse_uint256_string(text, out, &negative);
   }
   if (!ok) {
-    eip712_set_error(ctx, "整数格式无效");
+    eip712_set_error(ctx, i18n_tr_or("eip712.error.invalid_integer",
+                                     "Invalid integer format"));
     return false;
   }
   if (negative && !signed_type) {
-    eip712_set_error(ctx, "uint 不能为负数");
+    eip712_set_error(ctx, i18n_tr_or("eip712.error.uint_negative",
+                                     "uint cannot be negative"));
     return false;
   }
   if (negative) {
@@ -547,12 +562,20 @@ static bool eip712_hash_struct(eip712_ctx_t *ctx, const cJSON *types,
                                const char *type_name, const cJSON *data,
                                uint8_t out[32]) {
   if (!cJSON_IsObject(data)) {
-    eip712_set_error(ctx, "%s 数据不是对象", type_name ? type_name : "消息");
+    eip712_set_error(ctx,
+                     i18n_tr_or("eip712.error.data_not_object_format",
+                                "%s data is not an object"),
+                     type_name ? type_name
+                               : i18n_tr_or("eip712.label.message",
+                                            "message"));
     return false;
   }
   const cJSON *fields = eip712_type_fields(types, type_name);
   if (!fields) {
-    eip712_set_error(ctx, "缺少类型定义: %s", type_name);
+    eip712_set_error(ctx,
+                     i18n_tr_or("eip712.error.missing_type_definition_format",
+                                "Missing type definition: %s"),
+                     type_name);
     return false;
   }
 
@@ -564,7 +587,7 @@ static bool eip712_hash_struct(eip712_ctx_t *ctx, const cJSON *types,
   uint8_t *encoded = calloc(field_count + 1U, 32);
   if (!encoded) {
     free(encoded_type);
-    eip712_set_error(ctx, "内存不足");
+    eip712_set_error(ctx, i18n_tr_or("error.out_of_memory", "Out of memory"));
     return false;
   }
   eip712_hash_text(encoded_type, encoded);
@@ -586,7 +609,8 @@ static bool eip712_hash_struct(eip712_ctx_t *ctx, const cJSON *types,
                              encoded + slot * 32U)) {
       free(encoded);
       if (!ctx->err || !ctx->err[0])
-        eip712_set_error(ctx, "字段编码失败");
+        eip712_set_error(ctx, i18n_tr_or("eip712.error.field_encode_failed",
+                                         "Field encoding failed"));
       return false;
     }
     slot++;
@@ -601,12 +625,16 @@ static bool eip712_encode_array(eip712_ctx_t *ctx, const cJSON *types,
                                 const char *name, const char *type,
                                 const cJSON *value, uint8_t out[32]) {
   if (!cJSON_IsArray(value)) {
-    eip712_set_error(ctx, "%s 需要数组", name ? name : "字段");
+    eip712_set_error(ctx,
+                     i18n_tr_or("eip712.error.requires_array_format",
+                                "%s requires an array"),
+                     name ? name : i18n_tr_or("eip712.label.field", "field"));
     return false;
   }
   char parent_type[EIP712_MAX_TYPE_NAME];
   if (!eip712_parent_array_type(type, parent_type, sizeof(parent_type))) {
-    eip712_set_error(ctx, "数组类型无效");
+    eip712_set_error(ctx, i18n_tr_or("eip712.error.invalid_array_type",
+                                     "Invalid array type"));
     return false;
   }
   size_t count = cJSON_GetArraySize((cJSON *)value);
@@ -616,7 +644,7 @@ static bool eip712_encode_array(eip712_ctx_t *ctx, const cJSON *types,
   }
   uint8_t *encoded = calloc(count, 32);
   if (!encoded) {
-    eip712_set_error(ctx, "内存不足");
+    eip712_set_error(ctx, i18n_tr_or("error.out_of_memory", "Out of memory"));
     return false;
   }
   const cJSON *item = NULL;
@@ -655,7 +683,10 @@ static bool eip712_encode_field(eip712_ctx_t *ctx, const cJSON *types,
     return true;
   }
   if (!value || cJSON_IsNull(value)) {
-    eip712_set_error(ctx, "缺少字段: %s", name ? name : "-");
+    eip712_set_error(ctx,
+                     i18n_tr_or("eip712.error.missing_field_format",
+                                "Missing field: %s"),
+                     name ? name : "-");
     return false;
   }
 
@@ -676,7 +707,10 @@ static bool eip712_encode_field(eip712_ctx_t *ctx, const cJSON *types,
 
   if (strcmp(type, "address") == 0) {
     if (!eip712_parse_address(value, out)) {
-      eip712_set_error(ctx, "地址格式无效: %s", name ? name : "-");
+      eip712_set_error(ctx,
+                       i18n_tr_or("eip712.error.invalid_address_format",
+                                  "Invalid address format: %s"),
+                       name ? name : "-");
       return false;
     }
     return true;
@@ -691,7 +725,8 @@ static bool eip712_encode_field(eip712_ctx_t *ctx, const cJSON *types,
       return true;
     }
     if (!eip712_json_bytes_alloc(value, &bytes, &len)) {
-      eip712_set_error(ctx, "string 字段无效");
+      eip712_set_error(ctx, i18n_tr_or("eip712.error.invalid_string_field",
+                                       "Invalid string field"));
       return false;
     }
     evm_keccak256(bytes, len, out);
@@ -703,7 +738,8 @@ static bool eip712_encode_field(eip712_ctx_t *ctx, const cJSON *types,
     uint8_t *bytes = NULL;
     size_t len = 0;
     if (!eip712_json_bytes_alloc(value, &bytes, &len)) {
-      eip712_set_error(ctx, "bytes 字段无效");
+      eip712_set_error(ctx, i18n_tr_or("eip712.error.invalid_bytes_field",
+                                       "Invalid bytes field"));
       return false;
     }
     evm_keccak256(bytes, len, out);
@@ -718,7 +754,10 @@ static bool eip712_encode_field(eip712_ctx_t *ctx, const cJSON *types,
     if (!eip712_json_bytes_alloc(value, &bytes, &len) ||
         len > (size_t)fixed_bytes) {
       free(bytes);
-      eip712_set_error(ctx, "%s 长度无效", type);
+      eip712_set_error(ctx,
+                       i18n_tr_or("eip712.error.invalid_length_format",
+                                  "%s length is invalid"),
+                       type);
       return false;
     }
     memcpy(out, bytes, len);
@@ -744,7 +783,10 @@ static bool eip712_encode_field(eip712_ctx_t *ctx, const cJSON *types,
     return true;
   }
 
-  eip712_set_error(ctx, "不支持的字段类型: %s", type);
+  eip712_set_error(ctx,
+                   i18n_tr_or("eip712.error.unsupported_field_type_format",
+                              "Unsupported field type: %s"),
+                   type);
   return false;
 }
 
@@ -790,7 +832,9 @@ static bool eip712_domain_matches_declared_type(eip712_ctx_t *ctx,
       }
     }
     if (!found) {
-      eip712_set_error(ctx, "domain 字段与 EIP712Domain 不匹配");
+      eip712_set_error(
+          ctx, i18n_tr_or("eip712.error.domain_mismatch",
+                          "Domain fields do not match EIP712Domain"));
       return false;
     }
   }
@@ -801,7 +845,9 @@ static bool eip712_domain_matches_declared_type(eip712_ctx_t *ctx,
         eip712_json_string(cJSON_GetObjectItemCaseSensitive((cJSON *)field,
                                                             "name"));
     if (name && !cJSON_GetObjectItemCaseSensitive((cJSON *)domain, name)) {
-      eip712_set_error(ctx, "domain 字段与 EIP712Domain 不匹配");
+      eip712_set_error(
+          ctx, i18n_tr_or("eip712.error.domain_mismatch",
+                          "Domain fields do not match EIP712Domain"));
       return false;
     }
   }
@@ -811,7 +857,8 @@ static bool eip712_domain_matches_declared_type(eip712_ctx_t *ctx,
 static bool eip712_hash_domain(eip712_ctx_t *ctx, const cJSON *domain,
                                uint8_t out[32]) {
   if (!cJSON_IsObject(domain)) {
-    eip712_set_error(ctx, "domain 不是对象");
+    eip712_set_error(ctx, i18n_tr_or("eip712.error.domain_not_object",
+                                     "Domain is not an object"));
     return false;
   }
 
@@ -837,7 +884,10 @@ static bool eip712_hash_domain(eip712_ctx_t *ctx, const cJSON *domain,
   const cJSON *item = NULL;
   cJSON_ArrayForEach(item, domain) {
     if (!eip712_domain_key_allowed(item->string, NULL)) {
-      eip712_set_error(ctx, "无效 domain 字段: %s", item->string);
+      eip712_set_error(ctx,
+                       i18n_tr_or("eip712.error.invalid_domain_field_format",
+                                  "Invalid domain field: %s"),
+                       item->string);
       return false;
     }
   }
@@ -867,7 +917,7 @@ static bool eip712_hash_domain(eip712_ctx_t *ctx, const cJSON *domain,
   uint8_t *encoded = calloc(count + 1U, 32);
   if (!encoded) {
     free(sb.buf);
-    eip712_set_error(ctx, "内存不足");
+    eip712_set_error(ctx, i18n_tr_or("error.out_of_memory", "Out of memory"));
     return false;
   }
   eip712_hash_text(sb.buf, encoded);
@@ -906,7 +956,9 @@ static bool eip712_get_primary_type(eip712_ctx_t *ctx, const cJSON *types,
       return false;
   }
   if (custom.count == 0) {
-    eip712_set_error(ctx, "缺少自定义消息类型");
+    eip712_set_error(ctx,
+                     i18n_tr_or("eip712.error.missing_custom_message_type",
+                                "Missing custom message type"));
     return false;
   }
 
@@ -936,7 +988,9 @@ static bool eip712_get_primary_type(eip712_ctx_t *ctx, const cJSON *types,
     }
   }
   if (candidates != 1) {
-    eip712_set_error(ctx, "primaryType 无法确定");
+    eip712_set_error(ctx,
+                     i18n_tr_or("eip712.error.primary_type_undetermined",
+                                "Unable to determine primaryType"));
     out[0] = '\0';
     return false;
   }
@@ -949,7 +1003,9 @@ bool eip712_hash_typed_data_json(const char *typed_data_json, uint8_t out[32],
     err[0] = '\0';
   if (!typed_data_json || !out) {
     if (err && err_len > 0)
-      snprintf(err, err_len, "TypedData 为空");
+      snprintf(err, err_len, "%s",
+               i18n_tr_or("eip712.error.typed_data_empty",
+                          "TypedData is empty"));
     return false;
   }
   eip712_ctx_t ctx = {.err = err, .err_len = err_len};
@@ -957,7 +1013,9 @@ bool eip712_hash_typed_data_json(const char *typed_data_json, uint8_t out[32],
   cJSON *root = cJSON_Parse(typed_data_json);
   if (!cJSON_IsObject(root)) {
     cJSON_Delete(root);
-    eip712_set_error(&ctx, "TypedData 不是 JSON 对象");
+    eip712_set_error(&ctx,
+                     i18n_tr_or("eip712.error.typed_data_not_object",
+                                "TypedData is not a JSON object"));
     return false;
   }
 
@@ -968,14 +1026,17 @@ bool eip712_hash_typed_data_json(const char *typed_data_json, uint8_t out[32],
       eip712_json_string(cJSON_GetObjectItemCaseSensitive(root,
                                                           "primaryType"));
   if (!cJSON_IsObject(types) || !cJSON_IsObject(message)) {
-    eip712_set_error(&ctx, "TypedData 缺少 types/message");
+    eip712_set_error(&ctx,
+                     i18n_tr_or("eip712.error.typed_data_missing_types_message",
+                                "TypedData is missing types/message"));
     cJSON_Delete(root);
     return false;
   }
   if (!domain)
     domain = cJSON_CreateObject();
   if (!cJSON_IsObject(domain)) {
-    eip712_set_error(&ctx, "domain 不是对象");
+    eip712_set_error(&ctx, i18n_tr_or("eip712.error.domain_not_object",
+                                      "Domain is not an object"));
     if (domain && domain->string == NULL)
       cJSON_Delete((cJSON *)domain);
     cJSON_Delete(root);
@@ -997,7 +1058,10 @@ bool eip712_hash_typed_data_json(const char *typed_data_json, uint8_t out[32],
     return false;
   }
   if (provided_primary && strcmp(provided_primary, primary) != 0) {
-    eip712_set_error(&ctx, "primaryType 与类型定义不一致");
+    eip712_set_error(
+        &ctx,
+        i18n_tr_or("eip712.error.primary_type_mismatch",
+                   "primaryType does not match the type definitions"));
     if (domain && domain->string == NULL)
       cJSON_Delete((cJSON *)domain);
     cJSON_Delete(root);

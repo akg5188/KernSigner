@@ -51,9 +51,9 @@ Kern 当前关键文件：
 - `/home/ak/123/Kern/main/smartcard/smartcard_satochip.c`
 - `/home/ak/123/Kern/main/smartcard/smartcard_satochip.h`
 - `/home/ak/123/Kern/main/pages/scan/scan.c`
-- `/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c`
+- `/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c`
 - `/home/ak/123/Kern/main/core/evm.c`
-- `/home/ak/123/Kern/main/krux_port/krux_feature_catalog.c`
+- `/home/ak/123/Kern/main/signer_port/signer_feature_catalog.c`
 - `/home/ak/123/Kern/main/qr/scanner.c`
 
 ## 功能迁移状态

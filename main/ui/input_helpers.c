@@ -3,6 +3,7 @@
 #include "input_helpers.h"
 #include "../core/mnemonic_slots.h"
 #include "../core/wallet.h"
+#include "../i18n/i18n.h"
 #include "dialog.h"
 #include "theme.h"
 #include "../utils/secure_mem.h"
@@ -13,15 +14,15 @@
 
 static int max_i(int a, int b) { return a > b ? a : b; }
 
-#define SAFE_KB_DEL "删"
-#define SAFE_KB_OK "完成"
+#define SAFE_KB_DEL "Del"
+#define SAFE_KB_OK "Done"
 #define SAFE_KB_LEFT "<"
 #define SAFE_KB_RIGHT ">"
-#define SAFE_KB_SPACE "空"
-#define SAFE_KB_ENTER "换行"
-#define SAFE_KB_HIDE "返回"
+#define SAFE_KB_SPACE "Space"
+#define SAFE_KB_ENTER "Enter"
+#define SAFE_KB_HIDE "Back"
 
-static const char *const safe_kb_map_lc[] = {
+static const char *safe_kb_map_lc[] = {
     "1#",          "q",  "w", "e",  "r", "t", "y",  "u",
     "i",           "o",  "p", SAFE_KB_DEL, "\n",
     "ABC",         "a",  "s", "d",  "f", "g", "h",  "j",
@@ -31,7 +32,7 @@ static const char *const safe_kb_map_lc[] = {
     SAFE_KB_HIDE,  SAFE_KB_LEFT, SAFE_KB_SPACE, SAFE_KB_RIGHT, SAFE_KB_OK,
     ""};
 
-static const char *const safe_kb_map_uc[] = {
+static const char *safe_kb_map_uc[] = {
     "1#",          "Q",  "W", "E",  "R", "T", "Y",  "U",
     "I",           "O",  "P", SAFE_KB_DEL, "\n",
     "abc",         "A",  "S", "D",  "F", "G", "H",  "J",
@@ -41,7 +42,7 @@ static const char *const safe_kb_map_uc[] = {
     SAFE_KB_HIDE,  SAFE_KB_LEFT, SAFE_KB_SPACE, SAFE_KB_RIGHT, SAFE_KB_OK,
     ""};
 
-static const char *const safe_kb_map_spec[] = {
+static const char *safe_kb_map_spec[] = {
     "1",           "2", "3",  "4", "5", "6", "7", "8",
     "9",           "0", SAFE_KB_DEL, "\n",
     "abc",         "+", "&",  "/", "*", "=", "%", "!", "?",
@@ -76,7 +77,7 @@ static const lv_buttonmatrix_ctrl_t safe_kb_ctrl_spec_map[] = {
 // Compact keyboard maps for small (320x480) displays.
 // Trade fewer keys per row for wider touch targets.
 
-static const char *const compact_kb_map_lc[] = {
+static const char *compact_kb_map_lc[] = {
     "q",  "w",  "e",  "r",   "t",  "y",
     "u",  "i",  "o",  "p",   "\n", "a",
     "s",  "d",  "f",  "g",   "h",  "j",
@@ -120,7 +121,7 @@ static const lv_buttonmatrix_ctrl_t compact_kb_ctrl_lc_map[] = {
     1,
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2};
 
-static const char *const compact_kb_map_uc[] = {
+static const char *compact_kb_map_uc[] = {
     "Q",  "W",  "E",  "R",   "T",  "Y",
     "U",  "I",  "O",  "P",   "\n", "A",
     "S",  "D",  "F",  "G",   "H",  "J",
@@ -164,7 +165,7 @@ static const lv_buttonmatrix_ctrl_t compact_kb_ctrl_uc_map[] = {
     1,
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2};
 
-static const char *const compact_kb_map_spec[] = {"1",
+static const char *compact_kb_map_spec[] = {"1",
                                                   "2",
                                                   "3",
                                                   "4",
@@ -242,6 +243,53 @@ static const lv_buttonmatrix_ctrl_t compact_kb_ctrl_spec_map[] = {
     LV_KEYBOARD_CTRL_BUTTON_FLAGS | 2};
 #endif
 
+static const char *safe_kb_del_label(void) {
+  return i18n_tr_or("action.delete_short", SAFE_KB_DEL);
+}
+
+static const char *safe_kb_ok_label(void) {
+  return i18n_tr_or("dialog.keyboard_done", SAFE_KB_OK);
+}
+
+static const char *safe_kb_space_label(void) {
+  return i18n_tr_or("dialog.keyboard_space", SAFE_KB_SPACE);
+}
+
+static const char *safe_kb_hide_label(void) {
+  return i18n_tr_or("common.back", SAFE_KB_HIDE);
+}
+
+static void ui_keyboard_refresh_safe_labels(void) {
+  safe_kb_map_lc[11] = safe_kb_del_label();
+  safe_kb_map_lc[38] = safe_kb_hide_label();
+  safe_kb_map_lc[40] = safe_kb_space_label();
+  safe_kb_map_lc[42] = safe_kb_ok_label();
+
+  safe_kb_map_uc[11] = safe_kb_del_label();
+  safe_kb_map_uc[38] = safe_kb_hide_label();
+  safe_kb_map_uc[40] = safe_kb_space_label();
+  safe_kb_map_uc[42] = safe_kb_ok_label();
+
+  safe_kb_map_spec[10] = safe_kb_del_label();
+  safe_kb_map_spec[38] = safe_kb_hide_label();
+  safe_kb_map_spec[40] = safe_kb_space_label();
+  safe_kb_map_spec[42] = safe_kb_ok_label();
+
+#ifdef CONFIG_KSIG_BOARD_WAVE_35
+  compact_kb_map_lc[29] = safe_kb_del_label();
+  compact_kb_map_lc[33] = safe_kb_space_label();
+  compact_kb_map_lc[35] = safe_kb_ok_label();
+
+  compact_kb_map_uc[29] = safe_kb_del_label();
+  compact_kb_map_uc[33] = safe_kb_space_label();
+  compact_kb_map_uc[35] = safe_kb_ok_label();
+
+  compact_kb_map_spec[30] = safe_kb_del_label();
+  compact_kb_map_spec[34] = safe_kb_space_label();
+  compact_kb_map_spec[37] = safe_kb_ok_label();
+#endif
+}
+
 static void ui_async_send_ready(void *target) {
   lv_obj_t *textarea = (lv_obj_t *)target;
   if (textarea && lv_obj_is_valid(textarea))
@@ -300,12 +348,12 @@ static void ui_safe_keyboard_event_cb(lv_event_t *e) {
   }
 
   lv_obj_t *textarea = lv_keyboard_get_textarea(keyboard);
-  if (strcmp(txt, SAFE_KB_HIDE) == 0) {
+  if (strcmp(txt, SAFE_KB_HIDE) == 0 || strcmp(txt, safe_kb_hide_label()) == 0) {
     if (textarea)
       (void)lv_async_call(ui_async_send_cancel, textarea);
     return;
   }
-  if (strcmp(txt, SAFE_KB_OK) == 0) {
+  if (strcmp(txt, SAFE_KB_OK) == 0 || strcmp(txt, safe_kb_ok_label()) == 0) {
     if (textarea)
       (void)lv_async_call(ui_async_send_ready, textarea);
     return;
@@ -317,7 +365,8 @@ static void ui_safe_keyboard_event_cb(lv_event_t *e) {
     lv_textarea_add_char(textarea, '\n');
     if (lv_textarea_get_one_line(textarea))
       (void)lv_async_call(ui_async_send_ready, textarea);
-  } else if (strcmp(txt, SAFE_KB_DEL) == 0) {
+  } else if (strcmp(txt, SAFE_KB_DEL) == 0 ||
+             strcmp(txt, safe_kb_del_label()) == 0) {
     lv_textarea_delete_char(textarea);
     ui_textarea_keep_cursor_visible(textarea);
   } else if (strcmp(txt, SAFE_KB_LEFT) == 0) {
@@ -326,7 +375,8 @@ static void ui_safe_keyboard_event_cb(lv_event_t *e) {
   } else if (strcmp(txt, SAFE_KB_RIGHT) == 0) {
     lv_textarea_cursor_right(textarea);
     ui_textarea_keep_cursor_visible(textarea);
-  } else if (strcmp(txt, SAFE_KB_SPACE) == 0) {
+  } else if (strcmp(txt, SAFE_KB_SPACE) == 0 ||
+             strcmp(txt, safe_kb_space_label()) == 0) {
     lv_textarea_add_char(textarea, ' ');
     ui_textarea_keep_cursor_visible(textarea);
   } else {
@@ -344,7 +394,8 @@ static void ui_safe_textarea_insert_cb(lv_event_t *e) {
     return;
 
   lv_obj_t *textarea = lv_event_get_current_target(e);
-  if (strcmp(txt, SAFE_KB_DEL) == 0) {
+  if (strcmp(txt, SAFE_KB_DEL) == 0 ||
+      strcmp(txt, safe_kb_del_label()) == 0) {
     lv_textarea_delete_char(textarea);
     ui_textarea_keep_cursor_visible(textarea);
     lv_textarea_set_insert_replace(textarea, "");
@@ -356,14 +407,17 @@ static void ui_safe_textarea_insert_cb(lv_event_t *e) {
     lv_textarea_cursor_right(textarea);
     ui_textarea_keep_cursor_visible(textarea);
     lv_textarea_set_insert_replace(textarea, "");
-  } else if (strcmp(txt, SAFE_KB_SPACE) == 0) {
+  } else if (strcmp(txt, SAFE_KB_SPACE) == 0 ||
+             strcmp(txt, safe_kb_space_label()) == 0) {
     lv_textarea_set_insert_replace(textarea, " ");
   } else if (strcmp(txt, SAFE_KB_ENTER) == 0) {
     lv_textarea_set_insert_replace(textarea, "\n");
-  } else if (strcmp(txt, SAFE_KB_OK) == 0) {
+  } else if (strcmp(txt, SAFE_KB_OK) == 0 ||
+             strcmp(txt, safe_kb_ok_label()) == 0) {
     lv_textarea_set_insert_replace(textarea, "");
     (void)lv_async_call(ui_async_send_ready, textarea);
-  } else if (strcmp(txt, SAFE_KB_HIDE) == 0) {
+  } else if (strcmp(txt, SAFE_KB_HIDE) == 0 ||
+             strcmp(txt, safe_kb_hide_label()) == 0) {
     lv_textarea_set_insert_replace(textarea, "");
     (void)lv_async_call(ui_async_send_cancel, textarea);
   }
@@ -373,6 +427,7 @@ void ui_keyboard_apply_safe_text_map(lv_obj_t *keyboard) {
   if (!keyboard)
     return;
 
+  ui_keyboard_refresh_safe_labels();
   lv_keyboard_set_map(keyboard, LV_KEYBOARD_MODE_TEXT_LOWER, safe_kb_map_lc,
                       safe_kb_ctrl_text_map);
   lv_keyboard_set_map(keyboard, LV_KEYBOARD_MODE_TEXT_UPPER, safe_kb_map_uc,
@@ -432,15 +487,19 @@ static lv_obj_t *create_top_left_corner_button(lv_obj_t *parent,
 }
 
 lv_obj_t *ui_create_back_button(lv_obj_t *parent, lv_event_cb_t event_cb) {
-  return create_top_left_corner_button(parent, "返回", event_cb);
+  return create_top_left_corner_button(parent,
+                                       i18n_tr_or("common.back", "Back"),
+                                       event_cb);
 }
 
 lv_obj_t *ui_create_home_button(lv_obj_t *parent, lv_event_cb_t event_cb) {
-  return create_top_left_corner_button(parent, "首页", event_cb);
+  return create_top_left_corner_button(parent,
+                                       i18n_tr_or("common.home", "Home"),
+                                       event_cb);
 }
 
 lv_obj_t *ui_create_power_button(lv_obj_t *parent, lv_event_cb_t event_cb) {
-  return create_top_left_corner_button(parent, "关机", event_cb);
+  return create_top_left_corner_button(parent, "Power", event_cb);
 }
 
 static lv_obj_t *create_top_right_corner_button(lv_obj_t *parent,
@@ -481,7 +540,7 @@ static lv_obj_t *create_top_right_corner_button(lv_obj_t *parent,
 }
 
 lv_obj_t *ui_create_settings_button(lv_obj_t *parent, lv_event_cb_t event_cb) {
-  return create_top_right_corner_button(parent, "设置", event_cb);
+  return create_top_right_corner_button(parent, "Set", event_cb);
 }
 
 /* ---------- Shared power-off callback ---------- */
@@ -498,7 +557,7 @@ void ui_power_off_confirmed_cb(bool confirmed, void *user_data) {
     if (unload_key) {
       esp_restart();
     } else {
-      dialog_show_error("关机失败", NULL, DIALOG_STYLE_OVERLAY);
+      dialog_show_error("Power off failed", NULL, DIALOG_STYLE_OVERLAY);
     }
   }
 }
@@ -511,7 +570,9 @@ static void ui_text_input_eye_cb(lv_event_t *e) {
     return;
   bool hidden = lv_textarea_get_password_mode(input->textarea);
   lv_textarea_set_password_mode(input->textarea, !hidden);
-  lv_label_set_text(input->eye_label, hidden ? "隐藏" : "显示");
+  lv_label_set_text(input->eye_label,
+                    hidden ? i18n_tr_or("pin.hide", "Hide")
+                           : i18n_tr_or("pin.show", "Show"));
 }
 
 static void ui_textarea_focus_scroll_cb(lv_event_t *e) {
@@ -543,6 +604,7 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
   lv_textarea_set_one_line(input->textarea, true);
   lv_textarea_set_password_mode(input->textarea, password_mode);
   lv_textarea_set_placeholder_text(input->textarea, placeholder);
+  theme_apply_textarea(input->textarea, false);
   ui_textarea_enable_safe_keyboard_shortcuts(input->textarea);
   lv_obj_add_event_cb(input->textarea, ui_textarea_focus_scroll_cb,
                       LV_EVENT_FOCUSED, NULL);
@@ -584,7 +646,7 @@ void ui_text_input_create(ui_text_input_t *input, lv_obj_t *parent,
                         input);
 
     input->eye_label = lv_label_create(input->eye_btn);
-    lv_label_set_text(input->eye_label, "显示");
+    lv_label_set_text(input->eye_label, i18n_tr_or("pin.show", "Show"));
     lv_obj_set_style_text_color(input->eye_label, main_color(), 0);
     lv_obj_set_style_text_font(input->eye_label, theme_font_small(), 0);
     lv_obj_center(input->eye_label);

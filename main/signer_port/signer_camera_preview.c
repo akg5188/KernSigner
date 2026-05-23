@@ -1,7 +1,9 @@
 #include "signer_camera_preview.h"
 
 #include "core/settings.h"
+#include "i18n/i18n.h"
 #include "signer_qr_decoder.h"
+#include "ui/i18n_text.h"
 #include "ui/theme.h"
 
 #include <bsp/esp-bsp.h>
@@ -134,15 +136,17 @@ static qr_payload_classification_t classify_qr_payload(
     const signer_qr_decode_result_t *result) {
   qr_payload_classification_t cls = {
       .kind = QR_KIND_TEXT,
-      .name = "普通文本二维码",
-      .action = "只显示文本，不连接钱包流程。",
+      .name = i18n_tr_or("camera.qr_plain_text", "Plain text QR"),
+      .action = i18n_tr_or("camera.qr_plain_text_action",
+                           "Text only. Wallet flow will not start."),
       .sensitive = false,
   };
 
   if (!result || !result->printable) {
     cls.kind = QR_KIND_BINARY;
-    cls.name = "二进制二维码";
-    cls.action = "内容已隐藏，不导入钱包。";
+    cls.name = i18n_tr_or("camera.qr_binary", "Binary QR");
+    cls.action = i18n_tr_or("camera.qr_binary_action",
+                            "Content hidden. Wallet import will not start.");
     cls.sensitive = true;
     return cls;
   }
@@ -152,40 +156,48 @@ static qr_payload_classification_t classify_qr_payload(
       starts_with_ci(text, "ur:crypto-seed") ||
       looks_like_numeric_seed(text, result->payload_len)) {
     cls.kind = QR_KIND_SEED;
-    cls.name = "疑似助记词二维码";
-    cls.action = "请从加载助记词入口进入钱包导入流程。";
+    cls.name = i18n_tr_or("camera.qr_possible_seed", "Possible seed QR");
+    cls.action = i18n_tr_or("camera.qr_possible_seed_action",
+                            "Use Load Mnemonic to import wallet seed data.");
     cls.sensitive = true;
   } else if (starts_with_ci(text, "ur:")) {
     cls.kind = QR_KIND_UR;
-    cls.name = "UR/BC-UR 二维码";
-    cls.action = "可能是多片钱包数据；请从导入或扫码签名入口处理。";
+    cls.name = i18n_tr_or("camera.qr_ur", "UR/BC-UR QR");
+    cls.action = i18n_tr_or("camera.qr_ur_action",
+                            "May be multipart wallet data. Use Import or Scan Sign.");
     cls.sensitive = true;
   } else if (starts_with_ci(text, "B$") || starts_with_ci(text, "bbqr:")) {
     cls.kind = QR_KIND_BBQR;
-    cls.name = "分片二维码";
-    cls.action = "可能是多片钱包数据；请从导入或扫码签名入口处理。";
+    cls.name = i18n_tr_or("camera.qr_multipart", "Multipart QR");
+    cls.action = i18n_tr_or("camera.qr_multipart_action",
+                            "May be multipart wallet data. Use Import or Scan Sign.");
     cls.sensitive = true;
   } else if (looks_like_pmofn(text)) {
     cls.kind = QR_KIND_PMOFN;
-    cls.name = "多片二维码";
-    cls.action = "多片解析需要进入对应钱包流程。";
+    cls.name = i18n_tr_or("camera.qr_multipart", "Multipart QR");
+    cls.action = i18n_tr_or("camera.qr_multipart_open_action",
+                            "Open the matching wallet flow to decode all parts.");
     cls.sensitive = true;
   } else if (starts_with_ci(text, "psbt") || starts_with_ci(text, "cHNidP") ||
              contains_ci(text, "psbt") || contains_ci(text, "70736274ff")) {
     cls.kind = QR_KIND_PSBT;
-    cls.name = "交易签名二维码";
-    cls.action = "请从扫码签名入口进入钱包签名流程。";
+    cls.name = i18n_tr_or("camera.qr_transaction_signing",
+                          "Transaction signing QR");
+    cls.action = i18n_tr_or("camera.qr_transaction_signing_action",
+                            "Use Scan Sign to review and sign this request.");
     cls.sensitive = true;
   } else if (starts_with_ci(text, "bitcoin:") ||
              starts_with_ci(text, "lightning:")) {
     cls.kind = QR_KIND_BITCOIN_URI;
-    cls.name = "公开收款二维码";
-    cls.action = "只显示公开文本，不判断是否属于本机钱包。";
+    cls.name = i18n_tr_or("camera.qr_payment", "Payment QR");
+    cls.action = i18n_tr_or("camera.qr_payment_action",
+                            "Showing public text only. Ownership is not checked.");
   } else if (starts_with_ci(text, "http://") ||
              starts_with_ci(text, "https://")) {
     cls.kind = QR_KIND_URL;
-    cls.name = "网址二维码";
-    cls.action = "只显示网址文本，不自动联网。";
+    cls.name = i18n_tr_or("camera.qr_url", "URL QR");
+    cls.action = i18n_tr_or("camera.qr_url_action",
+                            "Showing URL text only. No network request is made.");
   }
 
   return cls;
@@ -198,18 +210,24 @@ static void format_qr_status(char *buf, size_t buf_len,
 
   qr_payload_classification_t cls = classify_qr_payload(result);
   if (!result) {
-    snprintf(buf, buf_len, "识别到二维码，但结果为空。");
+    snprintf(buf, buf_len, "%s",
+             i18n_tr_or("camera.qr_empty",
+                        "QR detected, but the result is empty."));
     return;
   }
 
   if (!s_reveal_qr_payload || cls.sensitive) {
-    snprintf(buf, buf_len, "识别到：%s\n长度：%zu 字节\n%s", cls.name,
-             result->payload_len, cls.action);
+    snprintf(buf, buf_len,
+             i18n_tr_or("camera.qr_detected_length_format",
+                        "Detected: %s\nLength: %zu bytes\n%s"),
+             cls.name, result->payload_len, cls.action);
     return;
   }
 
-  snprintf(buf, buf_len, "识别到：%s\n%s\n内容：%s", cls.name, cls.action,
-           result->text);
+  snprintf(buf, buf_len,
+           i18n_tr_or("camera.qr_detected_content_format",
+                      "Detected: %s\n%s\nContent: %s"),
+           cls.name, cls.action, result->text);
 }
 
 static uint8_t *allocate_preview_buffer(size_t size) {
@@ -354,7 +372,8 @@ static void camera_frame_cb(uint8_t *camera_buf, uint8_t camera_buf_index,
       ESP_LOGI(TAG, "QR detected, len=%zu printable=%d",
                qr_result.payload_len, qr_result.printable);
     } else if (!s_seen_frame && s_status_label) {
-      lv_label_set_text(s_status_label, "相机画面已收到：正在安全检测普通二维码。");
+      lv_label_set_text(s_status_label,
+                        "Camera frame received. Checking plain QR safely.");
       lv_obj_set_style_text_color(s_status_label, yes_color(), 0);
       s_seen_frame = true;
       ESP_LOGI(TAG, "first camera frame received, source=%" PRIu32 "x%" PRIu32,
@@ -377,12 +396,13 @@ static void update_status(const char *text, lv_color_t color) {
 static bool start_camera(void) {
   i2c_master_bus_handle_t i2c_handle = bsp_i2c_get_handle();
   if (!i2c_handle) {
-    update_status("启动失败：I2C 总线还没有初始化。", error_color());
+    update_status("Start failed: I2C bus is not initialized.", error_color());
     return false;
   }
 
   if (app_video_main(i2c_handle) != ESP_OK) {
-    update_status("启动失败：摄像头视频子系统初始化失败。", error_color());
+    update_status("Start failed: camera video subsystem init failed.",
+                  error_color());
     ESP_LOGE(TAG, "video init failed");
     return false;
   }
@@ -390,19 +410,21 @@ static bool start_camera(void) {
 
   s_camera_handle = app_video_open((char *)CAM_DEV_PATH, APP_VIDEO_FMT_RGB565);
   if (s_camera_handle < 0) {
-    update_status("启动失败：没有打开摄像头设备。", error_color());
+    update_status("Start failed: camera device did not open.", error_color());
     ESP_LOGE(TAG, "open camera device failed");
     return false;
   }
 
   if (app_video_register_frame_operation_cb(camera_frame_cb) != ESP_OK) {
-    update_status("启动失败：摄像头回调没有注册。", error_color());
+    update_status("Start failed: camera callback was not registered.",
+                  error_color());
     ESP_LOGE(TAG, "camera frame callback registration failed");
     return false;
   }
 
   if (!allocate_preview_buffers()) {
-    update_status("启动失败：预览缓冲区内存不足。", error_color());
+    update_status("Start failed: not enough memory for preview buffers.",
+                  error_color());
     ESP_LOGE(TAG, "preview buffer allocation failed");
     return false;
   }
@@ -419,13 +441,15 @@ static bool start_camera(void) {
   ppa_client_config_t ppa_cfg = {.oper_type = PPA_OPERATION_SRM};
   if (ppa_register_client(&ppa_cfg, &s_ppa_client) != ESP_OK) {
     s_ppa_client = NULL;
-    update_status("启动失败：图像缩放硬件没有启动。", error_color());
+    update_status("Start failed: image scaling hardware did not start.",
+                  error_color());
     ESP_LOGE(TAG, "PPA client registration failed");
     return false;
   }
 
   if (app_video_set_bufs(s_camera_handle, CAM_BUF_NUM, NULL) != ESP_OK) {
-    update_status("启动失败：摄像头帧缓冲配置失败。", error_color());
+    update_status("Start failed: camera frame buffer setup failed.",
+                  error_color());
     ESP_LOGE(TAG, "camera buffer setup failed");
     return false;
   }
@@ -433,7 +457,8 @@ static bool start_camera(void) {
   s_streaming = true;
   if (app_video_stream_task_start(s_camera_handle, 0) != ESP_OK) {
     s_streaming = false;
-    update_status("启动失败：摄像头采集任务没有启动。", error_color());
+    update_status("Start failed: camera capture task did not start.",
+                  error_color());
     ESP_LOGE(TAG, "camera stream task start failed");
     return false;
   }
@@ -444,7 +469,7 @@ static bool start_camera(void) {
   }
   ESP_LOGI(TAG, "camera preview started, preview=%" PRIu32 "x%" PRIu32,
            s_preview_size, s_preview_size);
-  update_status("正在等待第一帧画面...", highlight_color());
+  update_status("Waiting for the first camera frame...", highlight_color());
   return true;
 }
 
@@ -494,7 +519,7 @@ static void stop_camera(void) {
 static lv_obj_t *create_label(lv_obj_t *parent, const char *text, bool medium,
                               lv_color_t color) {
   lv_obj_t *label = lv_label_create(parent);
-  lv_label_set_text(label, text ? text : "");
+  lv_label_set_text(label, ui_i18n_text(text));
   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
   lv_obj_set_width(label, LV_PCT(100));
   lv_obj_set_style_text_font(label, medium ? theme_font_medium()
@@ -543,10 +568,14 @@ bool signer_camera_preview_open_ex(const char *title, const char *notice,
   lv_obj_set_flex_align(s_screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                         LV_FLEX_ALIGN_CENTER);
 
-  create_label(s_screen, title ? title : "相机预览", true, highlight_color());
+  create_label(s_screen,
+               title ? title : i18n_tr_or("tools.camera_preview", "Camera Preview"),
+               true,
+               highlight_color());
   create_label(s_screen,
                notice ? notice
-                      : "只检查摄像头画面，不解析二维码，也不会导入钱包数据。",
+                      : i18n_tr_or("service.camera.summary",
+                                   "Checks camera frames only. QR data is not imported."),
                false, secondary_color());
 
   lv_obj_t *frame = lv_obj_create(s_screen);
@@ -563,10 +592,12 @@ bool signer_camera_preview_open_ex(const char *title, const char *notice,
   lv_obj_set_size(s_camera_img, s_preview_size, s_preview_size);
   lv_obj_center(s_camera_img);
 
-  s_status_label = create_label(s_screen, "正在启动相机...", false,
-                                highlight_color());
+  s_status_label =
+      create_label(s_screen, i18n_tr_or("tools.camera_running", "Starting camera..."),
+                   false, highlight_color());
 
-  lv_obj_t *close_btn = theme_create_button(s_screen, "返回", false);
+  lv_obj_t *close_btn =
+      theme_create_button(s_screen, i18n_tr_or("common.back", "Back"), false);
   lv_obj_set_width(close_btn, LV_PCT(100));
   lv_obj_add_event_cb(close_btn, close_event_cb, LV_EVENT_CLICKED, NULL);
 

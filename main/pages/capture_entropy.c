@@ -13,6 +13,7 @@
 #include <wally_crypto.h>
 
 #include "../components/video/video.h"
+#include "../i18n/i18n.h"
 #include "../ui/dialog.h"
 #include "../ui/input_helpers.h"
 #include "../ui/theme.h"
@@ -370,7 +371,7 @@ static void touch_event_cb(lv_event_t *e) {
 
   if (entropy < ENTROPY_THRESHOLD) {
     dialog_showing = true;
-    dialog_show_confirm("随机性不足\n重新拍摄？", low_entropy_prompt_cb, NULL,
+    dialog_show_confirm("Low randomness\nRetake?", low_entropy_prompt_cb, NULL,
                         DIALOG_STYLE_OVERLAY);
     return;
   }
@@ -434,12 +435,15 @@ void capture_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_bg_color(camera_img, lv_color_white(), 0);
   lv_obj_set_style_bg_opa(camera_img, LV_OPA_COVER, 0);
 
-  lv_obj_t *title = theme_create_page_title(capture_screen, "拍照生成随机熵");
+  lv_obj_t *title =
+      theme_create_page_title(capture_screen,
+                              i18n_tr_or("menu.camera", "Camera Entropy"));
   lv_obj_set_width(title, LV_PCT(50));
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, theme_get_default_padding());
 
   lv_obj_t *instruction =
-      theme_create_label(capture_screen, "点击拍摄", false);
+      theme_create_label(capture_screen, i18n_tr_or("common.start", "Tap to capture"),
+                         false);
   lv_obj_set_style_text_color(instruction, highlight_color(), 0);
   lv_obj_align(instruction, LV_ALIGN_BOTTOM_MID, 0,
                -theme_get_default_padding());

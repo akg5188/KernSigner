@@ -129,10 +129,11 @@ button_slot_h = 5.20;
 ## 导出 STL
 
 ```bash
+cd /home/ak/123/Kern/hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera
 make all
 ```
 
-`make all` 只会导出主壳 `screen_protective_case.stl`。`make reference` 可生成带参考板位置的预览 STL，但不是打印件。
+需要先安装 `openscad`。`make all` 只会导出主壳 `screen_protective_case.stl`。`make reference` 可生成带参考板位置的预览 STL，但不是打印件。
 
 GitHub 上用于打印的文件只有：
 

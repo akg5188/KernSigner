@@ -2,6 +2,7 @@
 
 #include <lvgl.h>
 
+#include "../../i18n/i18n.h"
 #include "../../ui/battery.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
@@ -23,8 +24,8 @@ static lv_obj_t *power_button = NULL;
 static void power_button_cb(lv_event_t *e) {
   (void)e;
   // Pass NULL user_data to signal "no key to unload"
-  dialog_show_confirm("确定关机？", ui_power_off_confirmed_cb, NULL,
-                      DIALOG_STYLE_OVERLAY);
+  dialog_show_confirm(i18n_tr_or("settings.power_off_confirm", "Power off?"),
+                      ui_power_off_confirmed_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
 
 static void return_from_settings_cb(void) {
@@ -81,14 +82,18 @@ static void about_cb(void) {
 void login_page_create(lv_obj_t *parent) {
   login_screen = theme_create_page_container(parent);
 
-  login_menu = ui_menu_create(login_screen, "钱包", NULL);
-  ui_menu_add_entry(login_menu, "导入", load_mnemonic_cb);
-  ui_menu_add_entry(login_menu, "创建", new_mnemonic_cb);
-  ui_menu_add_entry(login_menu, "设置", settings_cb);
+  login_menu =
+      ui_menu_create(login_screen, i18n_tr_or("menu.wallet", "Wallet"), NULL);
+  ui_menu_add_entry(login_menu, i18n_tr_or("menu.import", "Import"),
+                    load_mnemonic_cb);
+  ui_menu_add_entry(login_menu, i18n_tr_or("menu.create", "Create"),
+                    new_mnemonic_cb);
+  ui_menu_add_entry(login_menu, i18n_tr_or("menu.settings", "Settings"),
+                    settings_cb);
 #if defined(DEV_TOOLS_ENABLED) && defined(KSIG_SHOW_DEV_TOOLS)
   (void)dev_tools_cb;
 #endif
-  ui_menu_add_entry(login_menu, "关于", about_cb);
+  ui_menu_add_entry(login_menu, i18n_tr_or("menu.about", "About"), about_cb);
   ui_menu_show(login_menu);
 
   // Power button at top-left (only useful with PMIC; without it there's

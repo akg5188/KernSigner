@@ -3,6 +3,7 @@
 #include "pin_settings.h"
 #include "../../core/pin.h"
 #include "../../core/session.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/menu.h"
@@ -59,7 +60,6 @@ static void change_pin_cb(void) {
 
 // Security policy is fixed: 3 minutes to lock, 10 minutes to power off.
 static const uint16_t timeout_values[] = {PIN_DEFAULT_TIMEOUT_SEC};
-static const char *timeout_options = "3 分钟";
 
 static void timeout_dropdown_cb(lv_event_t *e) {
   uint16_t sel = lv_dropdown_get_selected(lv_event_get_target(e));
@@ -83,9 +83,11 @@ static void show_timeout_page(void) {
 
   timeout_screen = theme_create_page_container(lv_screen_active());
   ui_create_back_button(timeout_screen, timeout_back_cb);
-  theme_create_page_title(timeout_screen, "自动锁定");
+  theme_create_page_title(timeout_screen,
+                          i18n_tr_or("pin.auto_lock", "Auto lock"));
 
-  timeout_dropdown = theme_create_dropdown(timeout_screen, timeout_options);
+  timeout_dropdown = theme_create_dropdown(
+      timeout_screen, i18n_tr_or("pin.timeout_3_minutes", "3 minutes"));
   lv_obj_set_width(timeout_dropdown, LV_HOR_RES * 40 / 100);
   lv_obj_align(timeout_dropdown, LV_ALIGN_CENTER, 0, 0);
 
@@ -138,12 +140,18 @@ static void show_threshold_page(void) {
 
   threshold_screen = theme_create_page_container(lv_screen_active());
   ui_create_back_button(threshold_screen, threshold_back_cb);
-  theme_create_page_title(threshold_screen, "关机保护");
+  theme_create_page_title(
+      threshold_screen,
+      i18n_tr_or("pin.power_off_protection", "Power-off protection"));
 
   lv_obj_t *desc = lv_label_create(threshold_screen);
-  lv_label_set_text(desc,
-                    "连续输错 PIN 3 次后，将清除本次会话并尝试关机保护。");
+  lv_label_set_text(
+      desc,
+      i18n_tr_or("pin.power_off_desc",
+                 "After 3 wrong PIN attempts clear this session and try "
+                 "power-off protection"));
   lv_obj_set_style_text_color(desc, secondary_color(), 0);
+  lv_obj_set_style_text_font(desc, theme_font_small(), 0);
   lv_obj_set_style_text_align(desc, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_width(desc, LV_PCT(80));
   lv_obj_align(desc, LV_ALIGN_CENTER, 0, -40);
@@ -193,10 +201,16 @@ void pin_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   return_callback = return_cb;
   settings_screen = theme_create_page_container(parent);
   settings_menu =
-      ui_menu_create(settings_screen, "PIN 设置", settings_back_cb);
-  ui_menu_add_entry(settings_menu, "修改 PIN", change_pin_cb);
-  ui_menu_add_entry(settings_menu, "自动锁定", show_timeout_page);
-  ui_menu_add_entry(settings_menu, "关机保护", show_threshold_page);
+      ui_menu_create(settings_screen, i18n_tr_or("pin.settings", "PIN Settings"),
+                     settings_back_cb);
+  ui_menu_add_entry(settings_menu, i18n_tr_or("pin.change", "Change PIN"),
+                    change_pin_cb);
+  ui_menu_add_entry(settings_menu, i18n_tr_or("pin.auto_lock", "Auto lock"),
+                    show_timeout_page);
+  ui_menu_add_entry(
+      settings_menu,
+      i18n_tr_or("pin.power_off_protection", "Power-off protection"),
+      show_threshold_page);
 }
 
 void pin_settings_page_show(void) {

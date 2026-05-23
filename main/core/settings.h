@@ -3,6 +3,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#include "i18n/i18n.h"
 #include "wallet.h"
 #include <esp_err.h>
 
@@ -25,6 +26,8 @@ uint16_t settings_get_focus_position(void);
 esp_err_t settings_set_focus_position(uint16_t position);
 bool settings_get_permissive_signing(void);
 esp_err_t settings_set_permissive_signing(bool permissive);
+i18n_language_t settings_get_language(void);
+esp_err_t settings_set_language(i18n_language_t language);
 esp_err_t settings_reset_all(void);
 
 #endif // SETTINGS_H

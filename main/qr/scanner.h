@@ -10,10 +10,6 @@
 #include <lvgl.h>
 #include <stdbool.h>
 
-#ifdef K_QUIRC_DEBUG
-#define QR_PERF_DEBUG
-#endif
-
 /**
  * @brief Create the QR scanner page
  *

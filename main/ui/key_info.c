@@ -1,6 +1,7 @@
 #include "key_info.h"
 #include "../core/key.h"
 #include "../core/wallet.h"
+#include "../i18n/i18n.h"
 #include "theme.h"
 #include <stdio.h>
 
@@ -21,14 +22,17 @@ lv_obj_t *ui_fingerprint_create(lv_obj_t *parent, lv_color_t color) {
   char fingerprint_hex[9];
   if (!key_get_fingerprint_hex(fingerprint_hex))
     return NULL;
-  return ui_icon_text_row_create(parent, "指纹", fingerprint_hex, color);
+  return ui_icon_text_row_create(parent,
+                                 i18n_tr_or("sign.fingerprint", "Fingerprint"),
+                                 fingerprint_hex, color);
 }
 
 lv_obj_t *ui_derivation_create(lv_obj_t *parent, lv_color_t color) {
   const char *derivation = wallet_get_derivation();
   if (!derivation)
     return NULL;
-  return ui_icon_text_row_create(parent, "路径", derivation, color);
+  return ui_icon_text_row_create(parent, i18n_tr_or("address.path", "Path"),
+                                 derivation, color);
 }
 
 lv_obj_t *ui_key_info_create(lv_obj_t *parent) {

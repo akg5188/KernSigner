@@ -21,6 +21,7 @@ set(SOURCES
     "core/ss_whitelist.c"
     "core/storage.c"
     "core/wallet.c"
+    "i18n/i18n.c"
     "qr/encoder.c"
     "qr/parser.c"
     "qr/scanner.c"
@@ -30,6 +31,7 @@ set(SOURCES
     "ui/battery.c"
     "ui/dialog.c"
     "ui/font_policy.c"
+    "ui/i18n_text.c"
     "ui/input_helpers.c"
     "ui/key_info.c"
     "ui/keyboard.c"
@@ -132,7 +134,7 @@ idf_component_register(
         "smartcard/cert/test-ca.cert"
         "smartcard/cert/test-subca-satochip.cert"
     PRIV_REQUIRES lvgl ${TOUCH_DRIVER} wave_4b wave_35 wave_5 wave_43
-                  nvs_flash sd_card spiffs esp_partition video k_quirc
+                  nvs_flash sd_card spiffs esp_partition video k_quirc zbar_qr
                   esp_driver_ppa esp_app_format efuse esp_security esp_timer
                   heap mbedtls usb bbqr libwally-core cUR
                   json

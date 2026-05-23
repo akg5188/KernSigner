@@ -4,13 +4,15 @@ This directory keeps the public screenshot set used by the GitHub README.
 
 Current public batch:
 
-- Directory: [current_20260522_193505](current_20260522_193505)
-- PNG screenshots: 296
-- Full Krux/KernSigner pages: 146
+- Directory: [current_20260523_163539](current_20260523_163539)
+- Page PNG screenshots: 297
+- Contact-sheet PNGs: 3
+- Full KernSigner pages: 150
 - Missing glyphs: 0
 - Smoke failures: 0
 - Scroll failures: 0
 - Screenshot generation failures: 0
+- Button interaction failures: 0
 
 Policy:
 

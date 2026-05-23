@@ -21,9 +21,9 @@ firmware/**/build_*/
 docs/logs/
 docs/screens/delivery_*/
 docs/screens/*_202605*/
-!docs/screens/current_20260522_193505/
-!docs/screens/current_20260522_193505/**/
-docs/screens/current_20260522_193505/**/*.bmp
+!docs/screens/current_20260523_163539/
+!docs/screens/current_20260523_163539/**/
+docs/screens/current_20260523_163539/**/*.bmp
 
 # Simulator
 simulator/build*/
@@ -33,6 +33,7 @@ simulator/sim_data/
 components/bbqr/test/test_bbqr
 components/bbqr/test/test_base32
 components/bbqr/test/test_miniz
+components/*/test/build/
 main/core/test/test_derivation_path
 main/core/test/test_ss_whitelist_parse
 main/core/test/test_ss_whitelist_is_whitelisted
@@ -42,6 +43,7 @@ main/core/test/test_registry_match
 main/core/test/test_registry_parse
 main/core/test/test_psbt_classify
 main/core/test/test_custom_derivation
+main/core/test/test_btc_derivation
 main/core/test/test_message_sign
 main/core/test/test_mnemonic_tools
 main/core/test/test_qr_relay_parser

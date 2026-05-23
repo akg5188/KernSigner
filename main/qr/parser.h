@@ -14,6 +14,7 @@
 #define FORMAT_BBQR 3
 #define FORMAT_RELAY 4
 #define FORMAT_TP_MULTI 5
+#define FORMAT_ELECTRUM 6
 
 /**
  * @brief Prefix length constants for different QR formats

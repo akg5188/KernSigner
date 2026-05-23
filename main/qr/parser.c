@@ -40,6 +40,8 @@ static void find_min_num_parts(const char *data, size_t data_len, int max_width,
                                int qr_format, int *num_parts, int *part_size);
 static bool add_part(QRPartParser *parser, int index, const char *data,
                      size_t data_len);
+static bool fallback_to_single_raw(QRPartParser *parser, const char *data,
+                                   size_t data_len);
 static char *decode_relay_result(QRPartParser *parser, size_t *result_len);
 static char *decode_tp_multi_result(QRPartParser *parser, size_t *result_len);
 static int compare_parts(const void *a, const void *b);
@@ -164,6 +166,26 @@ static bool add_part(QRPartParser *parser, int index, const char *data,
   return true;
 }
 
+static bool fallback_to_single_raw(QRPartParser *parser, const char *data,
+                                   size_t data_len) {
+  if (!parser || !data || data_len == 0)
+    return false;
+
+  if (parser->ur_decoder) {
+    ur_decoder_free((ur_decoder_t *)parser->ur_decoder);
+    parser->ur_decoder = NULL;
+  }
+  if (parser->bbqr) {
+    free(parser->bbqr->payload);
+    free(parser->bbqr);
+    parser->bbqr = NULL;
+  }
+
+  parser->format = FORMAT_NONE;
+  parser->total = 1;
+  return add_part(parser, 1, data, data_len);
+}
+
 int qr_parser_parse(QRPartParser *parser, const char *data) {
   if (!parser || !data)
     return -1;
@@ -221,6 +243,13 @@ int qr_parser_parse_with_len(QRPartParser *parser, const char *data,
       }
       size_t processed = ur_decoder_processed_parts_count(decoder);
       parsed_index = (int)processed - 1;
+    } else if (parser->parts_count == 0 &&
+               ur_decoder_processed_parts_count(decoder) == 0 &&
+               fallback_to_single_raw(parser, data, data_len)) {
+      // Some wallet QR payloads are URI-like but not strict BC-UR. Return the
+      // raw payload to the higher-level scanner instead of silently waiting
+      // forever on a decoder that will never complete.
+      parsed_index = 0;
     }
   } else if (parser->format == FORMAT_BBQR) {
     BBQrPart part;
@@ -455,7 +484,7 @@ static bool starts_with_case_insensitive(const char *str, const char *prefix) {
 }
 
 static int detect_format(const char *data, size_t data_len, BBQrCode **bbqr) {
-  if (data[0] == 'p') {
+  if (data[0] == 'p' || data[0] == 'P') {
     // Check for "pXofY " format
     const char *space = strchr(data, ' ');
     if (space) {
@@ -466,6 +495,8 @@ static int detect_format(const char *data, size_t data_len, BBQrCode **bbqr) {
         header[header_len] = '\0';
 
         const char *of_pos = strstr(header, "of");
+        if (!of_pos)
+          of_pos = strstr(header, "OF");
         if (of_pos && of_pos > header + 1) {
           // Check if number before "of"
           bool is_digit = true;
@@ -509,7 +540,8 @@ static int detect_format(const char *data, size_t data_len, BBQrCode **bbqr) {
 
 static bool parse_pmofn_qr_part(const char *data, char **part, int *index,
                                 int *total) {
-  if (!data || !part || !index || !total || data[0] != 'p')
+  if (!data || !part || !index || !total ||
+      (data[0] != 'p' && data[0] != 'P'))
     return false;
 
   const char *p = data + 1;
@@ -518,7 +550,8 @@ static bool parse_pmofn_qr_part(const char *data, char **part, int *index,
     return false;
 
   const char *of_pos = p;
-  if (of_pos[0] != 'o' || of_pos[1] != 'f')
+  if (!((of_pos[0] == 'o' || of_pos[0] == 'O') &&
+        (of_pos[1] == 'f' || of_pos[1] == 'F')))
     return false;
   p = of_pos + 2;
 
@@ -788,6 +821,64 @@ static bool json_simple_string_value(const char *json, const char *key,
   return *p == '"';
 }
 
+static char *json_simple_string_value_alloc(const char *json, const char *key) {
+  if (!json || !key)
+    return NULL;
+
+  char pattern[48];
+  snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+  const char *p = strstr(json, pattern);
+  if (!p)
+    return NULL;
+  p += strlen(pattern);
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  if (*p != ':')
+    return NULL;
+  p++;
+  while (*p && isspace((unsigned char)*p))
+    p++;
+  if (*p != '"')
+    return NULL;
+  p++;
+
+  char *out = (char *)malloc(strlen(p) + 1);
+  if (!out)
+    return NULL;
+
+  size_t pos = 0;
+  while (*p && *p != '"') {
+    if (*p == '\\' && p[1]) {
+      p++;
+      switch (*p) {
+      case 'n':
+        out[pos++] = '\n';
+        break;
+      case 'r':
+        out[pos++] = '\r';
+        break;
+      case 't':
+        out[pos++] = '\t';
+        break;
+      default:
+        out[pos++] = *p;
+        break;
+      }
+    } else {
+      out[pos++] = *p;
+    }
+    p++;
+  }
+
+  if (*p != '"') {
+    free(out);
+    return NULL;
+  }
+
+  out[pos] = '\0';
+  return out;
+}
+
 static bool json_simple_int_value(const char *json, const char *key,
                                   int *out) {
   if (!json || !key || !out)
@@ -865,12 +956,10 @@ static bool parse_tp_multi_fragment_qr_part(const char *data, size_t data_len,
   if (!query_param_decode(query, query_len, "data", &data_json))
     return false;
 
-  char content[1024];
   char index_text[32];
   char total_text[32];
-  bool ok = json_simple_string_value(data_json, "content", content,
-                                     sizeof(content));
-  if (!ok) {
+  char *content = json_simple_string_value_alloc(data_json, "content");
+  if (!content) {
     free(data_json);
     return false;
   }
@@ -915,24 +1004,31 @@ static bool parse_tp_multi_fragment_qr_part(const char *data, size_t data_len,
   free(data_json);
 
   if (parsed_total <= 0 || parsed_total > RELAY_MAX_PARTS ||
-      parsed_index < 0 || parsed_index > parsed_total)
+      parsed_index < 0 || parsed_index > parsed_total) {
+    free(content);
     return false;
+  }
 
   char *split = strrchr(content, '_');
-  if (!split || split == content || split[1] == '\0')
+  if (!split || split == content || split[1] == '\0') {
+    free(content);
     return false;
+  }
 
   size_t chunk_len = (size_t)(split - content);
   const char *crc = split + 1;
   size_t crc_len = strlen(crc);
   size_t out_len = crc_len + 1 + chunk_len;
   char *out = (char *)malloc(out_len + 1);
-  if (!out)
+  if (!out) {
+    free(content);
     return false;
+  }
   memcpy(out, crc, crc_len);
   out[crc_len] = '.';
   memcpy(out + crc_len + 1, content, chunk_len);
   out[out_len] = '\0';
+  free(content);
 
   *part = out;
   *index = parsed_index;

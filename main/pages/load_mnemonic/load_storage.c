@@ -3,6 +3,7 @@
 #include "load_storage.h"
 #include "../../core/kef.h"
 #include "../../core/storage.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../shared/kef_decrypt_page.h"
 #include "../shared/key_confirmation.h"
@@ -52,13 +53,15 @@ static void load_selected(int idx, const char *filename) {
   esp_err_t ret = storage_load_mnemonic(storage_browser_get_location(),
                                         filename, &envelope, &envelope_len);
   if (ret != ESP_OK) {
-    dialog_show_error("读取失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("dialog.read_failed", "Read failed"), NULL,
+                      0);
     return;
   }
 
   if (!kef_is_envelope(envelope, envelope_len)) {
     free(envelope);
-    dialog_show_error("数据无效", NULL, 0);
+    dialog_show_error(i18n_tr_or("dialog.invalid_input", "Invalid data"), NULL,
+                      0);
     return;
   }
 
@@ -94,7 +97,7 @@ void load_storage_page_create(lv_obj_t *parent, void (*return_cb)(void),
   success_callback = success_cb;
 
   storage_browser_config_t config = {
-      .item_type_name = "助记词",
+      .item_type_name = i18n_tr_or("menu.mnemonic", "Mnemonic"),
       .location = location,
       .list_files = storage_list_mnemonics,
       .delete_file = storage_delete_mnemonic,

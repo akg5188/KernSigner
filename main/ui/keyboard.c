@@ -1,6 +1,7 @@
 // UI Keyboard - QWERTY grid using lv_buttonmatrix
 
 #include "keyboard.h"
+#include "../i18n/i18n.h"
 #include "theme.h"
 #include <stdlib.h>
 #include <string.h>
@@ -33,8 +34,8 @@ static const char *kb_map[] = {"q",
                                "b",
                                "n",
                                "m",
-                               "删",
-                               "确定",
+                               "Del",
+                               "OK",
                                ""};
 
 static const char btn_to_char[] = {
@@ -80,6 +81,11 @@ static int get_btn_for_key_index(int key_index) {
 static inline bool is_key_enabled(ui_keyboard_t *kb, int key_index) {
   return (key_index >= 0 && key_index < UI_KB_KEY_COUNT) &&
          kb->enabled_keys[key_index];
+}
+
+static void refresh_keyboard_labels(void) {
+  kb_map[26] = i18n_tr_or("action.delete_short", "Del");
+  kb_map[27] = i18n_tr_or("common.ok", "OK");
 }
 
 static void kb_event_handler(lv_event_t *e) {
@@ -134,6 +140,7 @@ ui_keyboard_t *ui_keyboard_create(lv_obj_t *parent, const char *title,
                theme_get_screen_height() * 15 / 100);
 
   kb->btnmatrix = lv_buttonmatrix_create(parent);
+  refresh_keyboard_labels();
   lv_buttonmatrix_set_map(kb->btnmatrix, kb_map);
   lv_obj_align(kb->btnmatrix, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_obj_set_size(kb->btnmatrix, LV_PCT(100), LV_PCT(46));

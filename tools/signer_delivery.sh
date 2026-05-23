@@ -14,7 +14,10 @@ SIM_HEIGHT="${SIM_HEIGHT:-800}"
 JOBS="${JOBS:-2}"
 ACTION="${1:-all}"
 VERIFY_DIR="${2:-}"
-EXPECTED_HOME_TITLE="首页"
+EXPECTED_HOME_TITLES=("首页" "Home")
+if [[ -n "${KSIG_EXPECTED_HOME_TITLE:-}" ]]; then
+  EXPECTED_HOME_TITLES=("$KSIG_EXPECTED_HOME_TITLE")
+fi
 LAST_SCREENSHOT_DIR=""
 LAST_ACCEPTANCE_REPORT=""
 LAST_BOOT_LOG=""
@@ -59,6 +62,17 @@ KEY_SCREENSHOT_IDS=(
 
 log() {
   printf '[signer-delivery] %s\n' "$*"
+}
+
+home_title_matches() {
+  local actual="$1"
+  local expected
+  for expected in "${EXPECTED_HOME_TITLES[@]}"; do
+    if [[ "$actual" == "$expected" ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 source_idf() {
@@ -237,6 +251,7 @@ verify_screenshots() {
     echo "- Deprecated feature interaction entries: ${deprecated_interaction_ids:-0}"
     echo "- Button interaction rule: *action* 类入口必须命中目标文本，不再只按点击动作判定通过"
     echo "- Home title: $home_title"
+    echo "- Accepted home titles: ${EXPECTED_HOME_TITLES[*]}"
     echo
   } >>"$report"
 
@@ -288,7 +303,7 @@ verify_screenshots() {
     missing=1
   fi
 
-  if [[ "$home_title" != "$EXPECTED_HOME_TITLE" ]]; then
+  if ! home_title_matches "$home_title"; then
     log "unexpected home title: $home_title"
     echo "FAIL: unexpected home title" >>"$report"
     missing=1

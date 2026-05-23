@@ -1,24 +1,24 @@
 # 智能卡读卡器转接线测试流程
 
-目标很窄：证明 Waveshare ESP32-P4 能通过外接供电链路把 ACR39U-NF Pocketmate II 读卡器跑通。当前 Kern 已接入安全检测页，可测 USB 枚举、CCID 接口、ATR、Satochip/SeedKeeper AID 识别和只读状态 APDU；Satochip Web3 连接/签名、路径地址和 BTC 观察公钥走单独的智能卡钱包入口。检测页本身不写卡、不改 PIN、不重置。
+目标很窄：证明 Waveshare ESP32-P4 能通过外接供电链路把 ACR39U-NF Pocketmate II 读卡器跑通。当前 KernSigner 已接入安全检测页，可测 USB 枚举、CCID 接口、ATR、Satochip/SeedKeeper AID 识别和只读状态 APDU；Satochip Web3 连接/签名、路径地址和 BTC 观察公钥走单独的智能卡钱包入口。检测页本身不写卡、不改 PIN、不重置。
 
 ## 当前准备状态
 
 - 探针项目：`/home/ak/123/seedsigner/esp32_p4_ccid_probe`
-- Kern 总入口：`/home/ak/123/Kern/tools/run_ccid_adapter_probe.sh`
-- 日志目录：`/home/ak/123/Kern/docs/logs`
+- KernSigner 总入口：`/home/ak/123/KernSigner/tools/run_ccid_adapter_probe.sh`
+- 日志目录：`/home/ak/123/KernSigner/docs/logs`
 - 默认监控时间：90 秒
 - 默认编译并发：2，避免电脑卡死
 - 探针会在启动时清掉旧结果，避免把上一次 PASS 当成本次结果
 - 如果用充电器离线测试，插回电脑后用 `read` 模式读取上次 NVS 结果
-- Kern 真机入口：`设备检查 -> 智能卡检测`
+- KernSigner 真机入口：`设备检查 -> 智能卡检测`
 
 ## 先验收软件
 
 转接线没到也可以先跑一次编译，不刷机：
 
 ```bash
-cd /home/ak/123/Kern
+cd /home/ak/123/KernSigner
 tools/run_ccid_adapter_probe.sh build
 ```
 
@@ -40,28 +40,28 @@ tools/run_ccid_adapter_probe.sh build
 接好线后执行：
 
 ```bash
-cd /home/ak/123/Kern
+cd /home/ak/123/KernSigner
 MONITOR_SECONDS=90 tools/run_ccid_adapter_probe.sh run
 ```
 
 如果串口自动识别错了，指定端口：
 
 ```bash
-cd /home/ak/123/Kern
+cd /home/ak/123/KernSigner
 ESPPORT=/dev/ttyACM0 MONITOR_SECONDS=90 tools/run_ccid_adapter_probe.sh run
 ```
 
 如果已经刷过探针固件，只想重新看日志：
 
 ```bash
-cd /home/ak/123/Kern
+cd /home/ak/123/KernSigner
 NO_FLASH=1 MONITOR_SECONDS=90 tools/run_ccid_adapter_probe.sh monitor
 ```
 
 如果开发板当时不是接电脑，而是用手机充电器供电完成离线测试，之后插回电脑读取上次结果：
 
 ```bash
-cd /home/ak/123/Kern
+cd /home/ak/123/KernSigner
 tools/run_ccid_adapter_probe.sh read
 ```
 
@@ -78,7 +78,7 @@ tools/run_ccid_adapter_probe.sh read
 - `state=FAIL reason=power_on_*`：CCID 已经通，但卡片上电失败，查卡是否插好、供电是否足。
 - `state=FAIL reason=apdu_*`：ATR 已过或接近通过，后面重点改 CCID/APDU 传输。
 
-只要没有 `state=PASS` 或 `state=ATR_OK`，不要测试钱包级智能卡功能。当前 Kern 的钱包级入口只允许已经实现的 Satochip Web3 连接/签名、路径地址和 BTC 观察公钥读取。
+只要没有 `state=PASS` 或 `state=ATR_OK`，不要测试钱包级智能卡功能。当前 KernSigner 的钱包级入口只允许已经实现的 Satochip Web3 连接/签名、路径地址和 BTC 观察公钥读取。
 
 ## 现场操作顺序
 
@@ -98,7 +98,7 @@ tools/run_ccid_adapter_probe.sh read
 
 通过标准是至少拿到 `ATR_OK`，最好是 `PASS`。当前已经完成：
 
-1. 把探针里的 CCID 传输层抽成 Kern 可用组件。
+1. 把探针里的 CCID 传输层抽成 KernSigner 可用组件。
 2. 开放 `智能卡检测`：检测读卡器、读取 ATR、识别 Satochip/SeedKeeper、读取只读状态。
 
 后续再做：

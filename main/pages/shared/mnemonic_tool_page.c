@@ -1,6 +1,7 @@
 #include "mnemonic_tool_page.h"
 #include "../../core/key.h"
 #include "../../core/mnemonic_tools.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/menu.h"
@@ -42,44 +43,44 @@ static bool normalize_card_token(const char *tok, char out[3]);
 static void create_text_input(void);
 static void input_ready_cb(lv_event_t *e);
 
-static const char *const digit_keyboard_map[] = {
+static const char *digit_keyboard_map[] = {
     "1", "2", "3", "\n",
     "4", "5", "6", "\n",
     "7", "8", "9", "\n",
     "<", "0", ">", "\n",
-    "空", "删", "完成", ""};
+    NULL, NULL, NULL, ""};
 
-static const char *const d6_keyboard_map[] = {
+static const char *d6_keyboard_map[] = {
     "1", "2", "3", "\n",
     "4", "5", "6", "\n",
-    "<", "空", ">", "\n",
-    "删", "完成", ""};
+    "<", NULL, ">", "\n",
+    NULL, NULL, ""};
 
-static const char *const binary_keyboard_map[] = {
+static const char *binary_keyboard_map[] = {
     "0", "1", "\n",
-    "<", "空", ">", "\n",
-    "删", "完成", ""};
+    "<", NULL, ">", "\n",
+    NULL, NULL, ""};
 
-static const char *const hex_keyboard_map[] = {
+static const char *hex_keyboard_map[] = {
     "1", "2", "3", "A", "\n",
     "4", "5", "6", "B", "\n",
     "7", "8", "9", "C", "\n",
     "D", "0", "E", "F", "\n",
-    "<", "空", ">", "删", "完成", ""};
+    "<", NULL, ">", NULL, NULL, ""};
 
-static const char *const card_keyboard_map[] = {
+static const char *card_keyboard_map[] = {
     "A", "K", "Q", "J", "T", "\n",
     "9", "8", "7", "6", "5", "\n",
     "4", "3", "2", "C", "D", "\n",
     "H", "S", "<", ">", "\n",
-    "空", "删", "完成", ""};
+    NULL, NULL, NULL, ""};
 
-static const char *const shift_keyboard_map[] = {
+static const char *shift_keyboard_map[] = {
     "1", "2", "3", "+", "\n",
     "4", "5", "6", "-", "\n",
-    "7", "8", "9", "空", "\n",
-    "<", "0", ">", "删", "\n",
-    "空", "删", "完成", ""};
+    "7", "8", "9", NULL, "\n",
+    "<", "0", ">", NULL, "\n",
+    NULL, NULL, NULL, ""};
 
 static const lv_buttonmatrix_ctrl_t digit_keyboard_ctrl_map[] = {
     LV_BUTTONMATRIX_CTRL_WIDTH_1, LV_BUTTONMATRIX_CTRL_WIDTH_1,
@@ -157,34 +158,78 @@ static const lv_buttonmatrix_ctrl_t shift_keyboard_ctrl_map[] = {
     LV_BUTTONMATRIX_CTRL_WIDTH_3,
 };
 
+static const char *keyboard_space_label(void) {
+  return i18n_tr_or("dialog.keyboard_space", "Space");
+}
+
+static const char *keyboard_delete_label(void) {
+  return i18n_tr_or("action.delete_short", "Del");
+}
+
+static const char *keyboard_done_label(void) {
+  return i18n_tr_or("dialog.keyboard_done", "Done");
+}
+
+static void update_keyboard_maps(void) {
+  digit_keyboard_map[16] = keyboard_space_label();
+  digit_keyboard_map[17] = keyboard_delete_label();
+  digit_keyboard_map[18] = keyboard_done_label();
+
+  d6_keyboard_map[9] = keyboard_space_label();
+  d6_keyboard_map[12] = keyboard_delete_label();
+  d6_keyboard_map[13] = keyboard_done_label();
+
+  binary_keyboard_map[4] = keyboard_space_label();
+  binary_keyboard_map[7] = keyboard_delete_label();
+  binary_keyboard_map[8] = keyboard_done_label();
+
+  hex_keyboard_map[21] = keyboard_space_label();
+  hex_keyboard_map[23] = keyboard_delete_label();
+  hex_keyboard_map[24] = keyboard_done_label();
+
+  card_keyboard_map[23] = keyboard_space_label();
+  card_keyboard_map[24] = keyboard_delete_label();
+  card_keyboard_map[25] = keyboard_done_label();
+
+  shift_keyboard_map[13] = keyboard_space_label();
+  shift_keyboard_map[18] = keyboard_delete_label();
+  shift_keyboard_map[20] = keyboard_space_label();
+  shift_keyboard_map[21] = keyboard_delete_label();
+  shift_keyboard_map[22] = keyboard_done_label();
+}
+
 static const char *mode_title(mnemonic_tool_mode_t mode) {
   switch (mode) {
   case MNEMONIC_TOOL_INDEX_IMPORT:
-    return "编号导入";
+    return i18n_tr_or("input.index_import", "Index");
   case MNEMONIC_TOOL_HEX_ENTROPY:
-    return "16进制创建";
+    return i18n_tr_or("input.hex_create", "Hex create");
   case MNEMONIC_TOOL_BINARY_ENTROPY:
-    return "抛硬币";
+    return i18n_tr_or("input.coin_flip", "Coin flip");
   case MNEMONIC_TOOL_D6_ENTROPY:
-    return "骰子创建";
+    return i18n_tr_or("input.dice_create", "Dice create");
   case MNEMONIC_TOOL_D20_ENTROPY:
-    return "D20 骰子";
+    return i18n_tr_or("input.d20", "D20");
   case MNEMONIC_TOOL_CARD_ENTROPY:
-    return "扑克牌创建";
+    return i18n_tr_or("input.card_create", "Card create");
   case MNEMONIC_TOOL_BIP85_MNEMONIC:
-    return "BIP85 子助记词";
+    return i18n_tr_or("input.bip85_mnemonic", "BIP85 Mnemonic");
   case MNEMONIC_TOOL_XOR_CURRENT:
-    return "助记词异或";
+    return i18n_tr_or("input.xor_mnemonic", "Mnemonic XOR");
   case MNEMONIC_TOOL_SECONDARY_SHIFT:
-    return "助记词加密";
+    return i18n_tr_or("input.mnemonic_encryption",
+                      "Mnemonic Encryption");
   case MNEMONIC_TOOL_SECONDARY_ADD:
-    return "助记词加密";
+    return i18n_tr_or("input.mnemonic_encryption",
+                      "Mnemonic Encryption");
   case MNEMONIC_TOOL_SECONDARY_SUB:
-    return "助记词加密";
+    return i18n_tr_or("input.mnemonic_encryption",
+                      "Mnemonic Encryption");
   case MNEMONIC_TOOL_STEEL_RESTORE:
-    return "钢板数字恢复";
+    return i18n_tr_or("input.steel_number_restore",
+                      "Steel number restore");
   default:
-    return "助记词工具";
+    return i18n_tr_or("wallet.mnemonic_tool", "Mnemonic tool");
   }
 }
 
@@ -488,29 +533,31 @@ static const char *source_label_for_mode(mnemonic_tool_mode_t mode) {
   switch (mode) {
   case MNEMONIC_TOOL_INDEX_IMPORT:
   case MNEMONIC_TOOL_STEEL_RESTORE:
-    return "序号";
+    return i18n_tr_or("input.index_import", "Index");
   case MNEMONIC_TOOL_HEX_ENTROPY:
-    return "16进制";
+    return i18n_tr_or("input.hex", "Hex");
   case MNEMONIC_TOOL_BINARY_ENTROPY:
-    return "抛硬币";
+    return i18n_tr_or("input.coin_flip", "Coin flip");
   case MNEMONIC_TOOL_D6_ENTROPY:
-    return "D6骰子";
+    return i18n_tr_or("input.d6_dice", "D6 dice");
   case MNEMONIC_TOOL_D20_ENTROPY:
-    return "D20骰子";
+    return i18n_tr_or("input.d20_dice", "D20 dice");
   case MNEMONIC_TOOL_CARD_ENTROPY:
-    return "扑克牌";
+    return i18n_tr_or("input.cards", "Cards");
   case MNEMONIC_TOOL_SECONDARY_SHIFT:
   case MNEMONIC_TOOL_SECONDARY_ADD:
   case MNEMONIC_TOOL_SECONDARY_SUB:
-    return "加减数字";
+    return i18n_tr_or("input.shift_numbers", "Shift numbers");
   default:
-    return "原始输入";
+    return i18n_tr_or("input.raw_input", "Raw input");
   }
 }
 
 static void complete_with_mnemonic(char *mnemonic) {
   if (!mnemonic) {
-    dialog_show_error("助记词生成失败，请检查输入。", NULL, 0);
+    dialog_show_error(i18n_tr_or("wallet.mnemonic_generation_check_failed",
+                                 "Mnemonic generation failed; check input."),
+                      NULL, 0);
     return;
   }
 
@@ -698,7 +745,8 @@ static void tool_update_count(void) {
     char status[128];
     switch (current_mode) {
     case MNEMONIC_TOOL_HEX_ENTROPY:
-      snprintf(status, sizeof(status), "十六进制 %d/%u",
+      snprintf(status, sizeof(status),
+               i18n_tr_or("input.hex_count_format", "Hex %d/%u"),
                count_hex_digits(text),
                (unsigned)(entropy_len_for_word_count(selected_words) * 2));
       break;
@@ -706,17 +754,24 @@ static void tool_update_count(void) {
       bool invalid = false;
       int bits = count_binary_bits(text, &invalid);
       int target = target_entropy_bits_for_word_count(selected_words);
-      snprintf(status, sizeof(status), "%s%d/%d 位",
-               invalid ? "格式错 " : "抛硬币 ", bits, target);
+      snprintf(status, sizeof(status),
+               invalid ? i18n_tr_or("input.invalid_bits_count_format",
+                                     "Invalid %d/%d bits")
+                       : i18n_tr_or("input.coin_bits_count_format",
+                                     "Coin flip %d/%d bits"),
+               bits, target);
       break;
     }
     case MNEMONIC_TOOL_D6_ENTROPY:
-      snprintf(status, sizeof(status), "骰子 %d 次，熵 %d/%d",
+      snprintf(status, sizeof(status),
+               i18n_tr_or("input.dice_entropy_count_format",
+                          "Dice %d rolls, entropy %d/%d"),
                count_d6_digits(text), d6_entropy_bits(text),
                target_entropy_bits_for_word_count(selected_words));
       break;
     case MNEMONIC_TOOL_D20_ENTROPY:
-      snprintf(status, sizeof(status), "点数 %d/%d",
+      snprintf(status, sizeof(status),
+               i18n_tr_or("input.rolls_count_format", "Rolls %d/%d"),
                count_number_tokens(text),
                min_d20_rolls_for_word_count(selected_words));
       break;
@@ -726,19 +781,25 @@ static void tool_update_count(void) {
         int bits = 0;
         bool invalid = false;
         card_input_stats(text, &cards, &bits, &invalid, false);
-        snprintf(status, sizeof(status), "%s%d 张，熵 %d/%d",
-                 invalid ? "格式错 " : "扑克牌 ", cards, bits,
+        snprintf(status, sizeof(status),
+                 invalid ? i18n_tr_or("input.invalid_cards_entropy_format",
+                                       "Invalid %d cards, entropy %d/%d")
+                         : i18n_tr_or("input.cards_entropy_format",
+                                       "Cards %d, entropy %d/%d"),
+                 cards, bits,
                  required_card_bits_for_word_count(selected_words));
         break;
       }
       break;
     case MNEMONIC_TOOL_INDEX_IMPORT:
     case MNEMONIC_TOOL_STEEL_RESTORE:
-      snprintf(status, sizeof(status), "序号 %d/%d",
+      snprintf(status, sizeof(status),
+               i18n_tr_or("input.index_count_format", "Index %d/%d"),
                count_number_tokens(text), selected_words);
       break;
     case MNEMONIC_TOOL_BIP85_MNEMONIC:
-      snprintf(status, sizeof(status), "索引");
+      snprintf(status, sizeof(status), "%s",
+               i18n_tr_or("input.child_index", "Child index"));
       break;
     case MNEMONIC_TOOL_SECONDARY_SHIFT:
     case MNEMONIC_TOOL_SECONDARY_ADD:
@@ -747,16 +808,24 @@ static void tool_update_count(void) {
       int count = count_shift_tokens(text, &invalid);
       int target = current_mnemonic_word_count();
       if (target <= 0) {
-        snprintf(status, sizeof(status), "请先加载助记词");
+        snprintf(status, sizeof(status), "%s",
+                 i18n_tr_or("wallet.no_mnemonic_loaded",
+                            "Load a mnemonic first"));
       } else if (invalid) {
-        snprintf(status, sizeof(status), "格式错：%d/%d", count, target);
+        snprintf(status, sizeof(status),
+                 i18n_tr_or("input.invalid_count_format", "Invalid: %d/%d"),
+                 count, target);
       } else {
-        snprintf(status, sizeof(status), "加减 %d/%d", count, target);
+        snprintf(status, sizeof(status),
+                 i18n_tr_or("input.shift_count_format", "Shift %d/%d"),
+                 count, target);
       }
       break;
     }
     default:
-      snprintf(status, sizeof(status), "完成后点完成");
+      snprintf(status, sizeof(status), "%s",
+               i18n_tr_or("input.tap_done_when_finished",
+                          "Tap Done when finished"));
       break;
     }
     lv_label_set_text(tool_count_label, status);
@@ -818,15 +887,15 @@ static void tool_keyboard_event_cb(lv_event_t *e) {
   if (!txt)
     return;
 
-  if (strcmp(txt, "完成") == 0) {
+  if (strcmp(txt, keyboard_done_label()) == 0) {
     input_ready_cb(e);
-  } else if (strcmp(txt, "删") == 0) {
+  } else if (strcmp(txt, keyboard_delete_label()) == 0) {
     lv_textarea_delete_char(tool_textarea);
   } else if (strcmp(txt, "<") == 0) {
     lv_textarea_cursor_left(tool_textarea);
   } else if (strcmp(txt, ">") == 0) {
     lv_textarea_cursor_right(tool_textarea);
-  } else if (strcmp(txt, "空") == 0) {
+  } else if (strcmp(txt, keyboard_space_label()) == 0) {
     lv_textarea_add_char(tool_textarea, ' ');
   } else {
     lv_textarea_add_text(tool_textarea, txt);
@@ -835,7 +904,7 @@ static void tool_keyboard_event_cb(lv_event_t *e) {
   tool_update_count();
 }
 
-static void custom_keyboard_for_mode(const char *const **map_out,
+static void custom_keyboard_for_mode(const char ***map_out,
                                      const lv_buttonmatrix_ctrl_t **ctrl_out) {
   switch (current_mode) {
   case MNEMONIC_TOOL_BINARY_ENTROPY:
@@ -889,21 +958,24 @@ static const char *accepted_chars_for_mode(void) {
 static const char *placeholder_for_mode(void) {
   switch (current_mode) {
   case MNEMONIC_TOOL_BINARY_ENTROPY:
-    return "0/1，可空格分组";
+    return i18n_tr_or("input.binary_placeholder",
+                      "0/1, spaces allowed");
   case MNEMONIC_TOOL_HEX_ENTROPY:
-    return "32/40/48/56/64 位十六进制";
+    return i18n_tr_or("input.hex_placeholder",
+                      "32/40/48/56/64 hex digits");
   case MNEMONIC_TOOL_D6_ENTROPY:
-    return "六面骰 1-6";
+    return i18n_tr_or("input.d6_placeholder", "D6 rolls 1-6");
   case MNEMONIC_TOOL_D20_ENTROPY:
-    return "D20 点数 1-20";
+    return i18n_tr_or("input.d20_placeholder", "D20 rolls 1-20");
   case MNEMONIC_TOOL_CARD_ENTROPY:
-    return "AH QS 9D TC，10=T";
+    return i18n_tr_or("input.card_placeholder", "AH QS 9D TC, 10=T");
   case MNEMONIC_TOOL_SECONDARY_SHIFT:
   case MNEMONIC_TOOL_SECONDARY_ADD:
   case MNEMONIC_TOOL_SECONDARY_SUB:
-    return "+N / -N，空格分隔";
+    return i18n_tr_or("input.shift_placeholder",
+                      "+N / -N, separated by spaces");
   default:
-    return "0-2047 序号";
+    return i18n_tr_or("input.index_placeholder_text", "0-2047 indexes");
   }
 }
 
@@ -1059,13 +1131,13 @@ static const char *run_button_label(void) {
   switch (current_mode) {
   case MNEMONIC_TOOL_INDEX_IMPORT:
   case MNEMONIC_TOOL_STEEL_RESTORE:
-    return "生成助记词";
+    return i18n_tr_or("wallet.generate_mnemonic", "Generate mnemonic");
   case MNEMONIC_TOOL_SECONDARY_SHIFT:
   case MNEMONIC_TOOL_SECONDARY_ADD:
   case MNEMONIC_TOOL_SECONDARY_SUB:
-    return "执行转换";
+    return i18n_tr_or("input.run_transform", "Run transform");
   default:
-    return "生成";
+    return i18n_tr_or("action.generate", "Generate");
   }
 }
 
@@ -1111,6 +1183,7 @@ static void create_text_input(void) {
     lv_textarea_set_accepted_chars(tool_textarea, accepted_chars_for_mode());
     lv_textarea_set_placeholder_text(tool_textarea, placeholder_for_mode());
     lv_textarea_set_cursor_click_pos(tool_textarea, true);
+    theme_apply_textarea(tool_textarea, true);
     lv_obj_set_style_text_font(tool_textarea, theme_font_medium(), 0);
     lv_obj_set_style_text_color(tool_textarea, main_color(), 0);
     lv_obj_set_style_bg_color(tool_textarea, bg_color(), 0);
@@ -1132,8 +1205,9 @@ static void create_text_input(void) {
     lv_obj_align_to(tool_count_label, tool_textarea, LV_ALIGN_OUT_BOTTOM_MID, 0,
                     8);
 
-    const char *const *map = NULL;
+    const char **map = NULL;
     const lv_buttonmatrix_ctrl_t *ctrl = NULL;
+    update_keyboard_maps();
     custom_keyboard_for_mode(&map, &ctrl);
     tool_keyboard = lv_buttonmatrix_create(tool_screen);
     lv_buttonmatrix_set_map(tool_keyboard, map);
@@ -1155,7 +1229,9 @@ static void create_text_input(void) {
     return;
   }
 
-  ui_text_input_create(&input, tool_screen, "输入内容", false, input_ready_cb);
+  ui_text_input_create(&input, tool_screen,
+                       i18n_tr_or("input.enter_content", "Enter content"),
+                       false, input_ready_cb);
   if (input.textarea) {
     lv_textarea_set_one_line(input.textarea, false);
     lv_obj_set_width(input.textarea, LV_PCT(86));
@@ -1211,17 +1287,28 @@ static bool mode_needs_word_count(mnemonic_tool_mode_t mode) {
 static void create_tool_word_count_menu(void) {
   cleanup_input();
 
-  word_count_menu = ui_menu_create(tool_screen, "助记词长度", back_menu_cb);
+  word_count_menu =
+      ui_menu_create(tool_screen,
+                     i18n_tr_or("wallet.mnemonic_length",
+                                "Mnemonic length"),
+                     back_menu_cb);
   if (!word_count_menu)
     return;
 
-  ui_menu_add_entry(word_count_menu, "12 个单词", word_count_12_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.12_words", "12 words"),
+                    word_count_12_cb);
   if (current_mode != MNEMONIC_TOOL_BIP85_MNEMONIC)
-    ui_menu_add_entry(word_count_menu, "15 个单词", word_count_15_cb);
-  ui_menu_add_entry(word_count_menu, "18 个单词", word_count_18_cb);
+    ui_menu_add_entry(word_count_menu,
+                      i18n_tr_or("wallet.15_words", "15 words"),
+                      word_count_15_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.18_words", "18 words"),
+                    word_count_18_cb);
   if (current_mode != MNEMONIC_TOOL_BIP85_MNEMONIC)
-    ui_menu_add_entry(word_count_menu, "21 个单词", word_count_21_cb);
-  ui_menu_add_entry(word_count_menu, "24 个单词", word_count_24_cb);
+    ui_menu_add_entry(word_count_menu,
+                      i18n_tr_or("wallet.21_words", "21 words"),
+                      word_count_21_cb);
+  ui_menu_add_entry(word_count_menu, i18n_tr_or("wallet.24_words", "24 words"),
+                    word_count_24_cb);
   ui_menu_show(word_count_menu);
 }
 
@@ -1239,7 +1326,9 @@ void mnemonic_tool_page_create(lv_obj_t *parent, void (*return_cb)(void),
        mode == MNEMONIC_TOOL_XOR_CURRENT ||
        is_secondary_shift_mode(mode)) &&
       !key_is_loaded()) {
-    dialog_show_error("请先加载助记词", return_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.no_mnemonic_loaded",
+                                 "Load a mnemonic first"),
+                      return_cb, 0);
     return;
   }
 

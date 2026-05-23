@@ -1,6 +1,7 @@
 // New Mnemonic Menu Page
 
 #include "new_mnemonic_menu.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
 #include "../home/home.h"
@@ -188,19 +189,34 @@ void new_mnemonic_menu_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   new_mnemonic_menu_screen = theme_create_page_container(parent);
 
   new_mnemonic_menu =
-      ui_menu_create(new_mnemonic_menu_screen, "新助记词", back_cb);
+      ui_menu_create(new_mnemonic_menu_screen,
+                     i18n_tr_or("wallet.new_mnemonic", "New Mnemonic"),
+                     back_cb);
   if (!new_mnemonic_menu)
     return;
 
-  ui_menu_add_entry(new_mnemonic_menu, "骰子", from_dice_rolls_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "抛硬币", from_binary_entropy_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "手动", from_words_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "相机", from_camera_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "16进制", from_hex_entropy_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "二十面骰", from_d20_entropy_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "派生助记词", from_bip85_mnemonic_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "异或", from_xor_mnemonic_cb);
-  ui_menu_add_entry(new_mnemonic_menu, "加密", from_secondary_shift_cb);
+  ui_menu_add_entry(new_mnemonic_menu, i18n_tr_or("input.dice", "Dice"),
+                    from_dice_rolls_cb);
+  ui_menu_add_entry(new_mnemonic_menu,
+                    i18n_tr_or("input.coin_flip", "Coin flip"),
+                    from_binary_entropy_cb);
+  ui_menu_add_entry(new_mnemonic_menu, i18n_tr_or("input.manual", "Manual"),
+                    from_words_cb);
+  ui_menu_add_entry(new_mnemonic_menu, i18n_tr_or("input.camera", "Camera"),
+                    from_camera_cb);
+  ui_menu_add_entry(new_mnemonic_menu, i18n_tr_or("input.hex", "Hex"),
+                    from_hex_entropy_cb);
+  ui_menu_add_entry(new_mnemonic_menu, i18n_tr_or("input.d20", "D20"),
+                    from_d20_entropy_cb);
+  ui_menu_add_entry(new_mnemonic_menu,
+                    i18n_tr_or("input.bip85_mnemonic", "BIP85 Mnemonic"),
+                    from_bip85_mnemonic_cb);
+  ui_menu_add_entry(new_mnemonic_menu, i18n_tr_or("input.xor", "XOR"),
+                    from_xor_mnemonic_cb);
+  ui_menu_add_entry(new_mnemonic_menu,
+                    i18n_tr_or("input.mnemonic_encryption",
+                               "Mnemonic Encryption"),
+                    from_secondary_shift_cb);
   ui_menu_show(new_mnemonic_menu);
 }
 

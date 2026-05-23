@@ -7,8 +7,8 @@
 ## 先记住三句话
 
 - 助记词不是随便排列的单词。BIP39 会先有一段“原始熵”，再自动加校验位，最后变成 12/15/18/21/24 个英文单词。
-- 只要“原始熵”和“英文词库”一样，Kern 和 BIP39 网站生成出来的助记词就应该完全一样。
-- 最稳的验证方法是：在 Kern 上查看“原始熵”的十六进制，把它填到 BIP39 网站的 Entropy 里，Mnemonic Length 选择 `Use Raw Entropy`。
+- 只要“原始熵”和“英文词库”一样，KernSigner 和 BIP39 网站生成出来的助记词就应该完全一样。
+- 最稳的验证方法是：在 KernSigner 上查看“原始熵”的十六进制，把它填到 BIP39 网站的 Entropy 里，Mnemonic Length 选择 `Use Raw Entropy`。
 
 ## 创建入口
 
@@ -21,7 +21,7 @@
 5. 按页面提示选择词数并输入随机材料。
 6. 生成后认真抄写助记词，并完成设备上的确认流程。
 
-建议新手优先用 `12 词` 练习，用 `24 词` 做正式高强度钱包。测试时不要存入真实资产。
+建议新手优先用 `12 词` 练习。未来真正进入生产使用前，可以选择 `24 词` 提高熵强度；当前测试资金验收版只用测试助记词、测试网资产或你明确可承受损失的小额验收资金。
 
 ## 词数和输入长度
 
@@ -52,7 +52,7 @@
 
 这个方法适用于所有创建方式，包括相机、D20、智能卡、手动输入。
 
-### 第一步：在 Kern 上查看原始熵
+### 第一步：在 KernSigner 上查看原始熵
 
 创建并加载助记词后：
 
@@ -74,19 +74,19 @@
 1. 打开离线版 BIP39 网站。
 2. 勾选 `Show entropy details`。
 3. 找到 `Entropy` 输入框。
-4. 把 Kern 的十六进制原始熵粘进去，空格可以去掉。
+4. 把 KernSigner 的十六进制原始熵粘进去，空格可以去掉。
 5. `Entropy Type` 确认是 `hexadecimal`。
 6. `Mnemonic Length` 选择 `Use Raw Entropy (3 words per 32 bits)`。
 7. 查看 `BIP39 Mnemonic`。
-8. 网站显示的助记词应当和 Kern 上的一模一样。
+8. 网站显示的助记词应当和 KernSigner 上的一模一样。
 
-注意：验证 Kern 的原始熵时，不要在 BIP39 网站里选择 `12 Words`、`15 Words`、`24 Words` 这类选项。那些选项会让网站先对输入做 SHA256 再截取，结果会不一样。
+注意：验证 KernSigner 的原始熵时，不要在 BIP39 网站里选择 `12 Words`、`15 Words`、`24 Words` 这类选项。那些选项会让网站先对输入做 SHA256 再截取，结果会不一样。
 
 ## 方法一：16进制创建
 
 适合想和 BIP39 网站最直接对照的人。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 进入 `助记词` -> `创建` -> `16进制`。
 2. 选择词数。
@@ -102,7 +102,7 @@
 2. 在 `Entropy` 输入同一串十六进制。
 3. `Entropy Type` 选择 `hexadecimal`。
 4. `Mnemonic Length` 选择 `Use Raw Entropy`。
-5. 网站的 `BIP39 Mnemonic` 必须和 Kern 一样。
+5. 网站的 `BIP39 Mnemonic` 必须和 KernSigner 一样。
 
 ### 入门测试
 
@@ -124,7 +124,7 @@ abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon 
 
 适合完全用实物随机性创建。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 进入 `助记词` -> `创建` -> `抛硬币`。
 2. 选择词数。
@@ -145,7 +145,7 @@ abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon 
 
 适合用普通骰子创建。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 进入 `助记词` -> `创建` -> `骰子`。
 2. 选择词数。
@@ -153,7 +153,7 @@ abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon 
 4. 页面会显示熵是否已经足够。
 5. 足够后点 `完成` 或 `生成`。
 
-Kern 使用和 Ian Coleman BIP39 工具相同的无偏取位规则：
+KernSigner 使用和 Ian Coleman BIP39 工具相同的无偏取位规则：
 
 | 骰子点数 | 转成的位 |
 | --- | --- |
@@ -166,7 +166,7 @@ Kern 使用和 Ian Coleman BIP39 工具相同的无偏取位规则：
 
 ### BIP39 网站怎么验证
 
-最稳方法：用 Kern 的 `原始熵` 十六进制验证。
+最稳方法：用 KernSigner 的 `原始熵` 十六进制验证。
 
 也可以直接用骰子序列验证：
 
@@ -175,13 +175,13 @@ Kern 使用和 Ian Coleman BIP39 工具相同的无偏取位规则：
 3. `Mnemonic Length` 选择 `Use Raw Entropy`。
 4. 对比网站生成的助记词。
 
-如果直接用骰子序列不一致，优先检查是否多输入了骰子。Kern 会按所选词数取最终需要的那段熵；对新手来说，用 `原始熵` 十六进制验证更不容易错。
+如果直接用骰子序列不一致，优先检查是否多输入了骰子。KernSigner 会按所选词数取最终需要的那段熵；对新手来说，用 `原始熵` 十六进制验证更不容易错。
 
 ## 方法四：二十面骰 D20
 
 适合有 D20 骰子的用户。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 进入 `助记词` -> `创建` -> `D20` 或 `二十面骰`。
 2. 选择词数。
@@ -200,7 +200,7 @@ BIP39 网站没有原生 D20 类型，所以不要直接把 D20 数字粘到 Ent
 
 正确做法：
 
-1. 在 Kern 上打开 `原始熵`。
+1. 在 KernSigner 上打开 `原始熵`。
 2. 复制十六进制原始熵。
 3. 在 BIP39 网站的 `Entropy` 输入这串十六进制。
 4. `Entropy Type` 选择 `hexadecimal`。
@@ -211,7 +211,7 @@ BIP39 网站没有原生 D20 类型，所以不要直接把 D20 数字粘到 Ent
 
 适合用洗牌后的实体扑克牌创建。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 进入 `助记词` -> `创建` -> `扑克牌`。
 2. 选择词数。
@@ -229,7 +229,7 @@ AH QS 9D TC 2C
 
 ### BIP39 网站怎么验证
 
-最稳方法：用 Kern 的 `原始熵` 十六进制验证。
+最稳方法：用 KernSigner 的 `原始熵` 十六进制验证。
 
 也可以直接用扑克牌序列验证：
 
@@ -244,7 +244,7 @@ AH QS 9D TC 2C
 
 适合不想手动输入很多随机材料时使用。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 进入 `助记词` -> `创建` -> `相机`。
 2. 选择词数。
@@ -262,7 +262,7 @@ AH QS 9D TC 2C
 3. 按词数取需要长度的熵。
 4. 用 BIP39 生成助记词。
 
-验证时推荐直接用 Kern 的 `原始熵` 十六进制：
+验证时推荐直接用 KernSigner 的 `原始熵` 十六进制：
 
 1. 创建完成后进入 `原始熵`。
 2. 复制十六进制。
@@ -283,7 +283,7 @@ AH QS 9D TC 2C
 
 适合已经知道 BIP39 单词，或者要恢复/检查某组词的人。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 进入 `助记词` -> `创建` -> `手动`。
 2. 按顺序输入或选择单词。
@@ -304,7 +304,7 @@ AH QS 9D TC 2C
 
 适合使用 SeedKeeper/Satochip 等智能卡随机数能力。
 
-### Kern 上怎么做
+### KernSigner 上怎么做
 
 1. 接好智能卡和读卡器。
 2. 进入 `助记词` -> `创建` -> `智能卡`。
@@ -314,7 +314,7 @@ AH QS 9D TC 2C
 
 ### BIP39 网站怎么验证
 
-1. 创建并加载后，进入 Kern 的 `原始熵`。
+1. 创建并加载后，进入 KernSigner 的 `原始熵`。
 2. 复制十六进制。
 3. BIP39 网站选择 `hexadecimal` + `Use Raw Entropy`。
 4. 对比助记词。
@@ -323,7 +323,7 @@ AH QS 9D TC 2C
 
 ## BIP39 网站常见设置
 
-验证 Kern 生成结果时，一般用这些设置：
+验证 KernSigner 生成结果时，一般用这些设置：
 
 | 项目 | 应该选择 |
 | --- | --- |
@@ -352,7 +352,7 @@ AH QS 9D TC 2C
 5. 抛硬币是否把正反面规则中途反了。
 6. 骰子是否多输入或漏输入。
 7. 扑克牌的 10 是否写成了 `T`。
-8. D20 是否直接粘进网站了。D20 要用 Kern 的十六进制原始熵验证。
+8. D20 是否直接粘进网站了。D20 要用 KernSigner 的十六进制原始熵验证。
 9. 相机方式是否拿错了 SHA256：12 词只用前 32 个十六进制字符，24 词才用完整 64 个。
 10. 是否把密码短语 passphrase 也算进去了。验证助记词本身时 passphrase 留空。
 
@@ -374,8 +374,8 @@ abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon 
 ```
 
 4. 用 BIP39 网站按 `hexadecimal` + `Use Raw Entropy` 验证。
-5. 练熟后，再用骰子、硬币、相机或智能卡创建真实助记词。
-6. 真实助记词不要联网验证，不要拍照，不要发给任何人。
+5. 练熟后，再用骰子、硬币、相机或智能卡创建新的测试助记词做恢复演练。
+6. 未来如果创建真实助记词，不要联网验证，不要拍照，不要发给任何人；当前固件未过生产门禁前不要导入真实助记词。
 
 ## 参考资料
 

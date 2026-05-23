@@ -1,6 +1,7 @@
-// Manual 助记词 Input Page - BIP39 word entry with smart filtering
+// Manual Mnemonic Input Page - BIP39 word entry with smart filtering
 
 #include "manual_input.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/keyboard.h"
@@ -94,10 +95,14 @@ static void show_word_confirmation(const char *word) {
   int word_index = bip39_filter_get_word_index(word);
   char msg[96];
   if (word_index >= 0) {
-    snprintf(msg, sizeof(msg), "词 %d\n序号：%04d\n%s",
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("wallet.word_confirm_format",
+                        "Word %d\nIndex: %04d\n%s"),
              current_word_index + 1, word_index, word);
   } else {
-    snprintf(msg, sizeof(msg), "词 %d\n序号：未知\n%s",
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("wallet.word_confirm_unknown_format",
+                        "Word %d\nIndex: Unknown\n%s"),
              current_word_index + 1, word);
   }
 
@@ -145,15 +150,22 @@ static void create_word_count_menu(void) {
   cleanup_ui();
   current_mode = MODE_WORD_COUNT_SELECT;
 
-  current_menu = ui_menu_create(manual_input_screen, "词数", back_cb);
+  current_menu =
+      ui_menu_create(manual_input_screen,
+                     i18n_tr_or("wallet.word_count", "Word count"), back_cb);
   if (!current_menu)
     return;
 
-  ui_menu_add_entry(current_menu, "12词", word_count_12_cb);
-  ui_menu_add_entry(current_menu, "15词", word_count_15_cb);
-  ui_menu_add_entry(current_menu, "18词", word_count_18_cb);
-  ui_menu_add_entry(current_menu, "21词", word_count_21_cb);
-  ui_menu_add_entry(current_menu, "24词", word_count_24_cb);
+  ui_menu_add_entry(current_menu, i18n_tr_or("wallet.12_words", "12 words"),
+                    word_count_12_cb);
+  ui_menu_add_entry(current_menu, i18n_tr_or("wallet.15_words", "15 words"),
+                    word_count_15_cb);
+  ui_menu_add_entry(current_menu, i18n_tr_or("wallet.18_words", "18 words"),
+                    word_count_18_cb);
+  ui_menu_add_entry(current_menu, i18n_tr_or("wallet.21_words", "21 words"),
+                    word_count_21_cb);
+  ui_menu_add_entry(current_menu, i18n_tr_or("wallet.24_words", "24 words"),
+                    word_count_24_cb);
   ui_menu_show(current_menu);
 }
 
@@ -165,11 +177,14 @@ static void update_keyboard_state(void) {
   bool is_last_word =
       checksum_filter_mode && current_word_index == total_words - 1;
   if (is_last_word) {
-    snprintf(title, sizeof(title), "校验词 %d/%d",
+    snprintf(title, sizeof(title),
+             i18n_tr_or("wallet.checksum_word_format",
+                        "Checksum word %d/%d"),
              current_word_index + 1, total_words);
   } else {
-    snprintf(title, sizeof(title), "词 %d/%d", current_word_index + 1,
-             total_words);
+    snprintf(title, sizeof(title),
+             i18n_tr_or("wallet.word_format", "Word %d/%d"),
+             current_word_index + 1, total_words);
   }
   ui_keyboard_set_title(keyboard, title);
   ui_keyboard_set_input_text(keyboard, current_prefix);
@@ -202,7 +217,8 @@ static void back_confirm_cb(bool confirmed, void *user_data) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("返回？", back_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
+  dialog_show_confirm(i18n_tr_or("common.back_confirm", "Go back?"),
+                      back_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
 }
 
 static void create_keyboard_input(void) {
@@ -210,8 +226,9 @@ static void create_keyboard_input(void) {
   current_mode = MODE_KEYBOARD_INPUT;
 
   char title[48];
-  snprintf(title, sizeof(title), "词 %d/%d", current_word_index + 1,
-           total_words);
+  snprintf(title, sizeof(title),
+           i18n_tr_or("wallet.word_format", "Word %d/%d"),
+           current_word_index + 1, total_words);
 
   keyboard = ui_keyboard_create(manual_input_screen, title, keyboard_callback);
   if (!keyboard)
@@ -235,7 +252,9 @@ static void create_word_select_menu(void) {
   }
 
   char title[64];
-  snprintf(title, sizeof(title), "选词：%s", current_prefix);
+  snprintf(title, sizeof(title),
+           i18n_tr_or("wallet.select_word_prefix_format", "Select: %s"),
+           current_prefix);
 
   current_menu =
       ui_menu_create(manual_input_screen, title, back_to_keyboard_cb);
@@ -384,7 +403,9 @@ void manual_input_page_create(lv_obj_t *parent, void (*return_cb)(void),
   checksum_filter_mode = checksum_filter_last_word;
 
   if (!bip39_filter_init()) {
-    dialog_show_error("词表加载失败", return_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.wordlist_not_loaded",
+                                 "Wordlist not loaded"),
+                      return_cb, 0);
     return;
   }
 

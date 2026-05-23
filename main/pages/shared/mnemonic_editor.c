@@ -1,8 +1,9 @@
-// 助记词 Editor Page - Review and edit mnemonic words before loading
+// Mnemonic Editor Page - Review and edit mnemonic words before loading
 
 #include "mnemonic_editor.h"
 #include "../../core/key.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/assets/icons_24.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
@@ -89,7 +90,8 @@ static void format_word_line(char *out, size_t out_len, int position,
     snprintf(out, out_len, "%2d. %04d  %s", position + 1, word_index,
              word ? word : "");
   } else {
-    snprintf(out, out_len, "%2d. 未知  %s", position + 1, word ? word : "");
+    snprintf(out, out_len, "%2d. %s  %s", position + 1,
+             i18n_tr_or("common.unknown", "Unknown"), word ? word : "");
   }
 }
 
@@ -224,7 +226,10 @@ static void update_fingerprint_display(void) {
     char fp_hex[9];
     if (get_mnemonic_fingerprint_hex(fp_hex)) {
       char buf[32];
-      snprintf(buf, sizeof(buf), "钱包指纹 %s", fp_hex);
+      snprintf(buf, sizeof(buf),
+               i18n_tr_or("wallet.wallet_fingerprint_format",
+                          "Wallet fingerprint %s"),
+               fp_hex);
       lv_label_set_text(fingerprint_label, buf);
       lv_obj_clear_flag(fingerprint_label, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -243,10 +248,12 @@ static void update_checksum_ui(void) {
 
   if (valid) {
     lv_obj_add_flag(checksum_error_label, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(load_label, "加载");
+    lv_label_set_text(load_label, i18n_tr_or("action.load", "Load"));
   } else {
     lv_obj_clear_flag(checksum_error_label, LV_OBJ_FLAG_HIDDEN);
-    lv_label_set_text(load_label, "加载中间");
+    lv_label_set_text(load_label,
+                      i18n_tr_or("wallet.load_temporary",
+                                 "Load temporary"));
   }
 
   lv_obj_clear_state(load_btn, LV_STATE_DISABLED);
@@ -364,7 +371,9 @@ static void update_keyboard_state(void) {
     return;
 
   char title[32];
-  snprintf(title, sizeof(title), "第 %d/%d 个单词", editing_word_index + 1,
+  snprintf(title, sizeof(title),
+           i18n_tr_or("wallet.word_ordinal_format", "Word %d/%d"),
+           editing_word_index + 1,
            total_words);
   ui_keyboard_set_title(keyboard, title);
   ui_keyboard_set_input_text(keyboard, current_prefix);
@@ -388,7 +397,9 @@ static void show_keyboard_for_word(int index) {
   current_mode = MODE_KEYBOARD_INPUT;
 
   char title[32];
-  snprintf(title, sizeof(title), "第 %d/%d 个单词", index + 1, total_words);
+  snprintf(title, sizeof(title),
+           i18n_tr_or("wallet.word_ordinal_format", "Word %d/%d"), index + 1,
+           total_words);
 
   keyboard =
       ui_keyboard_create(mnemonic_editor_screen, title, keyboard_callback);
@@ -411,10 +422,14 @@ static void show_word_confirmation(const char *word) {
   int word_index = bip39_filter_get_word_index(word);
   char msg[96];
   if (word_index >= 0) {
-    snprintf(msg, sizeof(msg), "第 %d 个单词\n序号：%04d\n%s",
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("wallet.ordinal_word_confirm_format",
+                        "Word %d\nIndex: %04d\n%s"),
              editing_word_index + 1, word_index, word);
   } else {
-    snprintf(msg, sizeof(msg), "第 %d 个单词\n序号：未知\n%s",
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("wallet.ordinal_word_confirm_unknown_format",
+                        "Word %d\nIndex: Unknown\n%s"),
              editing_word_index + 1, word);
   }
 
@@ -498,7 +513,10 @@ static void create_word_select_menu(void) {
   }
 
   char title[64];
-  snprintf(title, sizeof(title), "选择：%s...", current_prefix);
+  snprintf(title, sizeof(title),
+           i18n_tr_or("wallet.select_word_prefix_ellipsis_format",
+                      "Select: %s..."),
+           current_prefix);
 
   current_menu =
       ui_menu_create(mnemonic_editor_screen, title, back_to_keyboard_cb);
@@ -547,7 +565,8 @@ static void back_confirm_cb(bool confirmed, void *user_data) {
 
 static void back_btn_cb(lv_event_t *e) {
   (void)e;
-  dialog_show_confirm("确定返回？", back_confirm_cb, NULL,
+  dialog_show_confirm(i18n_tr_or("common.back_confirm", "Go back?"),
+                      back_confirm_cb, NULL,
                       DIALOG_STYLE_OVERLAY);
 }
 
@@ -572,15 +591,21 @@ static void load_btn_cb(lv_event_t *e) {
   bool valid_checksum = bip39_mnemonic_validate(NULL, mnemonic) == WALLY_OK;
   if (!valid_checksum) {
     if (!key_load_from_mnemonic_unchecked(mnemonic)) {
-      dialog_show_error("临时助记词导入失败", NULL, 0);
+      dialog_show_error(i18n_tr_or("wallet.temporary_import_failed",
+                                   "Temporary mnemonic import failed"),
+                        NULL, 0);
       secure_memzero(mnemonic, sizeof(mnemonic));
       return;
     }
     wallet_cleanup();
     key_apply_pending_source_material(mnemonic);
     mnemonic_editor_page_hide();
-    dialog_show_message("已导入临时助记词",
-                        "只能用于助记词变换和还原，不能签名或备份。");
+    dialog_show_message(
+        i18n_tr_or("wallet.temporary_imported",
+                   "Temporary mnemonic imported"),
+        i18n_tr_or("wallet.temporary_imported_desc",
+                   "It can only be used for mnemonic transforms and restore, "
+                   "not signing or backup."));
     if (success_callback)
       success_callback();
     secure_memzero(mnemonic, sizeof(mnemonic));
@@ -702,7 +727,7 @@ static void create_ui(void) {
                theme_get_default_padding());
 
   lv_obj_t *title = lv_label_create(header_container);
-  lv_label_set_text(title, "助记词");
+  lv_label_set_text(title, i18n_tr_or("menu.mnemonic", "Mnemonic"));
   lv_obj_set_width(title, LV_PCT(100));
   lv_label_set_long_mode(title, LV_LABEL_LONG_CLIP);
   lv_obj_set_style_text_font(title, theme_font_small(), 0);
@@ -731,12 +756,14 @@ static void create_ui(void) {
   lv_obj_add_event_cb(load_btn, load_btn_cb, LV_EVENT_CLICKED, NULL);
 
   load_label = lv_label_create(load_btn);
-  lv_label_set_text(load_label, "加载");
+  lv_label_set_text(load_label, i18n_tr_or("action.load", "Load"));
   lv_obj_center(load_label);
   theme_apply_button_label(load_label, false);
 
   checksum_error_label = lv_label_create(mnemonic_editor_screen);
-  lv_label_set_text(checksum_error_label, "校验和无效");
+  lv_label_set_text(checksum_error_label,
+                    i18n_tr_or("wallet.checksum_invalid",
+                               "Invalid checksum"));
   lv_obj_set_style_text_color(checksum_error_label, error_color(), 0);
   lv_obj_set_style_text_font(checksum_error_label, theme_font_small(), 0);
   lv_obj_align_to(checksum_error_label, load_btn, LV_ALIGN_OUT_LEFT_MID, -10,
@@ -757,14 +784,18 @@ void mnemonic_editor_page_create(lv_obj_t *parent, void (*return_cb)(void),
   is_new_mnemonic = new_mnemonic;
 
   if (!bip39_filter_init()) {
-    dialog_show_error("单词表加载失败", return_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.wordlist_not_loaded",
+                                 "Wordlist not loaded"),
+                      return_cb, 0);
     return;
   }
 
   parse_mnemonic(mnemonic);
 
   if (total_words == 0) {
-    dialog_show_error("助记词为空", return_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.mnemonic_empty",
+                                 "Mnemonic is empty"),
+                      return_cb, 0);
     return;
   }
 

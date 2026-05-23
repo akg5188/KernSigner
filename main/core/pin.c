@@ -55,8 +55,13 @@ static void pin_power_off_protect(void) {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// Compute device salt via HMAC peripheral or deterministic fallback
-static esp_err_t compute_device_salt(uint8_t salt_out[PIN_HASH_SIZE]) {
+static esp_err_t compute_fallback_salt(uint8_t salt_out[PIN_HASH_SIZE]) {
+  int rc = crypto_sha256((const uint8_t *)FALLBACK_SALT_TAG,
+                         strlen(FALLBACK_SALT_TAG), salt_out);
+  return (rc == CRYPTO_OK) ? ESP_OK : ESP_FAIL;
+}
+
+static esp_err_t compute_hmac_salt(uint8_t salt_out[PIN_HASH_SIZE]) {
   uint8_t tag_hash[PIN_HASH_SIZE];
   int rc = crypto_sha256((const uint8_t *)HMAC_SALT_TAG, strlen(HMAC_SALT_TAG),
                          tag_hash);
@@ -77,10 +82,53 @@ static esp_err_t compute_device_salt(uint8_t salt_out[PIN_HASH_SIZE]) {
   return err;
 #endif
 
+  return err;
+}
+
+// Compute device salt via HMAC peripheral or deterministic fallback
+static esp_err_t compute_device_salt(uint8_t salt_out[PIN_HASH_SIZE],
+                                     bool *used_hmac) {
+  esp_err_t err = compute_hmac_salt(salt_out);
+  if (err == ESP_OK) {
+    if (used_hmac)
+      *used_hmac = true;
+    return ESP_OK;
+  }
+
   // Fallback: deterministic salt (no eFuse)
   ESP_LOGW(TAG, "HMAC peripheral unavailable, using fallback salt");
-  rc = crypto_sha256((const uint8_t *)FALLBACK_SALT_TAG,
-                     strlen(FALLBACK_SALT_TAG), salt_out);
+  if (used_hmac)
+    *used_hmac = false;
+  return compute_fallback_salt(salt_out);
+}
+
+static esp_err_t compute_stored_pin_salt(uint8_t salt_out[PIN_HASH_SIZE],
+                                         bool *used_hmac) {
+  uint8_t has_efuse = 0xff;
+  esp_err_t err = initialized ? nvs_get_u8(pin_nvs, KEY_HAS_EFUSE, &has_efuse)
+                              : ESP_ERR_INVALID_STATE;
+  if (err == ESP_OK) {
+    if (has_efuse) {
+      if (used_hmac)
+        *used_hmac = true;
+      return compute_hmac_salt(salt_out);
+    }
+    if (used_hmac)
+      *used_hmac = false;
+    return compute_fallback_salt(salt_out);
+  }
+
+  // Older firmware did not always record the salt mode. Prefer the current
+  // device mode, then pin_verify can still try the legacy fallback on mismatch.
+  return compute_device_salt(salt_out, used_hmac);
+}
+
+static esp_err_t hash_pin_with_salt(const char *pin, size_t len,
+                                    const uint8_t salt[PIN_HASH_SIZE],
+                                    uint8_t hash_out[PIN_HASH_SIZE]) {
+  int rc = crypto_pbkdf2_sha256((const uint8_t *)pin, len, salt,
+                                PIN_HASH_SIZE, PIN_PBKDF2_ITERATIONS,
+                                hash_out, PIN_HASH_SIZE);
   return (rc == CRYPTO_OK) ? ESP_OK : ESP_FAIL;
 }
 
@@ -243,15 +291,15 @@ esp_err_t pin_setup(const char *pin, size_t len, uint8_t split_pos) {
     return ESP_ERR_INVALID_ARG;
 
   uint8_t salt[PIN_HASH_SIZE];
-  esp_err_t err = compute_device_salt(salt);
+  bool used_hmac = false;
+  esp_err_t err = compute_device_salt(salt, &used_hmac);
   if (err != ESP_OK)
     return err;
 
   uint8_t hash[PIN_HASH_SIZE];
-  int rc = crypto_pbkdf2_sha256((const uint8_t *)pin, len, salt, sizeof(salt),
-                                PIN_PBKDF2_ITERATIONS, hash, PIN_HASH_SIZE);
+  err = hash_pin_with_salt(pin, len, salt, hash);
   secure_memzero(salt, sizeof(salt));
-  if (rc != CRYPTO_OK) {
+  if (err != ESP_OK) {
     secure_memzero(hash, sizeof(hash));
     return ESP_FAIL;
   }
@@ -276,9 +324,8 @@ esp_err_t pin_setup(const char *pin, size_t len, uint8_t split_pos) {
   if (nvs_get_u16(pin_nvs, KEY_TIMEOUT, &tmp16) != ESP_OK)
     nvs_set_u16(pin_nvs, KEY_TIMEOUT, PIN_DEFAULT_TIMEOUT_SEC);
 
-  // Record eFuse availability
-  uint8_t has_efuse = (pin_efuse_check() == PIN_EFUSE_PROVISIONED) ? 1 : 0;
-  nvs_set_u8(pin_nvs, KEY_HAS_EFUSE, has_efuse);
+  // Record the salt mode actually used, not merely whether eFuse exists.
+  nvs_set_u8(pin_nvs, KEY_HAS_EFUSE, used_hmac ? 1 : 0);
 
   return nvs_commit(pin_nvs);
 }
@@ -303,7 +350,8 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
   // Always run PBKDF2 before threshold handling. A correct PIN on the last
   // allowed attempt must still unlock and reset the counter.
   uint8_t salt[PIN_HASH_SIZE];
-  if (compute_device_salt(salt) != ESP_OK) {
+  bool used_hmac = false;
+  if (compute_stored_pin_salt(salt, &used_hmac) != ESP_OK) {
     secure_memzero(salt, sizeof(salt));
     if (pending_cnt >= max_fail) {
       pin_power_off_protect();
@@ -313,11 +361,9 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
   }
 
   uint8_t attempt_hash[PIN_HASH_SIZE];
-  int rc =
-      crypto_pbkdf2_sha256((const uint8_t *)pin, len, salt, sizeof(salt),
-                           PIN_PBKDF2_ITERATIONS, attempt_hash, PIN_HASH_SIZE);
+  esp_err_t hash_err = hash_pin_with_salt(pin, len, salt, attempt_hash);
   secure_memzero(salt, sizeof(salt));
-  if (rc != CRYPTO_OK) {
+  if (hash_err != ESP_OK) {
     secure_memzero(attempt_hash, sizeof(attempt_hash));
     if (pending_cnt >= max_fail) {
       pin_power_off_protect();
@@ -343,6 +389,46 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
   // Constant-time comparison
   int match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE);
   secure_memzero(attempt_hash, sizeof(attempt_hash));
+
+  if (match != 0 && used_hmac) {
+    if (compute_fallback_salt(salt) == ESP_OK &&
+        hash_pin_with_salt(pin, len, salt, attempt_hash) == ESP_OK) {
+      match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE);
+    }
+    secure_memzero(salt, sizeof(salt));
+    secure_memzero(attempt_hash, sizeof(attempt_hash));
+
+    if (match == 0) {
+      ESP_LOGW(TAG, "PIN matched legacy fallback salt; migrating hash");
+      uint8_t split = pin_get_split_position();
+      if (split < 1 || split >= len) {
+        split = len / 2;
+        if (split < 1)
+          split = 1;
+      }
+      (void)pin_setup(pin, len, split);
+      return PIN_VERIFY_OK;
+    }
+  }
+
+  if (match != 0 && !used_hmac) {
+    if (compute_hmac_salt(salt) == ESP_OK &&
+        hash_pin_with_salt(pin, len, salt, attempt_hash) == ESP_OK) {
+      match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE);
+    }
+    secure_memzero(salt, sizeof(salt));
+    secure_memzero(attempt_hash, sizeof(attempt_hash));
+
+    if (match == 0) {
+      ESP_LOGW(TAG, "PIN matched HMAC salt; migrating salt marker");
+      nvs_set_u8(pin_nvs, KEY_HAS_EFUSE, 1);
+      nvs_set_u8(pin_nvs, KEY_FAIL_CNT, 0);
+      nvs_commit(pin_nvs);
+      secure_memzero(stored_hash, sizeof(stored_hash));
+      return PIN_VERIFY_OK;
+    }
+  }
+
   secure_memzero(stored_hash, sizeof(stored_hash));
 
   if (match == 0) {

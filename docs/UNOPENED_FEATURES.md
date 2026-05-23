@@ -2,7 +2,7 @@
 
 日期：2026-05-20
 
-这些功能可能在 `/home/ak/123/satochip-signer` 参考项目里存在，但 Kern 当前不能作为已完成能力宣传，也不能放普通用户入口冒充功能。
+这些功能可能在 `/home/ak/123/satochip-signer` 参考项目里存在，但 KernSigner 当前不能作为已完成能力宣传，也不能放普通用户入口冒充功能。
 
 ## 智能卡
 
@@ -18,8 +18,8 @@
 | 卡片初始化/import seed | 未迁移 | 会改变卡状态，必须单独设计。 |
 | 卡片真伪证书检查 | 未迁移 | 未完成前不能宣传供应链认证。 |
 | 2FA 管理 | 未迁移 | 2FA 卡当前必须拒绝，不能半支持。 |
-| Satocash 管理 | 未迁移 | 参考项目还有独立 Satocash 分支，Kern 没有对应卡管理链。 |
-| Satodime 管理 | 未迁移 | 参考项目还有独立 Satodime 分支，Kern 没有对应卡管理链。 |
+| Satocash 管理 | 未迁移 | 参考项目还有独立 Satocash 分支，KernSigner 没有对应卡管理链。 |
+| Satodime 管理 | 未迁移 | 参考项目还有独立 Satodime 分支，KernSigner 没有对应卡管理链。 |
 
 ## Web3
 

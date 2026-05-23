@@ -36,19 +36,19 @@
 
 ```bash
 cd /home/ak/123/Kern
-ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
+ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh appflash
 ```
 
 刷机并重新打包验收：
 
 ```bash
 cd /home/ak/123/Kern
-JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
+JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh shipflash
 ```
 
 生产门禁检查：
 
 ```bash
 cd /home/ak/123/Kern
-tools/kern_delivery.sh prodcheck
+tools/signer_delivery.sh prodcheck
 ```

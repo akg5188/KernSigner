@@ -16,7 +16,7 @@ cd /home/ak/123/Kern
 
 ```bash
 pwd
-rg -n "Kern Documentation" docs/README.md
+rg -n "KernSigner Documentation" docs/README.md
 git status --short
 ```
 
@@ -24,19 +24,19 @@ git status --short
 
 ## 常见构建方式
 
-### 使用已有 build 目录增量构建
+### 使用默认固件构建目录
 
-当前工作区已有 `build/` 时，可以直接：
+当前默认固件构建目录是 `build_wave_43_fresh/`。已经配置过 ESP-IDF 后，可以直接：
 
 ```bash
 cd /home/ak/123/Kern
-cmake --build build
+idf.py -B build_wave_43_fresh build
 ```
 
 构建成功后会生成：
 
 ```text
-build/kernsigner.bin
+build_wave_43_fresh/kernsigner.bin
 ```
 
 ### 使用 ESP-IDF 构建 4.3 寸目标板
@@ -66,14 +66,14 @@ idf.py -B build_wave_43_fresh \
 
 ## 只检查某个 C 文件是否能编译
 
-改 UI 或页面后，可以用 `build/compile_commands.json` 做语法检查。
+改 UI 或页面后，可以用 `build_wave_43_fresh/compile_commands.json` 做语法检查。
 
 示例：
 
 ```bash
 cd /home/ak/123/Kern
 file=/home/ak/123/Kern/main/pages/capture_entropy.c
-cmd=$(jq -r --arg f "$file" '.[] | select(.file == $f) | .command' build/compile_commands.json)
+cmd=$(jq -r --arg f "$file" '.[] | select(.file == $f) | .command' build_wave_43_fresh/compile_commands.json)
 eval "$cmd -fsyntax-only"
 ```
 
@@ -84,10 +84,10 @@ cd /home/ak/123/Kern
 for file in \
   /home/ak/123/Kern/main/pages/capture_entropy.c \
   /home/ak/123/Kern/main/pages/pin/pin_page.c \
-  /home/ak/123/Kern/main/pages/krux_shell/krux_shell.c
+  /home/ak/123/Kern/main/pages/signer_shell/signer_shell.c
 do
   echo "syntax-check ${file#/home/ak/123/Kern/}"
-  cmd=$(jq -r --arg f "$file" '.[] | select(.file == $f) | .command' build/compile_commands.json)
+  cmd=$(jq -r --arg f "$file" '.[] | select(.file == $f) | .command' build_wave_43_fresh/compile_commands.json)
   eval "$cmd -fsyntax-only"
 done
 ```
@@ -114,14 +114,14 @@ done
 
 ```bash
 cd /home/ak/123/Kern
-ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
+ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh appflash
 ```
 
 如果手动用 esptool：
 
 ```bash
 python3 -m esptool --chip esp32p4 -p /dev/ttyACM0 -b 115200 \
-  --before default_reset --after hard_reset write_flash 0x20000 build/kernsigner.bin
+  --before default_reset --after hard_reset write_flash 0x20000 build_wave_43_fresh/kernsigner.bin
 ```
 
 地址 `0x20000` 只适用于当前分区布局。换分区表前必须重新确认。
@@ -144,7 +144,7 @@ idf.py -B build_wave_43_fresh -p /dev/ttyACM0 monitor
 
 ```bash
 cd /home/ak/123/Kern
-ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh bootlog
+ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh monitor
 ```
 
 日志保存到 `docs/logs/` 后，要在验收记录里写明文件名。
@@ -157,16 +157,20 @@ ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh bootlog
 cd /home/ak/123/Kern/simulator
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -- -j"$(nproc)"
-./build/kern_simulator --width 480 --height 800
+./build/signer_simulator --width 480 --height 800
 ```
 
-截图验收可以用：
+截图验收可以用 `sim` 或 `check`。`check` 会构建模拟器、生成截图并做截图验收：
 
 ```bash
 cd /home/ak/123/Kern
-tools/kern_delivery.sh sim
-tools/kern_delivery.sh screenshots
-tools/kern_delivery.sh verify
+tools/signer_delivery.sh check
+```
+
+如果只想验收已有截图目录，把目录作为第二个参数传给 `verify`。不传目录时脚本会使用它能找到的默认验收目录：
+
+```bash
+tools/signer_delivery.sh verify docs/screens/delivery_YYYYMMDD_HHMMSS
 ```
 
 ## 交付脚本
@@ -175,11 +179,11 @@ tools/kern_delivery.sh verify
 
 | 命令 | 用途 |
 | --- | --- |
-| `tools/kern_delivery.sh build` | 构建 4.3 寸验收固件 |
-| `tools/kern_delivery.sh check` | 跑交付检查 |
-| `tools/kern_delivery.sh final` | 生成最终交付材料 |
-| `tools/kern_delivery.sh appflash` | app-only 刷机 |
-| `tools/kern_delivery.sh prodcheck` | 生产门禁检查 |
+| `tools/signer_delivery.sh build` | 构建 4.3 寸验收固件 |
+| `tools/signer_delivery.sh check` | 跑交付检查 |
+| `tools/signer_delivery.sh final` | 校验最新交付包 |
+| `tools/signer_delivery.sh appflash` | app-only 刷机 |
+| `tools/signer_delivery.sh prodcheck` | 生产门禁检查 |
 
 生产门禁失败并不代表开发构建失败。它表示还不能宣传为商业真钱包。
 
@@ -191,7 +195,7 @@ tools/kern_delivery.sh verify
 2. `rg` 能不能搜到你刚改的文字。
 3. 另一个窗口是不是用了另一个 build 目录。
 4. 是否只编译了 simulator，没有编译固件。
-5. 是否刷的是旧发布包，不是当前 `build/kernsigner.bin`。
+5. 是否刷的是旧发布包，不是当前 `build_wave_43_fresh/kernsigner.bin`。
 6. 是否 app-only 刷到了错误分区地址。
 7. 刷完是否设备实际重启。
 
@@ -200,8 +204,8 @@ tools/kern_delivery.sh verify
 ```bash
 cd /home/ak/123/Kern
 rg -n "本机助记词|拍照生成随机熵|pin_unlock_textarea_y" main docs
-cmake --build build
-sha256sum build/kernsigner.bin
+idf.py -B build_wave_43_fresh build
+sha256sum build_wave_43_fresh/kernsigner.bin
 ```
 
 刷机后记录新的 SHA256。
@@ -213,8 +217,8 @@ sha256sum build/kernsigner.bin
 ```bash
 cd /home/ak/123/Kern
 git diff --check
-cmake --build build
-tools/kern_delivery.sh prodcheck
+idf.py -B build_wave_43_fresh build
+tools/signer_delivery.sh prodcheck
 ```
 
 如果只是测试资金验收版，`prodcheck` 可以失败，但必须在交付说明里写清楚“不是商业生产版”。

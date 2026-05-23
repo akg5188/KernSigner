@@ -10,8 +10,8 @@
 
 ## 必须全部通过
 
-- `tools/kern_delivery.sh prodcheck` 必须通过。
-- 商业候选包必须使用 `tools/kern_delivery.sh prodship` 或 `prodshipflash` 生成，不能用普通 `ship/shipflash` 冒充生产包。
+- `tools/signer_delivery.sh prodcheck` 必须通过。
+- 商业候选包必须使用 `tools/signer_delivery.sh prodship` 或 `prodshipflash` 生成，不能用普通 `ship/shipflash` 冒充生产包。
 - 交付包内 `PRODUCTION_CHECK.txt` 必须显示生产安全门禁通过。
 - 交付包内 `MANUFACTURING_READINESS.txt` 必须记录签名镜像、eFuse、Secure Boot、Flash Encryption、NVS key 和制造证据。
 - bootloader、partition table、app、NVS key 等生产镜像必须都有 SHA256、签名状态和烧录地址记录。

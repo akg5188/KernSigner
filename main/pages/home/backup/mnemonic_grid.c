@@ -1,5 +1,6 @@
 #include "mnemonic_grid.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../ui/dialog.h"
 #include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
@@ -108,7 +109,10 @@ void mnemonic_grid_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   return_callback = return_cb;
   if (!key_mnemonic_is_valid()) {
-    dialog_show_error("临时助记词不能显示点阵板", return_cb, 0);
+    dialog_show_error(
+        i18n_tr_or("backup.no_temporary_punch_grid",
+                   "Temporary mnemonic cannot show the punch grid"),
+        return_cb, 0);
     return;
   }
   if (!bip39_filter_init())
@@ -122,7 +126,8 @@ void mnemonic_grid_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   grid_screen = theme_create_page_container(parent);
   lv_obj_set_style_bg_color(grid_screen, bg_color(), 0);
   lv_obj_set_style_bg_opa(grid_screen, LV_OPA_COVER, 0);
-  theme_create_page_title(grid_screen, "点阵板");
+  theme_create_page_title(grid_screen,
+                          i18n_tr_or("input.punch_grid", "Punch grid"));
   (void)ui_create_back_button(grid_screen, back_btn_cb);
 
   lv_obj_t *list = lv_obj_create(grid_screen);

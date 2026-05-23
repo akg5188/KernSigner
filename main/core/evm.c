@@ -2,6 +2,7 @@
 #include "key.h"
 #include "crypto_utils.h"
 #include "../utils/secure_mem.h"
+#include "i18n/i18n.h"
 #include "../../components/cUR/src/types/cbor_data.h"
 #include "../../components/cUR/src/types/cbor_encoder.h"
 #include "../../components/cUR/src/ur_encoder.h"
@@ -1090,8 +1091,8 @@ bool evm_web3_build_connect_qr(evm_web3_profile_t profile,
       return false;
     bundle_out->page_count = 1;
     bundle_out->animated = false;
-    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "普通 EVM 地址码");
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary), "%s",
+             i18n_tr_or("evm.qr.evm_address", "EVM address QR"));
     return true;
   }
 
@@ -1104,34 +1105,40 @@ bool evm_web3_build_connect_qr(evm_web3_profile_t profile,
   case EVM_WEB3_PROFILE_OKX:
     ok = web3_build_multi_accounts(profile, bundle_out, master_fingerprint);
     snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "OKX 动态连接码 / %u 片",
+             i18n_tr_or("evm.qr.okx_connect_format",
+                        "OKX animated connection QR / %u parts"),
              (unsigned)bundle_out->page_count);
     break;
   case EVM_WEB3_PROFILE_BITGET:
     ok = web3_build_multi_accounts(profile, bundle_out, master_fingerprint);
     snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "Bitget 静态连接码 / %u 片",
+             i18n_tr_or("evm.qr.bitget_connect_format",
+                        "Bitget static connection QR / %u parts"),
              (unsigned)bundle_out->page_count);
     break;
   case EVM_WEB3_PROFILE_METAMASK:
     ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
-    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "MetaMask 账户连接码");
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary), "%s",
+             i18n_tr_or("evm.qr.metamask_account_connect",
+                        "MetaMask account connection QR"));
     break;
   case EVM_WEB3_PROFILE_RABBY:
     ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
-    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "Rabby 静态连接码");
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary), "%s",
+             i18n_tr_or("evm.qr.rabby_static_connect",
+                        "Rabby static connection QR"));
     break;
   case EVM_WEB3_PROFILE_TOKENPOCKET:
     ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
-    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "TokenPocket 静态连接码");
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary), "%s",
+             i18n_tr_or("evm.qr.tokenpocket_static_connect",
+                        "TokenPocket static connection QR"));
     break;
   case EVM_WEB3_PROFILE_IMTOKEN:
     ok = web3_build_hdkey_page(bundle_out, master_fingerprint);
-    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "imToken 静态连接码");
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary), "%s",
+             i18n_tr_or("evm.qr.imtoken_static_connect",
+                        "imToken static connection QR"));
     break;
   case EVM_WEB3_PROFILE_ADDRESS:
   default:
@@ -1162,8 +1169,9 @@ bool evm_web3_build_external_connect_qr(
       return false;
     bundle_out->page_count = 1;
     bundle_out->animated = false;
-    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "智能卡 EVM 地址码");
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary), "%s",
+             i18n_tr_or("evm.qr.smartcard_evm_address",
+                        "Smartcard EVM address QR"));
     return true;
   }
 
@@ -1178,14 +1186,16 @@ bool evm_web3_build_external_connect_qr(
     ok = web3_build_external_multi_accounts(profile, account, bundle_out,
                                             master_fingerprint);
     snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "OKX 智能卡连接码 / %u 片",
+             i18n_tr_or("evm.qr.okx_smartcard_connect_format",
+                        "OKX smartcard connection QR / %u parts"),
              (unsigned)bundle_out->page_count);
     break;
   case EVM_WEB3_PROFILE_BITGET:
     ok = web3_build_external_multi_accounts(profile, account, bundle_out,
                                             master_fingerprint);
     snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             "Bitget 智能卡静态连接码 / %u 片",
+             i18n_tr_or("evm.qr.bitget_smartcard_connect_format",
+                        "Bitget smartcard static connection QR / %u parts"),
              (unsigned)bundle_out->page_count);
     break;
   case EVM_WEB3_PROFILE_METAMASK:
@@ -1211,9 +1221,12 @@ bool evm_web3_build_external_connect_qr(
       bundle_out->page_count = 1;
       bundle_out->animated = false;
     }
-    snprintf(bundle_out->summary, sizeof(bundle_out->summary),
-             profile == EVM_WEB3_PROFILE_IMTOKEN ? "imToken 智能卡连接码"
-                                                 : "智能卡账户连接码");
+    snprintf(bundle_out->summary, sizeof(bundle_out->summary), "%s",
+             profile == EVM_WEB3_PROFILE_IMTOKEN
+                 ? i18n_tr_or("evm.qr.imtoken_smartcard_connect",
+                              "imToken smartcard connection QR")
+                 : i18n_tr_or("evm.qr.smartcard_account_connect",
+                              "Smartcard account connection QR"));
     break;
   }
   case EVM_WEB3_PROFILE_ADDRESS:

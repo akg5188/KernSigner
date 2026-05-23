@@ -3,6 +3,7 @@
 #include "../../core/mnemonic_slots.h"
 #include "../../core/settings.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
@@ -93,7 +94,9 @@ static void passphrase_success_cb(const char *passphrase) {
   char *mnemonic = NULL;
   if (!key_get_mnemonic(&mnemonic)) {
     passphrase_page_destroy();
-    dialog_show_error("请先加载助记词", return_from_passphrase_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.no_mnemonic_loaded",
+                                 "Load a mnemonic first"),
+                      return_from_passphrase_cb, 0);
     return;
   }
 
@@ -114,12 +117,17 @@ static void passphrase_success_cb(const char *passphrase) {
 
   passphrase_page_destroy();
   if (!ok) {
-    dialog_show_error("密码短语应用失败", return_from_passphrase_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.passphrase_failed",
+                                 "Passphrase failed"),
+                      return_from_passphrase_cb, 0);
     return;
   }
 
   (void)mnemonic_slots_add_current(NULL);
-  dialog_show_message("已完成", "密码短语已应用，钱包指纹已更新。");
+  dialog_show_message(i18n_tr_or("dialog.operation_complete", "Complete"),
+                      i18n_tr_or("wallet.passphrase_applied",
+                                 "Passphrase applied; wallet fingerprint "
+                                 "updated."));
   loaded_mnemonic_menu_page_show();
 }
 
@@ -183,13 +191,17 @@ static void launch_passphrase(void) {
 
 static void launch_seedkeeper_write(void) {
   if (!signer_shell_show_screen("smartcard_seedkeeper_write_mnemonic")) {
-    dialog_show_error("页面不可用", loaded_mnemonic_menu_page_show, 0);
+    dialog_show_error(i18n_tr_or("dialog.page_unavailable",
+                                 "Page unavailable"),
+                      loaded_mnemonic_menu_page_show, 0);
   }
 }
 
 static void launch_satochip_write(void) {
   if (!signer_shell_show_screen("smartcard_satochip_write_mnemonic")) {
-    dialog_show_error("页面不可用", loaded_mnemonic_menu_page_show, 0);
+    dialog_show_error(i18n_tr_or("dialog.page_unavailable",
+                                 "Page unavailable"),
+                      loaded_mnemonic_menu_page_show, 0);
   }
 }
 
@@ -218,30 +230,56 @@ void loaded_mnemonic_menu_page_create(lv_obj_t *parent, void (*return_cb)(void))
 
   return_callback = return_cb;
   loaded_screen = theme_create_page_container(parent);
-  loaded_menu = ui_menu_create(loaded_screen,
-                               key_has_signing_key() ? "已加载助记词"
-                                                     : "临时助记词",
-                               back_cb);
+  loaded_menu = ui_menu_create(
+      loaded_screen,
+      key_has_signing_key()
+          ? i18n_tr_or("wallet.loaded_mnemonic", "Loaded mnemonic")
+          : i18n_tr_or("wallet.temporary_mnemonic", "Temporary mnemonic"),
+      back_cb);
   if (!loaded_menu)
     return;
 
   if (key_has_signing_key()) {
-    ui_menu_add_entry(loaded_menu, "扩展公钥", public_key_cb);
-    ui_menu_add_entry(loaded_menu, "地址核对", addresses_cb);
-    ui_menu_add_entry(loaded_menu, "派生地址", custom_derivation_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("address.extended_public_key",
+                                 "Extended public key"),
+                      public_key_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("address.address_check", "Address check"),
+                      addresses_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("address.derive_address",
+                                 "Derive address"),
+                      custom_derivation_cb);
   }
   if (key_mnemonic_is_valid()) {
-    ui_menu_add_entry(loaded_menu, "序号", words_cb);
-    ui_menu_add_entry(loaded_menu, "原始熵", entropy_cb);
-    ui_menu_add_entry(loaded_menu, "密码短语", passphrase_cb);
-    ui_menu_add_entry(loaded_menu, "写SeedKeeper", seedkeeper_write_cb);
-    ui_menu_add_entry(loaded_menu, "写Satochip", satochip_write_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("backup.word_indexes", "Word indexes"),
+                      words_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("wallet.raw_entropy", "Raw entropy"),
+                      entropy_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("wallet.passphrase", "Passphrase"),
+                      passphrase_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("backup.seedkeeper_write",
+                                 "Write SeedKeeper"),
+                      seedkeeper_write_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("backup.satochip_write", "Write Satochip"),
+                      satochip_write_cb);
   }
   if (key_has_signing_key())
     ui_menu_add_entry(loaded_menu, "BIP85", bip85_cb);
-  ui_menu_add_entry(loaded_menu, "助记词加密", secondary_shift_cb);
+  ui_menu_add_entry(loaded_menu,
+                    i18n_tr_or("input.mnemonic_encryption",
+                               "Mnemonic Encryption"),
+                    secondary_shift_cb);
   if (key_can_backup_mnemonic())
-    ui_menu_add_entry(loaded_menu, "备份导出", backup_cb);
+    ui_menu_add_entry(loaded_menu,
+                      i18n_tr_or("backup.export_backup", "Export Backup"),
+                      backup_cb);
 
   ui_menu_apply_compact_grid(loaded_menu);
 }

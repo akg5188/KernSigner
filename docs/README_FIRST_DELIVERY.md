@@ -1,4 +1,4 @@
-# 先读我：Kern 交付入口
+# 先读我：KernSigner 交付入口
 
 日期：2026-05-22
 
@@ -6,11 +6,11 @@
 
 ## 当前定位
 
-当前 Kern 是 Waveshare ESP32-P4 4.3 寸设备上的真机验收固件。它已经接入旧 Kern 钱包核心、中文 UI、助记词主流程、扫码签名、连接钱包、设备检查、Satochip Web3 主线和 SeedKeeper 测试卡维护主线。
+当前 KernSigner 是 Waveshare ESP32-P4 4.3 寸设备上的真机验收固件。它已经接入旧 Kern 钱包核心、中文 UI、助记词主流程、扫码签名、连接钱包、设备检查、Satochip Web3 主线和 SeedKeeper 测试卡维护主线。
 
 这个仓库里的大部分实现由 AI 辅助完成，仍在持续打磨中，只适合学习、交流和测试，不要把真实资产放进去。
 
-当前不是商业真钱包生产版。没有通过 `tools/kern_delivery.sh prodcheck`、真机验收和安全审计前，不要放真实资产。
+当前不是商业真钱包生产版。没有通过 `tools/signer_delivery.sh prodcheck`、真机验收和安全审计前，不要放真实资产。
 
 ## 可以验收
 
@@ -30,7 +30,7 @@
 
 - 不能宣称商业生产版。
 - 不能宣称可以直接放真钱。
-- 不能宣称完整迁移了 `/home/ak/123/satochip-signer`。
+- 不能宣称完整迁移了外部 `satochip-signer` 参考项目。
 - 不能宣称 SeedKeeper、写卡、改 PIN、重置已经过生产审计。
 - 不能宣称支持 Satochip BTC PSBT 卡签名。
 - 不能宣称支持 TypedData/EIP-712。
@@ -40,10 +40,9 @@
 
 - `docs/FLASH_PRECHECK.md`：刷机前检查。
 - `docs/零基础第一次上手教程.zh-CN.md`：完全新手第一次从开机到测试签名的操作教程。
-- `docs/USER_QUICK_START.zh-CN.md`：第一次使用 Kern 的完整新手流程。
+- `docs/USER_QUICK_START.zh-CN.md`：第一次使用 KernSigner 的完整新手流程。
 - `docs/全功能操作总手册.zh-CN.md`：当前所有主要功能的操作入口总图。
 - `docs/BUILD_FLASH_DEBUG_GUIDE.zh-CN.md`：构建、刷机、调试和“改了没编进去”排查。
-- `docs/安卓构建环境准备.zh-CN.md`：安卓中转 App 的 JDK、SDK、debug/release APK 构建步骤。
 - `docs/TROUBLESHOOTING_GENERAL.zh-CN.md`：屏幕、触摸、相机、扫码、构建、刷机等通用排障。
 - `docs/BACKUP_AND_RECOVERY_GUIDE.zh-CN.md`：助记词备份和恢复演练。
 - `docs/连接钱包教程.zh-CN.md`：Web3 商业钱包、BTC 观察钱包和扫码签名新手教程。

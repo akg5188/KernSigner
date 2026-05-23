@@ -9,7 +9,7 @@
 商业钱包口径：
 
 - 核心测试新增 PSBT 攻击拒签和 BTC 消息签名路径策略，`make -C main/core/test run` 必须通过。
-- 正式资金版发布前必须执行 `tools/kern_delivery.sh prodcheck`，并完成 Secure Boot、Flash Encryption、NVS 加密、调试口/控制台关闭、panic/WDT 策略、clean release provenance 和 eFuse 流程。
+- 正式资金版发布前必须执行 `tools/signer_delivery.sh prodcheck`，并完成 Secure Boot、Flash Encryption、NVS 加密、调试口/控制台关闭、panic/WDT 策略、clean release provenance 和 eFuse 流程。
 - 当前开发配置下 `prodcheck` 会提示 Secure Boot / Flash Encryption / NVS 加密 / 调试口与控制台等条件未满足，所以不能标记为商业资金正式版。
 - Waveshare 4.3 寸显示启动路径已经做过商业钱包级防崩溃加固：显示、触摸、LVGL 启动失败会记录日志并可控重启，不再靠 `assert` 或 abort 蓝屏。
 
@@ -17,15 +17,15 @@
 
 ## 明早先看这几个文件
 
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/RELEASE_SUMMARY.txt`：本次交付包、固件 SHA256、截图数量和启动日志状态。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/PROJECT_PROGRESS_AND_PLAN.md`：项目总进展、详细计划、风险边界和后续阶段。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/FINAL_READINESS.txt`：最终交付状态，集中确认固件、截图、启动日志和安全边界。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/ACCEPTANCE_REPORT.txt`：模拟器首屏/底部截图、中文缺字、UI 烟测、滚动验收和按钮点击验收结果，最终必须是 `FINAL: PASS`。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/boot.log`：真机启动日志，应该看到屏幕、GT911 触摸和背光初始化成功。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/contact_sheet_key_pages.png`：关键页面拼图，方便快速确认中文 UI。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/screenshots/contact_sheet_all_top.png`：全部首屏拼图。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/screenshots/contact_sheet_all_bottom.png`：全部可滚动页面底部拼图。
-- `_release/kern_delivery_YYYYMMDD_HHMMSS/DELIVERY_STATUS.md`：完整验收清单和风险边界。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/RELEASE_SUMMARY.txt`：本次交付包、固件 SHA256、截图数量和启动日志状态。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/PROJECT_PROGRESS_AND_PLAN.md`：项目总进展、详细计划、风险边界和后续阶段。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/FINAL_READINESS.txt`：最终交付状态，集中确认固件、截图、启动日志和安全边界。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/ACCEPTANCE_REPORT.txt`：模拟器首屏/底部截图、中文缺字、UI 烟测、滚动验收和按钮点击验收结果，最终必须是 `FINAL: PASS`。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/boot.log`：真机启动日志，应该看到屏幕、GT911 触摸和背光初始化成功。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/contact_sheet_key_pages.png`：关键页面拼图，方便快速确认中文 UI。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/screenshots/contact_sheet_all_top.png`：全部首屏拼图。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/screenshots/contact_sheet_all_bottom.png`：全部可滚动页面底部拼图。
+- `_release/signer_delivery_YYYYMMDD_HHMMSS/DELIVERY_STATUS.md`：完整验收清单和风险边界。
 - `docs/README_FIRST_DELIVERY.md`：交付前先读入口，统一当前版本定位。
 - `docs/FLASH_PRECHECK.md`：刷机前检查，防止 app-only 包误刷。
 - `docs/RELEASE_POINTERS_AND_HISTORY.md`：确认 `_release/LATEST_RELEASE.txt` 是否还是旧包，防止刷错版本。
@@ -70,7 +70,7 @@
 
 ```bash
 cd /home/ak/123/Kern
-ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
+ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh appflash
 ```
 
 刷完后脚本会自动抓启动日志并判断是否 PASS。
@@ -79,14 +79,14 @@ ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
 
 ```bash
 cd /home/ak/123/Kern
-JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
+JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh shipflash
 ```
 
 ## 最终确认
 
 ```bash
 cd /home/ak/123/Kern
-tools/kern_delivery.sh final
+tools/signer_delivery.sh final
 ```
 
 看到 `final verify: PASS` 就表示最新交付包、固件 SHA256、截图报告、按钮验收、启动日志和关键文档都完整。
@@ -94,7 +94,7 @@ tools/kern_delivery.sh final
 如果要检查是否达到商业真钱包生产安全配置：
 
 ```bash
-tools/kern_delivery.sh prodcheck
+tools/signer_delivery.sh prodcheck
 ```
 
 当前如果这里失败，说明还只是验收固件，不是生产资金固件。
@@ -102,7 +102,7 @@ tools/kern_delivery.sh prodcheck
 如果只是重新生成交付包并最终校验，不刷开发板：
 
 ```bash
-tools/kern_delivery.sh ship
+tools/signer_delivery.sh ship
 ```
 
 ## 已知非阻塞日志

@@ -5,6 +5,21 @@
 ### Added
 - Support for Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 (wave_43, 480x800 MIPI DSI, ST7701)
 
+## [0.0.7-rc1] - 2026-05-22
+
+### Added
+- Included untested `wave_43` full and app-only firmware images under `firmware/wave_43/`.
+- Added KernSigner Chinese user guides, troubleshooting guides, firmware flashing guide, and documentation coverage map.
+- Added Satochip/SeedKeeper test-card operation guides, powered-OTG notes, and smart-card release boundaries.
+
+### Changed
+- Renamed delivery tooling and documentation around `tools/signer_delivery.sh` and `tools/signer_production_check.sh`.
+- Clarified that this repository is a test-funds validation build, not an audited production custody wallet.
+
+### Known Boundaries
+- Secure Boot, Flash Encryption, NVS encryption, debug-port closure, release provenance, and full real-device regression remain production gates.
+- TypedData/EIP-712, Satochip BTC PSBT/card message signing, 2FA, and card authenticity flows must not be marketed as production-ready.
+
 ## [0.0.6] - 2026-04-25
 
 ### Changed
@@ -41,7 +56,7 @@
 
 ### Fixed
 - Scanner PPA Q4.4 quantization
-- Screen rotation, not working with lgvl_adapter, was removed
+- Screen rotation, not working with lvgl_adapter, was removed
 - Dice rolls label overflowing the keypad on wave_35; truncates with "..." indicator when full
 
 ## [0.0.3] - 2026-04-13

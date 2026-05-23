@@ -3,6 +3,7 @@
 #include "../../core/mnemonic_slots.h"
 #include "../../core/settings.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../qr/encoder.h"
 #include "../../ui/assets/icons_36.h"
 #include "../../ui/dialog.h"
@@ -41,7 +42,9 @@ static void loading_timer_cb(lv_timer_t *timer) {
     key_apply_pending_source_material(mnemonic_content);
     if (!wallet_init(net)) {
       SECURE_FREE_STRING(mnemonic_content);
-      dialog_show_error("钱包初始化失败", return_callback, 0);
+      dialog_show_error(i18n_tr_or("settings.wallet_init_failed",
+                                   "Wallet initialization failed"),
+                        return_callback, 0);
       return;
     }
     (void)mnemonic_slots_add_current(NULL);
@@ -51,7 +54,9 @@ static void loading_timer_cb(lv_timer_t *timer) {
   } else {
     SECURE_FREE_STRING(passphrase);
     SECURE_FREE_STRING(mnemonic_content);
-    dialog_show_error("密钥加载失败", return_callback, 0);
+    dialog_show_error(i18n_tr_or("settings.key_reload_failed",
+                                 "Key load failed"),
+                      return_callback, 0);
   }
 }
 
@@ -108,7 +113,8 @@ static void create_ui(const char *fingerprint_hex) {
   lv_obj_set_style_text_font(fp_text, theme_font_medium(), 0);
   lv_obj_set_style_text_color(fp_text, highlight_color(), 0);
 
-  lv_obj_t *hint = theme_create_label(center, "正在加载钱包", true);
+  lv_obj_t *hint = theme_create_label(
+      center, i18n_tr_or("wallet.loading_wallet", "Loading wallet"), true);
   lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
 
   loading_timer = lv_timer_create(loading_timer_cb, LOADING_DELAY_MS, NULL);
@@ -125,7 +131,9 @@ void key_confirmation_page_create(lv_obj_t *parent, void (*return_cb)(void),
   SECURE_FREE_STRING(mnemonic_content);
   mnemonic_content = mnemonic_qr_to_mnemonic(content, content_len, NULL);
   if (!mnemonic_content) {
-    dialog_show_error("助记词无效", return_callback, 0);
+    dialog_show_error(i18n_tr_or("wallet.mnemonic_invalid",
+                                 "Mnemonic is invalid"),
+                      return_callback, 0);
     return;
   }
 
@@ -143,7 +151,9 @@ void key_confirmation_page_create(lv_obj_t *parent, void (*return_cb)(void),
     SECURE_FREE_STRING(passphrase);
     secure_memzero(seed, sizeof(seed));
     SECURE_FREE_STRING(mnemonic_content);
-    dialog_show_error("助记词处理失败", return_callback, 0);
+    dialog_show_error(i18n_tr_or("wallet.mnemonic_processing_failed",
+                                 "Mnemonic processing failed"),
+                      return_callback, 0);
     return;
   }
   SECURE_FREE_STRING(passphrase);
@@ -157,7 +167,9 @@ void key_confirmation_page_create(lv_obj_t *parent, void (*return_cb)(void),
                            &fingerprint_hex) != WALLY_OK) {
     secure_memzero(fingerprint, sizeof(fingerprint));
     SECURE_FREE_STRING(mnemonic_content);
-    dialog_show_error("指纹格式化失败", return_callback, 0);
+    dialog_show_error(i18n_tr_or("wallet.fingerprint_format_failed",
+                                 "Fingerprint formatting failed"),
+                      return_callback, 0);
     return;
   }
 

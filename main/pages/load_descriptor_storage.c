@@ -3,6 +3,7 @@
 #include "load_descriptor_storage.h"
 #include "../core/kef.h"
 #include "../core/storage.h"
+#include "../i18n/i18n.h"
 #include "../ui/dialog.h"
 #include "shared/descriptor_loader.h"
 #include "shared/kef_decrypt_page.h"
@@ -41,7 +42,8 @@ static void success_from_kef_decrypt(const uint8_t *data, size_t len) {
   char *descriptor_str = malloc(len + 1);
   if (!descriptor_str) {
     kef_decrypt_page_destroy();
-    dialog_show_error("内存不足", NULL, 0);
+    dialog_show_error(i18n_tr_or("dialog.operation_failed", "Out of memory"),
+                      NULL, 0);
     storage_browser_show();
     return;
   }
@@ -67,14 +69,17 @@ static void load_selected(int idx, const char *filename) {
   esp_err_t ret = storage_load_descriptor(
       storage_browser_get_location(), filename, &data, &data_len, &encrypted);
   if (ret != ESP_OK) {
-    dialog_show_error("文件加载失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("dialog.load_failed", "File load failed"),
+                      NULL, 0);
     return;
   }
 
   if (encrypted) {
     if (!kef_is_envelope(data, data_len)) {
       free(data);
-      dialog_show_error("加密数据无效", NULL, 0);
+      dialog_show_error(i18n_tr_or("dialog.invalid_input",
+                                   "Invalid encrypted data"),
+                        NULL, 0);
       return;
     }
 
@@ -88,7 +93,8 @@ static void load_selected(int idx, const char *filename) {
     char *descriptor_str = malloc(data_len + 1);
     if (!descriptor_str) {
       free(data);
-      dialog_show_error("内存不足", NULL, 0);
+      dialog_show_error(i18n_tr_or("dialog.operation_failed", "Out of memory"),
+                        NULL, 0);
       return;
     }
     memcpy(descriptor_str, data, data_len);
@@ -160,7 +166,7 @@ void load_descriptor_storage_page_create(lv_obj_t *parent,
   success_callback = success_cb;
 
   storage_browser_config_t config = {
-      .item_type_name = "描述符",
+      .item_type_name = i18n_tr_or("descriptor.descriptor", "Descriptor"),
       .location = location,
       .list_files = storage_list_descriptors,
       .delete_file = storage_delete_descriptor,

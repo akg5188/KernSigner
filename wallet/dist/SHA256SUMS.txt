@@ -1,1 +1,0 @@
-e9e31969878af6c8c12aca980c0c845b73c0e25575928a3c89c2a8beebb47f8d  wallet/dist/smartcard-compat-v0.1.19-usbt1-release.apk

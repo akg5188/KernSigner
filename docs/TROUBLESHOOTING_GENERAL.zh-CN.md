@@ -64,16 +64,22 @@
 
 相机创建助记词时，如果提示随机性不足，换一个细节更多的场景重新拍。
 
+第一次使用 Waveshare ESP32-P4 4.3 开发板或刚换过摄像头/排线时，先做物理对焦：打开相机或扫码页，显示一个普通黑白二维码，保持 10-20 cm 距离，捏住 OV5647 镜头外圈小幅旋转，直到二维码边缘和小格子最清楚。不要拧排线、不要扯摄像头主板。普通二维码稳定识别后，再测 OKX、Bitget、TokenPocket 这类高密度动态码。
+
 扫码失败时：
 
 | 现象 | 可能原因 |
 | --- | --- |
-| 二维码太密 | 用 Android 中转 App 或降低密度 |
+| 二维码太密 | 截图或投屏到电脑放大，或收集照片/录屏做桌面端解码 |
 | 反光严重 | 调整屏幕角度和亮度 |
+| 普通二维码都不灵敏 | 先调摄像头焦距、擦镜头、确认 FFC 排线插紧 |
 | 一直扫不到 | 确认二维码类型是否支持 |
 | 扫到但不能签 | 可能不是当前钱包、网络或路径不匹配 |
+| OKX 圆点码完全没反应 | 先按 OKX 圆点动态二维码复盘检查摄像头焦距和图像解码层 |
+| OKX 动态码有进度但不跳签名 | 查 UR 分片是否收齐、`eth-sign-request` CBOR 是否解析成功 |
+| 刷完二维码好了但字体乱码 | 查字体是否为压缩位图，重新烘焙并确认 `.bitmap_format = 0` |
 
-Android 中转看 [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md)。
+OKX 圆点动态二维码专项排障看 [OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md](OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md)。
 
 ## 助记词生成和 BIP39 网站不一致
 
@@ -82,9 +88,9 @@ Android 中转看 [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUI
 1. BIP39 网站语言是否是 `English`。
 2. 是否勾选 `Show entropy details`。
 3. `Mnemonic Length` 是否选了 `Use Raw Entropy`。
-4. Kern 上复制的是 `十六进制` 原始熵，不是 SHA256 显示或别的输入。
+4. KernSigner 上复制的是 `十六进制` 原始熵，不是 SHA256 显示或别的输入。
 5. 抛硬币、骰子、扑克牌是否漏输或多输。
-6. D20 不要直接粘到 BIP39 网站，先用 Kern 的原始熵验证。
+6. D20 不要直接粘到 BIP39 网站，先用 KernSigner 的原始熵验证。
 
 详细看 [MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md](MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md)。
 
@@ -126,7 +132,7 @@ Android 中转看 [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUI
 3. TypedData/EIP-712 是否被拒绝，这是预期安全边界。
 4. 链 ID、from 地址、to 地址是否正确。
 5. 签名来源是本机助记词还是智能卡。
-6. 如果二维码太密，使用 Android 中转 App。
+6. 如果二维码太密，截图或投屏到电脑放大；仍失败就保存照片/录屏做桌面端解码。
 
 不要为了“签过去”而忽略合约、授权和金额。
 
@@ -157,7 +163,7 @@ Android 中转看 [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUI
 常用命令：
 
 ```bash
-cd /home/ak/123/Kern
+cd /home/ak/123/KernSigner
 git submodule update --init --recursive
 source /home/ak/esp-idf-v5.5.4/export.sh
 cmake --build build
@@ -170,7 +176,7 @@ cmake --build build
 按顺序查：
 
 1. 是否在正确目录构建。
-2. 是否刷了刚生成的 `build/kernsigner.bin`。
+2. 是否刷了刚生成的 `build_wave_43_fresh/kernsigner.bin`。
 3. 是否刷到正确串口。
 4. 是否只刷 app，但设备分区表不是同一套。
 5. 是否刷完设备没有重启。
@@ -179,7 +185,7 @@ cmake --build build
 记录：
 
 ```bash
-sha256sum build/kernsigner.bin
+sha256sum build_wave_43_fresh/kernsigner.bin
 ```
 
 把 SHA256 写入交付记录。
@@ -190,7 +196,7 @@ sha256sum build/kernsigner.bin
 
 - 开发板 PIN 只剩最后一次机会。
 - 智能卡 PIN 或 PUK 只剩最后一次机会。
-- 收款地址和 Kern 显示不一致。
+- 收款地址和 KernSigner 显示不一致。
 - 签名页面显示的金额、合约或授权看不懂。
 - 相机或 QR 反复卡住并伴随崩溃日志。
 - 不确定固件是不是测试版还是生产版。

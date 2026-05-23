@@ -1,5 +1,9 @@
 #include "smartcard_ccid.h"
 
+#include "i18n/i18n.h"
+
+#define SC_TR(key, fallback) i18n_tr_or("smartcard.ccid." key, fallback)
+
 #ifdef SIMULATOR
 
 #include <stdio.h>
@@ -8,7 +12,8 @@
 static smartcard_ccid_report_t s_report = {
     .state = SMARTCARD_CCID_STATE_UNSUPPORTED,
     .terminal = true,
-    .detail = "模拟器不访问 USB Host；请在真机上外接供电后检测。",
+    .detail = "Simulator does not access USB Host; use powered hardware to "
+              "probe.",
 };
 
 esp_err_t smartcard_ccid_start(void) { return ESP_ERR_NOT_SUPPORTED; }
@@ -18,7 +23,10 @@ esp_err_t smartcard_ccid_probe(uint32_t timeout_ms) {
   s_report.state = SMARTCARD_CCID_STATE_UNSUPPORTED;
   s_report.terminal = true;
   snprintf(s_report.detail, sizeof(s_report.detail),
-           "模拟器不访问 USB Host；真机才会枚举 CCID 读卡器。");
+           "%s",
+           SC_TR("simulator_no_usb",
+                 "Simulator does not access USB Host; CCID readers are "
+                 "enumerated only on hardware."));
   return ESP_ERR_NOT_SUPPORTED;
 }
 
@@ -289,12 +297,12 @@ static void write_le32(uint8_t *buf, uint32_t value) {
 
 static const char *ccid_exchange_level_name(uint32_t features) {
   if ((features & CCID_FEATURE_EXTENDED_APDU_EXCHANGE) != 0)
-    return "扩展 APDU";
+    return SC_TR("exchange.extended_apdu", "Extended APDU");
   if ((features & CCID_FEATURE_SHORT_APDU_EXCHANGE) != 0)
-    return "短 APDU";
+    return SC_TR("exchange.short_apdu", "Short APDU");
   if ((features & CCID_FEATURE_TPDU_EXCHANGE) != 0)
     return "TPDU";
-  return "未知";
+  return i18n_tr_or("common.unknown", "Unknown");
 }
 
 static bool ccid_reader_uses_tpdu(const ccid_ctx_t *ctx) {
@@ -356,7 +364,10 @@ static void report_reset_for_probe(void) {
   s_ctx.report.host_started = s_ctx.host_installed;
   s_ctx.report.terminal = false;
   snprintf(s_ctx.report.detail, sizeof(s_ctx.report.detail),
-           "正在等待 CCID 读卡器。请使用外接供电 Hub 或供电转接线。");
+           "%s",
+           SC_TR("waiting_reader",
+                 "Waiting for a CCID reader. Use a powered USB hub or "
+                 "powered adapter."));
   if (s_ctx.lock)
     xSemaphoreGive(s_ctx.lock);
 }
@@ -398,7 +409,8 @@ static void report_store_atr(const uint8_t *atr, size_t atr_len) {
   s_ctx.report.state = SMARTCARD_CCID_STATE_ATR_OK;
   s_ctx.report.terminal = false;
   snprintf(s_ctx.report.detail, sizeof(s_ctx.report.detail),
-           "已读取 ATR，继续识别 Satochip/SeedKeeper。");
+           "%s", SC_TR("atr_read_identifying",
+                       "ATR read. Identifying Satochip/SeedKeeper."));
   if (s_ctx.lock)
     xSemaphoreGive(s_ctx.lock);
 }
@@ -653,7 +665,8 @@ static void client_event_cb(const usb_host_client_event_msg_t *event_msg,
       ctx->dev_addr = event_msg->new_dev.address;
       ctx->new_dev_pending = true;
       report_setf(SMARTCARD_CCID_STATE_WAITING, false,
-                  "发现 USB 设备，地址 %u，正在检查是否为 CCID。",
+                  SC_TR("usb_device_found_format",
+                        "USB device found at address %u. Checking for CCID."),
                   ctx->dev_addr);
     }
     break;
@@ -661,7 +674,8 @@ static void client_event_cb(const usb_host_client_event_msg_t *event_msg,
     if (ctx->dev_hdl && event_msg->dev_gone.dev_hdl == ctx->dev_hdl) {
       ctx->dev_gone_pending = true;
       report_setf(SMARTCARD_CCID_STATE_WAITING, false,
-                  "USB 设备已拔出，等待重新插入。");
+                  SC_TR("usb_device_removed",
+                        "USB device removed. Waiting for reinsertion."));
     }
     break;
   default:
@@ -1005,7 +1019,9 @@ static esp_err_t ccid_submit_apdu_step(ccid_ctx_t *ctx) {
         ccid_custom_apdu_fail(ctx, ESP_ERR_INVALID_SIZE);
       } else {
         report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                    "APDU 太长，当前 T=1 TPDU 通道暂不支持。");
+                    SC_TR("apdu_too_long_tpdu",
+                          "APDU is too long for the current T=1 TPDU "
+                          "channel."));
       }
       return ESP_ERR_INVALID_SIZE;
     }
@@ -1019,9 +1035,11 @@ static esp_err_t ccid_submit_apdu_step(ccid_ctx_t *ctx) {
   } else if (payload_len > 261) {
     if (custom_apdu) {
       ccid_custom_apdu_fail(ctx, ESP_ERR_INVALID_SIZE);
-    } else {
-      report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "APDU 太长，当前读卡器只支持短 APDU 测试。");
+      } else {
+        report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                    SC_TR("apdu_too_long_short",
+                          "APDU is too long; this reader only supports short "
+                          "APDU tests."));
     }
     return ESP_ERR_INVALID_SIZE;
   }
@@ -1030,10 +1048,12 @@ static esp_err_t ccid_submit_apdu_step(ccid_ctx_t *ctx) {
   if (max_msg > 0 && payload_len + CCID_MSG_MIN_LEN > max_msg) {
     if (custom_apdu) {
       ccid_custom_apdu_fail(ctx, ESP_ERR_INVALID_SIZE);
-    } else {
-      report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "CCID 消息超过读卡器上限：%u/%" PRIu32 "。",
-                  (unsigned)(payload_len + CCID_MSG_MIN_LEN), max_msg);
+      } else {
+        report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                  SC_TR("ccid_message_too_large_format",
+                        "CCID message exceeds reader limit: %u/%u."),
+                  (unsigned)(payload_len + CCID_MSG_MIN_LEN),
+                  (unsigned)max_msg);
     }
     return ESP_ERR_INVALID_SIZE;
   }
@@ -1141,12 +1161,15 @@ static esp_err_t ccid_open_pending_device(ccid_ctx_t *ctx) {
   if (!ccid_parse_descriptors(ctx, config_desc)) {
     if (ctx->dev_class == 0x09) {
       report_setf(SMARTCARD_CCID_STATE_WAITING, false,
-                  "只看到 USB Hub：VID=%04x PID=%04x。请确认读卡器插在 Hub "
-                  "下游并已外接供电。",
+                  SC_TR("usb_hub_only_format",
+                        "Only a USB hub was seen: VID=%04x PID=%04x. Confirm "
+                        "the reader is downstream and externally powered."),
                   ctx->vid, ctx->pid);
     } else {
       report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "USB 设备不是 CCID 读卡器：VID=%04x PID=%04x class=%02x。",
+                  SC_TR("not_ccid_reader_format",
+                        "USB device is not a CCID reader: VID=%04x PID=%04x "
+                        "class=%02x."),
                   ctx->vid, ctx->pid, ctx->dev_class);
     }
     ccid_teardown_device(ctx);
@@ -1158,7 +1181,9 @@ static esp_err_t ccid_open_pending_device(ccid_ctx_t *ctx) {
                                  ctx->interface_alt_setting);
   if (err != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "CCID 接口占用失败：%s。", esp_err_to_name(err));
+                SC_TR("claim_interface_failed_format",
+                      "Failed to claim CCID interface: %s."),
+                esp_err_to_name(err));
     ccid_teardown_device(ctx);
     return err;
   }
@@ -1167,7 +1192,9 @@ static esp_err_t ccid_open_pending_device(ccid_ctx_t *ctx) {
   err = ccid_alloc_transfers(ctx);
   if (err != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "USB 传输缓存分配失败：%s。", esp_err_to_name(err));
+                SC_TR("transfer_alloc_failed_format",
+                      "Failed to allocate USB transfer buffers: %s."),
+                esp_err_to_name(err));
     ccid_teardown_device(ctx);
     return err;
   }
@@ -1176,7 +1203,8 @@ static esp_err_t ccid_open_pending_device(ccid_ctx_t *ctx) {
     xSemaphoreTake(ctx->lock, portMAX_DELAY);
   report_update_reader_locked();
   report_set_locked(SMARTCARD_CCID_STATE_READER_READY, false,
-                    "CCID 读卡器已识别，正在给卡片上电。");
+                    SC_TR("reader_detected_powering_card",
+                          "CCID reader detected. Powering on the card."));
   if (ctx->lock)
     xSemaphoreGive(ctx->lock);
 
@@ -1184,7 +1212,8 @@ static esp_err_t ccid_open_pending_device(ccid_ctx_t *ctx) {
   err = ccid_submit_power_on(ctx);
   if (err != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_READER_READY, false,
-                "读卡器已识别，等待插卡或重新插卡。");
+                SC_TR("reader_detected_wait_card",
+                      "Reader detected. Insert or reinsert the card."));
   }
 
   ctx->new_dev_pending = false;
@@ -1215,13 +1244,17 @@ static void ccid_handle_power_on_completion(ccid_ctx_t *ctx) {
 
   if (!transfer_status_is_ok(transfer->status)) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "卡片上电响应失败：USB status=%d。", transfer->status);
+                SC_TR("power_on_response_failed_format",
+                      "Card power-on response failed: USB status=%d."),
+                transfer->status);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
   if (actual < CCID_MSG_MIN_LEN) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "卡片上电响应太短：%u 字节。", (unsigned)actual);
+                SC_TR("power_on_response_short_format",
+                      "Card power-on response is too short: %u bytes."),
+                (unsigned)actual);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
@@ -1236,7 +1269,9 @@ static void ccid_handle_power_on_completion(ccid_ctx_t *ctx) {
 
   if (cmd_status != 0 || atr_len == 0) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "卡片上电失败：cmd=%u err=%02x。请确认卡插到底、外接供电稳定。",
+                SC_TR("power_on_failed_format",
+                      "Card power-on failed: cmd=%u err=%02x. Check card "
+                      "seating and external power."),
                 cmd_status, error);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
@@ -1259,7 +1294,8 @@ static void ccid_handle_power_on_completion(ccid_ctx_t *ctx) {
     ctx->bulk_stage = BULK_STAGE_WAIT_SET_PARAMETERS_OUT;
     if (ccid_submit_set_parameters_t1(ctx) != ESP_OK) {
       report_setf(SMARTCARD_CCID_STATE_ATR_OK, true,
-                  "ATR 已读取，但 T=1 参数设置未能开始。");
+                  SC_TR("t1_setup_start_failed",
+                        "ATR read, but T=1 parameter setup could not start."));
       ctx->bulk_stage = BULK_STAGE_IDLE;
     }
     return;
@@ -1273,7 +1309,8 @@ static void ccid_handle_power_on_completion(ccid_ctx_t *ctx) {
   ctx->bulk_stage = BULK_STAGE_WAIT_APDU_OUT;
   if (ccid_submit_apdu_step(ctx) != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_ATR_OK, true,
-                "ATR 已读取，但 APDU 测试未能开始。");
+                SC_TR("apdu_test_start_failed",
+                      "ATR read, but APDU test could not start."));
     ctx->bulk_stage = BULK_STAGE_IDLE;
   }
 }
@@ -1286,7 +1323,9 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
     if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_INVALID_RESPONSE))
       return false;
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "T=1 响应块无效，长度 %u。", (unsigned)payload_len);
+                SC_TR("t1_invalid_block_format",
+                      "Invalid T=1 response block, length %u."),
+                (unsigned)payload_len);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return false;
   }
@@ -1295,7 +1334,8 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
   if (ctx->t1_exchange_steps > CCID_T1_MAX_EXCHANGE_STEPS) {
     if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_TIMEOUT))
       return false;
-    report_setf(SMARTCARD_CCID_STATE_FAIL, true, "T=1 交换超时。");
+    report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                SC_TR("t1_exchange_timeout", "T=1 exchange timed out."));
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return false;
   }
@@ -1305,7 +1345,9 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_INVALID_RESPONSE))
         return false;
       report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "T=1 卡片要求重发，但没有上一块。");
+                  SC_TR("t1_retransmit_without_previous",
+                        "The card requested T=1 retransmit, but no previous "
+                        "block is available."));
       ctx->bulk_stage = BULK_STAGE_IDLE;
       return false;
     }
@@ -1324,7 +1366,9 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
     } else {
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_FAIL))
         return false;
-      report_setf(SMARTCARD_CCID_STATE_FAIL, true, "T=1 重发提交失败。");
+      report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                  SC_TR("t1_retransmit_submit_failed",
+                        "T=1 retransmit submit failed."));
       ctx->bulk_stage = BULK_STAGE_IDLE;
     }
     return false;
@@ -1335,7 +1379,9 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_NOT_SUPPORTED))
         return false;
       report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "不支持的 T=1 S-Block：PCB=%02X。", block.pcb);
+                  SC_TR("t1_unsupported_s_block_format",
+                        "Unsupported T=1 S-Block: PCB=%02X."),
+                  block.pcb);
       ctx->bulk_stage = BULK_STAGE_IDLE;
       return false;
     }
@@ -1357,7 +1403,9 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
     } else {
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_FAIL))
         return false;
-      report_setf(SMARTCARD_CCID_STATE_FAIL, true, "T=1 等待扩展响应失败。");
+      report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                  SC_TR("t1_wtx_submit_failed",
+                        "T=1 WTX response submit failed."));
       ctx->bulk_stage = BULK_STAGE_IDLE;
     }
     return false;
@@ -1367,7 +1415,9 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
     if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_NOT_SUPPORTED))
       return false;
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "不支持的 T=1 响应块：PCB=%02X。", block.pcb);
+                SC_TR("t1_unsupported_response_block_format",
+                      "Unsupported T=1 response block: PCB=%02X."),
+                block.pcb);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return false;
   }
@@ -1396,7 +1446,8 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
     } else {
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_FAIL))
         return false;
-      report_setf(SMARTCARD_CCID_STATE_FAIL, true, "T=1 NACK 提交失败。");
+      report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                  SC_TR("t1_nack_submit_failed", "T=1 NACK submit failed."));
       ctx->bulk_stage = BULK_STAGE_IDLE;
     }
     return false;
@@ -1406,7 +1457,8 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
     if (ctx->t1_response_len + block.inf_len > sizeof(ctx->t1_response)) {
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_INVALID_SIZE))
         return false;
-      report_setf(SMARTCARD_CCID_STATE_FAIL, true, "T=1 响应太长。");
+      report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                  SC_TR("t1_response_too_long", "T=1 response is too long."));
       ctx->bulk_stage = BULK_STAGE_IDLE;
       return false;
     }
@@ -1433,7 +1485,8 @@ static bool ccid_handle_t1_payload(ccid_ctx_t *ctx, const uint8_t *payload,
     } else {
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_FAIL))
         return false;
-      report_setf(SMARTCARD_CCID_STATE_FAIL, true, "T=1 ACK 提交失败。");
+      report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                  SC_TR("t1_ack_submit_failed", "T=1 ACK submit failed."));
       ctx->bulk_stage = BULK_STAGE_IDLE;
     }
     return false;
@@ -1449,7 +1502,9 @@ static void ccid_finish_with_generic_apdu(ccid_ctx_t *ctx,
                                           size_t resp_len,
                                           uint16_t sw) {
   report_store_response(resp, resp_len, sw, NULL, SMARTCARD_CCID_STATE_PASS,
-                        true, "CCID、ATR 和无害 APDU 测试通过。");
+                        true,
+                        SC_TR("generic_apdu_passed",
+                              "CCID, ATR, and safe APDU test passed."));
   ctx->bulk_stage = BULK_STAGE_IDLE;
 }
 
@@ -1458,7 +1513,9 @@ static void ccid_finish_factory_reset_ready(ccid_ctx_t *ctx) {
     return;
   ctx->bulk_stage = BULK_STAGE_IDLE;
   report_setf(SMARTCARD_CCID_STATE_ATR_OK, true,
-              "恢复出厂模式已就绪。已暂停自动识别，请按页面提示执行。");
+              SC_TR("factory_reset_ready",
+                    "Factory reset mode is ready. Auto-identification is "
+                    "paused; follow the page instructions."));
 }
 
 static void ccid_handle_set_parameters_completion(ccid_ctx_t *ctx) {
@@ -1468,13 +1525,17 @@ static void ccid_handle_set_parameters_completion(ccid_ctx_t *ctx) {
 
   if (!transfer_status_is_ok(transfer->status)) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "T=1 参数响应失败：USB status=%d。", transfer->status);
+                SC_TR("t1_parameter_response_failed_format",
+                      "T=1 parameter response failed: USB status=%d."),
+                transfer->status);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
   if (actual < CCID_MSG_MIN_LEN) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "T=1 参数响应太短：%u 字节。", (unsigned)actual);
+                SC_TR("t1_parameter_response_short_format",
+                      "T=1 parameter response is too short: %u bytes."),
+                (unsigned)actual);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
@@ -1492,7 +1553,9 @@ static void ccid_handle_set_parameters_completion(ccid_ctx_t *ctx) {
 
   if (cmd_status != CCID_CMD_STATUS_PROCESSED) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "T=1 参数设置失败：cmd=%u err=%02x。", cmd_status, error);
+                SC_TR("t1_parameter_setup_failed_format",
+                      "T=1 parameter setup failed: cmd=%u err=%02x."),
+                cmd_status, error);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
@@ -1505,7 +1568,9 @@ static void ccid_handle_set_parameters_completion(ccid_ctx_t *ctx) {
   }
 
   report_setf(SMARTCARD_CCID_STATE_ATR_OK, false,
-              "ATR 已读取，T=1 参数已设置，继续识别 Satochip。");
+              SC_TR("t1_parameters_set",
+                    "ATR read. T=1 parameters set. Continuing Satochip "
+                    "detection."));
   if (ctx->factory_reset_mode) {
     ccid_finish_factory_reset_ready(ctx);
     return;
@@ -1513,7 +1578,8 @@ static void ccid_handle_set_parameters_completion(ccid_ctx_t *ctx) {
   ctx->bulk_stage = BULK_STAGE_WAIT_APDU_OUT;
   if (ccid_submit_apdu_step(ctx) != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_ATR_OK, true,
-                "T=1 参数已设置，但 APDU 测试未能开始。");
+                SC_TR("t1_set_apdu_start_failed",
+                      "T=1 parameters set, but APDU test could not start."));
     ctx->bulk_stage = BULK_STAGE_IDLE;
   }
 }
@@ -1527,7 +1593,9 @@ static void ccid_handle_apdu_completion(ccid_ctx_t *ctx) {
     if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_INVALID_RESPONSE))
       return;
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "APDU 响应失败：USB status=%d。", transfer->status);
+                SC_TR("apdu_response_failed_format",
+                      "APDU response failed: USB status=%d."),
+                transfer->status);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
@@ -1535,7 +1603,9 @@ static void ccid_handle_apdu_completion(ccid_ctx_t *ctx) {
     if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_INVALID_RESPONSE))
       return;
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "APDU 响应太短：%u 字节。", (unsigned)actual);
+                SC_TR("apdu_response_short_format",
+                      "APDU response is too short: %u bytes."),
+                (unsigned)actual);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
@@ -1562,7 +1632,9 @@ static void ccid_handle_apdu_completion(ccid_ctx_t *ctx) {
     if (ccid_custom_apdu_fail_if_active(ctx, ESP_FAIL))
       return;
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "APDU 执行失败：cmd=%u err=%02x。", cmd_status, error);
+                SC_TR("apdu_execution_failed_format",
+                      "APDU execution failed: cmd=%u err=%02x."),
+                cmd_status, error);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
@@ -1580,7 +1652,9 @@ static void ccid_handle_apdu_completion(ccid_ctx_t *ctx) {
     if (ccid_custom_apdu_fail_if_active(ctx, ESP_ERR_INVALID_RESPONSE))
       return;
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "APDU 响应太短：%u 字节。", (unsigned)resp_len);
+                SC_TR("apdu_response_short_format",
+                      "APDU response is too short: %u bytes."),
+                (unsigned)resp_len);
     ctx->bulk_stage = BULK_STAGE_IDLE;
     return;
   }
@@ -1597,12 +1671,16 @@ static void ccid_handle_apdu_completion(ccid_ctx_t *ctx) {
   if (ctx->apdu_step == 0 && sw == CARD_SW_OK) {
     report_store_response(resp, resp_len, sw, "Satochip",
                           SMARTCARD_CCID_STATE_APPLET_OK, false,
-                          "已识别 Satochip，正在读取只读状态。");
+                          SC_TR("satochip_detected_read_status",
+                                "Satochip detected. Reading read-only "
+                                "status."));
     ctx->apdu_step = 3;
   } else if (ctx->apdu_step == 1 && sw == CARD_SW_OK) {
     report_store_response(resp, resp_len, sw, "SeedKeeper",
                           SMARTCARD_CCID_STATE_APPLET_OK, false,
-                          "已识别 SeedKeeper，正在读取只读状态。");
+                          SC_TR("seedkeeper_detected_read_status",
+                                "SeedKeeper detected. Reading read-only "
+                                "status."));
     ctx->apdu_step = 3;
   } else if (ctx->apdu_step == 3) {
     smartcard_ccid_state_t state =
@@ -1610,9 +1688,15 @@ static void ccid_handle_apdu_completion(ccid_ctx_t *ctx) {
                                            : SMARTCARD_CCID_STATE_APPLET_OK;
     const char *detail =
         (sw == CARD_SW_OK)
-            ? "智能卡应用已识别，只读状态读取通过。"
-            : ((sw == 0x9C04) ? "智能卡应用已识别，卡片尚未初始化。"
-                              : "智能卡应用已识别，状态 APDU 返回非成功码。");
+            ? SC_TR("status_read_passed",
+                    "Smartcard app detected. Read-only status check passed.")
+            : ((sw == 0x9C04)
+                   ? SC_TR("card_not_initialized",
+                           "Smartcard app detected. The card is not "
+                           "initialized.")
+                   : SC_TR("status_apdu_non_success",
+                           "Smartcard app detected. Status APDU returned a "
+                           "non-success code."));
     report_store_response(resp, resp_len, sw,
                           s_ctx.report.applet[0] ? s_ctx.report.applet : NULL,
                           state, true, detail);
@@ -1632,7 +1716,10 @@ static void ccid_handle_apdu_completion(ccid_ctx_t *ctx) {
   ctx->bulk_stage = BULK_STAGE_WAIT_APDU_OUT;
   if (ccid_submit_apdu_step(ctx) != ESP_OK) {
     report_store_response(resp, resp_len, sw, NULL, SMARTCARD_CCID_STATE_ATR_OK,
-                          true, "ATR 已读取，但后续 APDU 未能继续。");
+                          true,
+                          SC_TR("next_apdu_continue_failed",
+                                "ATR read, but the next APDU could not "
+                                "continue."));
     ctx->bulk_stage = BULK_STAGE_IDLE;
   }
 }
@@ -1641,7 +1728,8 @@ static void ccid_handle_bulk_out_completion(ccid_ctx_t *ctx) {
   if (ctx->bulk_stage == BULK_STAGE_WAIT_POWER_ON_OUT) {
     if (!transfer_status_is_ok(ctx->bulk_out_xfer->status)) {
       report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "卡片上电发送失败：USB status=%d。",
+                  SC_TR("power_on_send_failed_format",
+                        "Card power-on send failed: USB status=%d."),
                   ctx->bulk_out_xfer->status);
       ctx->bulk_stage = BULK_STAGE_IDLE;
       return;
@@ -1651,7 +1739,8 @@ static void ccid_handle_bulk_out_completion(ccid_ctx_t *ctx) {
   } else if (ctx->bulk_stage == BULK_STAGE_WAIT_SET_PARAMETERS_OUT) {
     if (!transfer_status_is_ok(ctx->bulk_out_xfer->status)) {
       report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "T=1 参数发送失败：USB status=%d。",
+                  SC_TR("t1_parameter_send_failed_format",
+                        "T=1 parameter send failed: USB status=%d."),
                   ctx->bulk_out_xfer->status);
       ctx->bulk_stage = BULK_STAGE_IDLE;
       return;
@@ -1663,7 +1752,8 @@ static void ccid_handle_bulk_out_completion(ccid_ctx_t *ctx) {
       if (ccid_custom_apdu_fail_if_active(ctx, ESP_FAIL))
         return;
       report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                  "APDU 发送失败：USB status=%d。",
+                  SC_TR("apdu_send_failed_format",
+                        "APDU send failed: USB status=%d."),
                   ctx->bulk_out_xfer->status);
       ctx->bulk_stage = BULK_STAGE_IDLE;
       return;
@@ -1733,7 +1823,9 @@ static void client_task(void *arg) {
   esp_err_t err = usb_host_client_register(&client_config, &ctx->client_hdl);
   if (err != ESP_OK) {
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "USB Host client 注册失败：%s。", esp_err_to_name(err));
+                SC_TR("host_client_register_failed_format",
+                      "USB Host client registration failed: %s."),
+                esp_err_to_name(err));
     vTaskDelete(NULL);
     return;
   }
@@ -1818,7 +1910,9 @@ esp_err_t smartcard_ccid_start(void) {
 esp_err_t smartcard_ccid_probe(uint32_t timeout_ms) {
   esp_err_t err = smartcard_ccid_start();
   if (err != ESP_OK) {
-    report_setf(SMARTCARD_CCID_STATE_FAIL, true, "USB Host 启动失败：%s。",
+    report_setf(SMARTCARD_CCID_STATE_FAIL, true,
+                SC_TR("host_start_failed_format",
+                      "USB Host startup failed: %s."),
                 esp_err_to_name(err));
     return err;
   }
@@ -1832,7 +1926,9 @@ esp_err_t smartcard_ccid_probe(uint32_t timeout_ms) {
     if (s_ctx.lock)
       xSemaphoreGive(s_ctx.lock);
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "智能卡正在处理上一条指令，请稍后再试。");
+                SC_TR("busy_previous_command",
+                      "Smartcard is still processing the previous command. "
+                      "Try again shortly."));
     return ESP_ERR_INVALID_STATE;
   }
   s_ctx.seq = 1;
@@ -1847,7 +1943,9 @@ esp_err_t smartcard_ccid_probe(uint32_t timeout_ms) {
     xSemaphoreGive(s_ctx.lock);
   if (start_power_on && err != ESP_OK)
     report_setf(SMARTCARD_CCID_STATE_FAIL, true,
-                "卡片上电启动失败：%s。", esp_err_to_name(err));
+                SC_TR("power_on_start_failed_format",
+                      "Card power-on start failed: %s."),
+                esp_err_to_name(err));
 
   TickType_t ticks = pdMS_TO_TICKS(timeout_ms ? timeout_ms : 12000);
   if (s_ctx.done && xSemaphoreTake(s_ctx.done, ticks) == pdTRUE) {
@@ -1865,7 +1963,9 @@ esp_err_t smartcard_ccid_probe(uint32_t timeout_ms) {
   if (s_ctx.lock)
     xSemaphoreGive(s_ctx.lock);
   report_setf(SMARTCARD_CCID_STATE_TIMEOUT, true,
-              "检测超时：没有拿到完整结果。请确认外接供电、读卡器和卡片。");
+              SC_TR("probe_timeout",
+                    "Probe timed out: no complete result. Check external "
+                    "power, reader, and card."));
   return ESP_ERR_TIMEOUT;
 }
 
@@ -1996,7 +2096,10 @@ static void hex_append(char *out, size_t out_len, const uint8_t *data,
     snprintf(out + used, out_len - used, " ...");
 }
 
-static const char *bool_cn(uint8_t value) { return value ? "是" : "否"; }
+static const char *bool_text(uint8_t value) {
+  return value ? i18n_tr_or("common.yes", "Yes")
+               : i18n_tr_or("common.no", "No");
+}
 
 static void append_status_parse(char *out, size_t out_len,
                                 const smartcard_ccid_report_t *report) {
@@ -2010,7 +2113,9 @@ static void append_status_parse(char *out, size_t out_len,
     if (report->sw == 0x9C04) {
       size_t used = strlen(out);
       if (used < out_len)
-        snprintf(out + used, out_len - used, "\n卡状态：尚未初始化");
+        snprintf(out + used, out_len - used, "\n%s",
+                 SC_TR("card_status_not_initialized",
+                       "Card status: not initialized"));
     }
     return;
   }
@@ -2021,7 +2126,9 @@ static void append_status_parse(char *out, size_t out_len,
     return;
 
   int n = snprintf(out + used, out_len - used,
-                   "\n卡状态：协议 %u.%u / 应用 %u.%u", (unsigned)r[0],
+                   SC_TR("card_status_protocol_format",
+                         "\nCard status: protocol %u.%u / app %u.%u"),
+                   (unsigned)r[0],
                    (unsigned)r[1], (unsigned)r[2], (unsigned)r[3]);
   if (n <= 0)
     return;
@@ -2029,7 +2136,8 @@ static void append_status_parse(char *out, size_t out_len,
 
   if (data_len >= 8 && used < out_len) {
     n = snprintf(out + used, out_len - used,
-                 "\nPIN 剩余：PIN0=%u PUK0=%u PIN1=%u PUK1=%u",
+                 SC_TR("pin_remaining_format",
+                       "\nPIN remaining: PIN0=%u PUK0=%u PIN1=%u PUK1=%u"),
                  (unsigned)r[4], (unsigned)r[5], (unsigned)r[6],
                  (unsigned)r[7]);
     if (n > 0)
@@ -2038,37 +2146,42 @@ static void append_status_parse(char *out, size_t out_len,
 
   if (data_len >= 12 && used < out_len) {
     snprintf(out + used, out_len - used,
-             "\n2FA：%s / 已有种子：%s / 已初始化：%s / 安全通道：%s",
-             bool_cn(r[8]), bool_cn(r[9]), bool_cn(r[10]), bool_cn(r[11]));
+             SC_TR("status_flags_format",
+                   "\n2FA: %s / Seed: %s / Initialized: %s / Secure "
+                   "channel: %s"),
+             bool_text(r[8]), bool_text(r[9]), bool_text(r[10]),
+             bool_text(r[11]));
   } else if (report->sw == 0x9C04 && used < out_len) {
-    snprintf(out + used, out_len - used, "\n卡状态：尚未初始化");
+    snprintf(out + used, out_len - used, "\n%s",
+             SC_TR("card_status_not_initialized",
+                   "Card status: not initialized"));
   }
 }
 
 const char *smartcard_ccid_state_name(smartcard_ccid_state_t state) {
   switch (state) {
   case SMARTCARD_CCID_STATE_IDLE:
-    return "未检测";
+    return SC_TR("state.idle", "Not checked");
   case SMARTCARD_CCID_STATE_STARTING:
-    return "启动中";
+    return SC_TR("state.starting", "Starting");
   case SMARTCARD_CCID_STATE_WAITING:
-    return "等待设备";
+    return SC_TR("state.waiting", "Waiting for device");
   case SMARTCARD_CCID_STATE_READER_READY:
-    return "读卡器已识别";
+    return SC_TR("state.reader_ready", "Reader detected");
   case SMARTCARD_CCID_STATE_ATR_OK:
-    return "ATR 已读取";
+    return SC_TR("state.atr_ok", "ATR read");
   case SMARTCARD_CCID_STATE_APPLET_OK:
-    return "应用已识别";
+    return SC_TR("state.applet_ok", "App detected");
   case SMARTCARD_CCID_STATE_PASS:
-    return "通过";
+    return SC_TR("state.pass", "Passed");
   case SMARTCARD_CCID_STATE_TIMEOUT:
-    return "超时";
+    return SC_TR("state.timeout", "Timed out");
   case SMARTCARD_CCID_STATE_FAIL:
-    return "失败";
+    return SC_TR("state.fail", "Failed");
   case SMARTCARD_CCID_STATE_UNSUPPORTED:
-    return "不支持";
+    return SC_TR("state.unsupported", "Unsupported");
   default:
-    return "未知";
+    return i18n_tr_or("common.unknown", "Unknown");
   }
 }
 
@@ -2088,25 +2201,32 @@ void smartcard_ccid_format_report(char *out, size_t out_len) {
   smartcard_ccid_snapshot(&report);
 
   snprintf(out, out_len,
-           "状态：%s\n"
-           "读卡器：%s\n"
-           "卡片：%s\n"
-           "VID/PID：%04X:%04X\n"
-           "接口：%u\n"
-           "应用：%s\n"
-           "SW：%04X\n"
-           "%s",
+           SC_TR("report_format",
+                 "State: %s\n"
+                 "Reader: %s\n"
+                 "Card: %s\n"
+                 "VID/PID: %04X:%04X\n"
+                 "Interface: %u\n"
+                 "Application: %s\n"
+                 "SW: %04X\n"
+                 "%s"),
            smartcard_ccid_state_name(report.state),
-           report.reader_present ? "已识别" : "未识别",
-           report.card_present ? "已上电" : "未上电", report.vid, report.pid,
+           report.reader_present ? SC_TR("reader.detected", "Detected")
+                                 : SC_TR("reader.not_detected",
+                                         "Not detected"),
+           report.card_present ? SC_TR("card.powered", "Powered")
+                               : SC_TR("card.not_powered", "Not powered"),
+           report.vid, report.pid,
            (unsigned)report.interface_num,
-           report.applet[0] ? report.applet : "未识别", report.sw,
+           report.applet[0] ? report.applet
+                            : SC_TR("applet.not_detected", "Not detected"),
+           report.sw,
            report.detail);
 
   if (report.atr_len > 0) {
     size_t used = strlen(out);
     if (used + 12 < out_len) {
-      snprintf(out + used, out_len - used, "\nATR：");
+      snprintf(out + used, out_len - used, "\n%s", SC_TR("atr", "ATR:"));
       hex_append(out, out_len, report.atr, report.atr_len, 32);
     }
   }
@@ -2114,7 +2234,8 @@ void smartcard_ccid_format_report(char *out, size_t out_len) {
   if (report.response_len > 0) {
     size_t used = strlen(out);
     if (used + 14 < out_len) {
-      snprintf(out + used, out_len - used, "\n响应：");
+      snprintf(out + used, out_len - used, "\n%s",
+               SC_TR("response", "Response:"));
       hex_append(out, out_len, report.response, report.response_len, 48);
     }
   }

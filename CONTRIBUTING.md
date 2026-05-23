@@ -6,11 +6,11 @@ Thank you for your interest in contributing to KernSigner! This document outline
 
 1. Fork the repository and clone it locally.
 2. Initialize submodules: `git submodule update --init --recursive`
-3. Set up ESP-IDF v6.0.1 and source the environment: `source ~/esp/esp-idf/export.sh`
+3. Set up ESP-IDF v5.5.4 and source the environment: `. ~/esp/esp-idf-v5.5.4/export.sh`
 4. Build the project with the correct board defaults, for example:
    ```bash
-   idf.py -B build_wave_43 \
-     -D SDKCONFIG=build_wave_43/sdkconfig \
+   idf.py -B build_wave_43_fresh \
+     -D SDKCONFIG=build_wave_43_fresh/sdkconfig \
      -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' \
      build
    ```
@@ -47,17 +47,17 @@ Both tools cover `main/` and first-party components (`bbqr`, `cUR`, `k_quirc`, `
 **clang-tidy** (recommended — catches real bugs):
 ```bash
 # Requires a build first (for compile_commands.json)
-idf.py build
+idf.py -B build_wave_43_fresh build
 
 # Run on a single file
-clang-tidy -p build/compile_commands.json main/core/wallet.c
+clang-tidy -p build_wave_43_fresh/compile_commands.json main/core/wallet.c
 
 # Run on all project source files (excluding libwally-core)
 find main components/bbqr components/cUR components/k_quirc \
      components/sd_card components/video \
      components/wave_4b components/wave_35 components/wave_43 \
      -name '*.c' -not -path '*/build/*' 2>/dev/null | \
-  xargs -P$(nproc) -I{} clang-tidy -p build/compile_commands.json {}
+  xargs -P$(nproc) -I{} clang-tidy -p build_wave_43_fresh/compile_commands.json {}
 ```
 
 The project `.clang-tidy` config enables bug-finding and security checks tuned for embedded C. Warnings about unknown GCC flags (`-fno-tree-switch-conversion`, `-fstrict-volatile-bitfields`) are expected and harmless — they come from clang analyzing GCC-compiled code.

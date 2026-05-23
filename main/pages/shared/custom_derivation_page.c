@@ -3,6 +3,7 @@
 #include "../../core/key.h"
 #include "../../core/mnemonic_slots.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../smartcard/smartcard_satochip.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
@@ -107,11 +108,11 @@ static custom_address_type_t selected_type(void) {
 static const char *selected_type_name(custom_address_type_t type) {
   switch (type) {
   case CUSTOM_ADDR_BTC_P2PKH:
-    return "BTC传统";
+    return i18n_tr_or("address.btc_legacy", "BTC Legacy");
   case CUSTOM_ADDR_BTC_P2SH_P2WPKH:
-    return "BTC隔离";
+    return i18n_tr_or("address.btc_nested_segwit", "BTC Nested SegWit");
   case CUSTOM_ADDR_BTC_P2WPKH:
-    return "BTC原生";
+    return i18n_tr_or("address.btc_native_segwit", "BTC Native SegWit");
   case CUSTOM_ADDR_BTC_P2TR:
     return "BTC Taproot";
   case CUSTOM_ADDR_EVM:
@@ -160,14 +161,17 @@ static const custom_derivation_source_option_t *selected_source(void) {
 
 static const char *selected_source_name(void) {
   if (selected_entry == CUSTOM_DERIV_ENTRY_SMARTCARD)
-    return "智能卡";
+    return i18n_tr_or("menu.smartcard", "Smartcard");
   const custom_derivation_source_option_t *source = selected_source();
-  return source ? source->label : "助记词";
+  return source ? source->label : i18n_tr_or("menu.mnemonic", "Mnemonic");
 }
 
 static void set_generate_button_text(const char *text) {
   if (generate_btn_label)
-    lv_label_set_text(generate_btn_label, text ? text : "生成地址");
+    lv_label_set_text(generate_btn_label,
+                      text ? text
+                           : i18n_tr_or("address.generate_address",
+                                        "Generate Address"));
 }
 
 static void hide_result_card(void) {
@@ -379,8 +383,12 @@ static void show_failure(const char *title, const char *body) {
     return;
 
   hide_all_input_keyboards();
-  lv_label_set_text(result_title, title ? title : "失败");
-  lv_label_set_text(result_body, body ? body : "操作失败");
+  lv_label_set_text(result_title,
+                    title ? title : i18n_tr_or("dialog.failed", "Failed"));
+  lv_label_set_text(result_body,
+                    body ? body
+                         : i18n_tr_or("dialog.operation_failed",
+                                      "Operation failed"));
   if (result_qr)
     lv_obj_add_flag(result_qr, LV_OBJ_FLAG_HIDDEN);
   show_result_card();
@@ -410,7 +418,8 @@ static void build_source_options(char *options_buf, size_t options_len,
   if (has_current && source_option_count < (sizeof(source_options) /
                                             sizeof(source_options[0]))) {
     snprintf(source_options[source_option_count].label,
-             sizeof(source_options[source_option_count].label), "当前 %s",
+             sizeof(source_options[source_option_count].label),
+             i18n_tr_or("address.current_source_format", "Current %s"),
              current_fp);
     source_options[source_option_count].kind = CUSTOM_DERIV_SOURCE_CURRENT;
     source_options[source_option_count].slot_index = 0;
@@ -428,7 +437,8 @@ static void build_source_options(char *options_buf, size_t options_len,
       break;
 
     snprintf(source_options[source_option_count].label,
-             sizeof(source_options[source_option_count].label), "助记词%u %s",
+             sizeof(source_options[source_option_count].label),
+             i18n_tr_or("wallet.mnemonic_slot_format", "Mnemonic %u %s"),
              (unsigned)(i + 1), info.fingerprint);
     source_options[source_option_count].kind = CUSTOM_DERIV_SOURCE_SLOT;
     source_options[source_option_count].slot_index = i;
@@ -465,7 +475,7 @@ static void build_source_options(char *options_buf, size_t options_len,
 }
 
 static void update_generate_button_label(void) {
-  set_generate_button_text("读取地址");
+  set_generate_button_text(i18n_tr_or("address.read_address", "Read Address"));
 }
 
 static void refresh_source_dropdown(void) {
@@ -496,14 +506,16 @@ static void update_detail_source_controls(void) {
     return;
 
   if (selected_entry == CUSTOM_DERIV_ENTRY_SMARTCARD) {
-    lv_label_set_text(source_label, "来源：智能卡");
+    lv_label_set_text(source_label,
+                      i18n_tr_or("address.source_smartcard",
+                                 "Source: Smartcard"));
     set_obj_visible(source_dropdown, false);
     return;
   }
 
   const custom_derivation_source_option_t *source = selected_source();
   if (source_option_count > 1) {
-    lv_label_set_text(source_label, "来源");
+    lv_label_set_text(source_label, i18n_tr_or("address.source", "Source"));
     set_obj_visible(source_dropdown, true);
     refresh_source_dropdown();
     return;
@@ -512,7 +524,7 @@ static void update_detail_source_controls(void) {
   if (source)
     lv_label_set_text(source_label, source->label);
   else
-    lv_label_set_text(source_label, "来源");
+    lv_label_set_text(source_label, i18n_tr_or("address.source", "Source"));
   set_obj_visible(source_dropdown, false);
 }
 
@@ -542,7 +554,9 @@ static void show_detail_stage(custom_derivation_entry_source_t entry) {
       mnemonic_import_callback();
       return;
     }
-    dialog_show_error("请先导入助记词", NULL, 1600);
+    dialog_show_error(i18n_tr_or("wallet.no_mnemonic_loaded",
+                                 "Load a mnemonic first"),
+                      NULL, 1600);
     return;
   }
 
@@ -616,9 +630,11 @@ static void render_address_result(const char *path, custom_address_type_t type,
 
   hide_all_input_keyboards();
   char body[384];
-  snprintf(body, sizeof(body), "来源：%s\n路径：%s\n类型：%s\n地址：%s",
+  snprintf(body, sizeof(body),
+           i18n_tr_or("address.result_body_format",
+                      "Source: %s\nPath: %s\nType: %s\nAddress: %s"),
            selected_source_name(), path, selected_type_name(type), address);
-  lv_label_set_text(result_title, "结果");
+  lv_label_set_text(result_title, i18n_tr_or("address.result", "Result"));
   lv_label_set_text(result_body, body);
   if (result_qr) {
     lv_qrcode_update(result_qr, address, (uint32_t)strlen(address));
@@ -684,7 +700,9 @@ static void generate_now(const char *path, custom_address_type_t type,
   char address[128];
   if (!render_mnemonic_address(path, type, is_testnet, address,
                                sizeof(address))) {
-    show_failure("失败", "助记词或路径无效");
+    show_failure(i18n_tr_or("dialog.failed", "Failed"),
+                 i18n_tr_or("address.mnemonic_or_path_invalid",
+                            "Mnemonic or path is invalid"));
     return;
   }
 
@@ -711,14 +729,16 @@ static void smartcard_pin_ready_cb(lv_event_t *e) {
   if (path_input.textarea)
     lv_textarea_set_text(path_input.textarea, path);
   if (path[0] == '\0') {
-    dialog_show_error("请输入路径", NULL, 1600);
+    dialog_show_error(i18n_tr_or("address.enter_path", "Enter path"), NULL,
+                      1600);
     focus_text_input(&path_input);
     return;
   }
 
   const char *pin_text = lv_textarea_get_text(smartcard_pin_input.textarea);
   if (!pin_text || pin_text[0] == '\0') {
-    dialog_show_error("请输入智能卡 PIN", NULL, 1600);
+    dialog_show_error(i18n_tr_or("smartcard.enter_pin", "Smartcard PIN"), NULL,
+                      1600);
     focus_text_input(&smartcard_pin_input);
     return;
   }
@@ -736,7 +756,10 @@ static void smartcard_pin_ready_cb(lv_event_t *e) {
   secure_memzero(pin_copy, sizeof(pin_copy));
 
   if (!ok) {
-    show_failure("失败", err_body[0] ? err_body : "智能卡读取失败");
+    show_failure(i18n_tr_or("dialog.failed", "Failed"),
+                 err_body[0] ? err_body
+                             : i18n_tr_or("smartcard.read_failed",
+                                          "Smartcard read failed"));
     return;
   }
 
@@ -826,7 +849,8 @@ static void path_ready_cb(lv_event_t *e) {
   }
 
   if (selected_entry != CUSTOM_DERIV_ENTRY_MNEMONIC) {
-    show_failure("失败", "请先选择来源");
+    show_failure(i18n_tr_or("dialog.failed", "Failed"),
+                 i18n_tr_or("address.choose_source", "Choose source"));
     return;
   }
 
@@ -921,7 +945,9 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
   lv_obj_add_flag(page_screen, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scroll_dir(page_screen, LV_DIR_VER);
   lv_obj_set_scrollbar_mode(page_screen, LV_SCROLLBAR_MODE_OFF);
-  theme_create_page_title(page_screen, "派生地址");
+  theme_create_page_title(page_screen,
+                          i18n_tr_or("address.derive_address",
+                                     "Derive address"));
   back_btn = ui_create_back_button(page_screen, back_cb);
 
   char source_options_text[512];
@@ -929,7 +955,10 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
   build_source_options(source_options_text, sizeof(source_options_text),
                        &source_default_index);
 
-  source_choice_label = create_page_label(page_screen, "先选择来源", 80);
+  source_choice_label =
+      create_page_label(page_screen,
+                        i18n_tr_or("address.choose_source", "Choose source"),
+                        80);
   source_choice_row = lv_obj_create(page_screen);
   lv_obj_set_width(source_choice_row, LV_PCT(92));
   lv_obj_set_height(source_choice_row, LV_SIZE_CONTENT);
@@ -944,13 +973,17 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
   lv_obj_set_style_margin_top(source_choice_row, theme_get_small_padding(), 0);
   lv_obj_align(source_choice_row, LV_ALIGN_TOP_MID, 0, 112);
 
-  create_source_choice_button(source_choice_row, "助记词",
+  create_source_choice_button(source_choice_row,
+                              i18n_tr_or("menu.mnemonic", "Mnemonic"),
                               mnemonic_choice_cb);
-  create_source_choice_button(source_choice_row, "智能卡",
+  create_source_choice_button(source_choice_row,
+                              i18n_tr_or("menu.smartcard", "Smartcard"),
                               smartcard_choice_cb);
 
   if (source_option_count > 1) {
-    source_label = create_page_label(page_screen, "来源", 54);
+    source_label =
+        create_page_label(page_screen, i18n_tr_or("address.source", "Source"),
+                          54);
     source_dropdown = theme_create_dropdown(page_screen, source_options_text);
     lv_obj_set_width(source_dropdown, LV_PCT(90));
     lv_obj_align(source_dropdown, LV_ALIGN_TOP_MID, 0, 76);
@@ -967,13 +1000,21 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
     source_label = create_page_label(page_screen, source_options[0].label, 54);
     set_obj_visible(source_label, false);
   } else {
-    source_label = create_page_label(page_screen, "来源", 54);
+    source_label =
+        create_page_label(page_screen, i18n_tr_or("address.source", "Source"),
+                          54);
     set_obj_visible(source_label, false);
   }
 
-  type_label = create_page_label(page_screen, "类型", 118);
-  type_dropdown =
-      theme_create_dropdown(page_screen, "BTC传统\nBTC隔离\nBTC原生\nTaproot\nEVM");
+  type_label =
+      create_page_label(page_screen, i18n_tr_or("address.type", "Type"), 118);
+  char type_options[160];
+  snprintf(type_options, sizeof(type_options), "%s\n%s\n%s\n%s\n%s",
+           i18n_tr_or("address.btc_legacy", "BTC Legacy"),
+           i18n_tr_or("address.btc_nested_segwit", "BTC Nested SegWit"),
+           i18n_tr_or("address.btc_native_segwit", "BTC Native SegWit"),
+           "Taproot", "EVM");
+  type_dropdown = theme_create_dropdown(page_screen, type_options);
   lv_obj_set_width(type_dropdown, LV_PCT(90));
   lv_obj_align(type_dropdown, LV_ALIGN_TOP_MID, 0, 140);
   style_dropdown_control(type_dropdown);
@@ -982,9 +1023,13 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
   set_obj_visible(type_label, false);
   set_obj_visible(type_dropdown, false);
 
-  path_label = create_page_label(page_screen, "路径", 184);
+  path_label =
+      create_page_label(page_screen, i18n_tr_or("address.path", "Path"), 184);
   set_obj_visible(path_label, false);
-  smartcard_pin_label = create_page_label(page_screen, "智能卡 PIN", 284);
+  smartcard_pin_label =
+      create_page_label(page_screen,
+                        i18n_tr_or("smartcard.enter_pin", "Smartcard PIN"),
+                        284);
   set_obj_visible(smartcard_pin_label, false);
 
   ui_text_input_create(&path_input, page_screen, "m/...", false, path_ready_cb);
@@ -1012,8 +1057,9 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
   }
   ui_text_input_hide(&path_input);
 
-  ui_text_input_create(&smartcard_pin_input, page_screen, "智能卡 PIN", true,
-                       smartcard_pin_ready_cb);
+  ui_text_input_create(&smartcard_pin_input, page_screen,
+                       i18n_tr_or("smartcard.enter_pin", "Smartcard PIN"),
+                       true, smartcard_pin_ready_cb);
   if (smartcard_pin_input.textarea) {
     lv_obj_set_width(smartcard_pin_input.textarea, LV_PCT(76));
     lv_obj_set_height(smartcard_pin_input.textarea, 58);
@@ -1042,7 +1088,8 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
   lv_obj_add_event_cb(generate_btn, generate_btn_cb, LV_EVENT_CLICKED, NULL);
 
   generate_btn_label = lv_label_create(generate_btn);
-  lv_label_set_text(generate_btn_label, "读取地址");
+  lv_label_set_text(generate_btn_label,
+                    i18n_tr_or("address.read_address", "Read Address"));
   lv_obj_set_style_text_font(generate_btn_label, theme_font_medium(), 0);
   lv_obj_set_style_text_color(generate_btn_label, main_color(), 0);
   lv_obj_center(generate_btn_label);

@@ -1,5 +1,6 @@
 #include "mnemonic_1248.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../ui/dialog.h"
 #include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
@@ -109,13 +110,16 @@ static void create_stackbit_grid(lv_obj_t *parent, const int digits[4]) {
   lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
 
   lv_obj_t *group_row = create_clean_row(grid);
-  create_label_cell(group_row, "千", STACKBIT_CELL_W, secondary_color());
-  create_label_cell(group_row, "百", STACKBIT_CELL_W * 2 + STACKBIT_CELL_GAP,
-                    secondary_color());
-  create_label_cell(group_row, "十", STACKBIT_CELL_W * 2 + STACKBIT_CELL_GAP,
-                    secondary_color());
-  create_label_cell(group_row, "个", STACKBIT_CELL_W * 2 + STACKBIT_CELL_GAP,
-                    secondary_color());
+  create_label_cell(group_row,
+                    i18n_tr_or("backup.digit_thousands", "Thou"),
+                    STACKBIT_CELL_W, secondary_color());
+  create_label_cell(group_row,
+                    i18n_tr_or("backup.digit_hundreds", "Hund"),
+                    STACKBIT_CELL_W * 2 + STACKBIT_CELL_GAP, secondary_color());
+  create_label_cell(group_row, i18n_tr_or("backup.digit_tens", "Tens"),
+                    STACKBIT_CELL_W * 2 + STACKBIT_CELL_GAP, secondary_color());
+  create_label_cell(group_row, i18n_tr_or("backup.digit_ones", "Ones"),
+                    STACKBIT_CELL_W * 2 + STACKBIT_CELL_GAP, secondary_color());
 
   lv_obj_t *top_row = create_clean_row(grid);
   for (int col = 0; col < 7; col++) {
@@ -136,7 +140,10 @@ void mnemonic_1248_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   return_callback = return_cb;
   if (!key_mnemonic_is_valid()) {
-    dialog_show_error("临时助记词不能显示1248打孔", return_cb, 0);
+    dialog_show_error(
+        i18n_tr_or("backup.no_temporary_1248_punch",
+                   "Temporary mnemonic cannot show 1248 punch backup"),
+        return_cb, 0);
     return;
   }
   if (!bip39_filter_init())
@@ -148,7 +155,9 @@ void mnemonic_1248_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
     return;
 
   stack_screen = theme_create_page_container(parent);
-  theme_create_page_title(stack_screen, "1248打孔板");
+  theme_create_page_title(stack_screen,
+                          i18n_tr_or("backup.1248_punch_board",
+                                     "1248 punch board"));
   (void)ui_create_back_button(stack_screen, back_cb);
 
   lv_obj_t *list = lv_obj_create(stack_screen);

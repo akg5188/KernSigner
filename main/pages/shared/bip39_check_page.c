@@ -1,4 +1,5 @@
 #include "bip39_check_page.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/theme.h"
 #include "../../utils/bip39_filter.h"
@@ -115,14 +116,18 @@ static void show_word_result(const char *word) {
 
   int index = bip39_filter_get_word_index(word);
   if (index < 0) {
-    lv_label_set_text(result_title, "未找到单词");
-    lv_label_set_text(result_body, "请输入标准英文 BIP39 单词。");
+    lv_label_set_text(result_title,
+                      i18n_tr_or("bip39.word_not_found", "Word not found"));
+    lv_label_set_text(result_body,
+                      i18n_tr_or("bip39.enter_standard_word",
+                                 "Enter a standard English BIP39 word."));
     return;
   }
 
   struct words *wordlist = NULL;
-  const char *previous_word = "（无）";
-  const char *next_word = "（无）";
+  const char *none_text = i18n_tr_or("common.none", "None");
+  const char *previous_word = none_text;
+  const char *next_word = none_text;
   if (bip39_get_wordlist(NULL, &wordlist) == WALLY_OK && wordlist) {
     if (index > 0) {
       const char *tmp = bip39_get_word_by_index(wordlist, (size_t)(index - 1));
@@ -140,9 +145,12 @@ static void show_word_result(const char *word) {
   format_weight_line((uint32_t)index, weights, sizeof(weights));
   char body[256];
   snprintf(body, sizeof(body),
-           "单词：%s\n十进制：%04d\n十六进制：0x%03x\n八进制：0o%04o\n前词：%s\n后词：%s\n钢板打孔：%s",
+           i18n_tr_or("bip39.word_result_format",
+                      "Word: %s\nDecimal: %04d\nHex: 0x%03x\nOctal: "
+                      "0o%04o\nPrevious: %s\nNext: %s\nSteel punch: %s"),
            word, index, index, index, previous_word, next_word, weights);
-  lv_label_set_text(result_title, "BIP39 单词");
+  lv_label_set_text(result_title,
+                    i18n_tr_or("bip39.word_result_title", "BIP39 word"));
   lv_label_set_text(result_body, body);
 }
 
@@ -152,40 +160,55 @@ static void show_index_result(uint32_t index) {
     return;
 
   if (!bip39_filter_init()) {
-    lv_label_set_text(result_title, "词表加载失败");
-    lv_label_set_text(result_body, "无法查询 BIP39 词表。");
+    lv_label_set_text(result_title,
+                      i18n_tr_or("wallet.wordlist_not_loaded",
+                                 "Wordlist not loaded"));
+    lv_label_set_text(result_body,
+                      i18n_tr_or("bip39.wordlist_query_failed",
+                                 "Unable to query the BIP39 wordlist."));
     return;
   }
 
   struct words *wordlist = NULL;
   if (bip39_get_wordlist(NULL, &wordlist) != WALLY_OK || !wordlist) {
-    lv_label_set_text(result_title, "词表加载失败");
-    lv_label_set_text(result_body, "无法查询 BIP39 词表。");
+    lv_label_set_text(result_title,
+                      i18n_tr_or("wallet.wordlist_not_loaded",
+                                 "Wordlist not loaded"));
+    lv_label_set_text(result_body,
+                      i18n_tr_or("bip39.wordlist_query_failed",
+                                 "Unable to query the BIP39 wordlist."));
     return;
   }
 
   const char *word = bip39_get_word_by_index(wordlist, index);
   if (!word) {
-    lv_label_set_text(result_title, "编号无效");
-    lv_label_set_text(result_body, "请输入 0-2047 之间的编号。");
+    lv_label_set_text(result_title,
+                      i18n_tr_or("input.invalid_index", "Invalid index"));
+    lv_label_set_text(result_body,
+                      i18n_tr_or("input.index_range_hint",
+                                 "Enter an index between 0 and 2047."));
     return;
   }
 
+  const char *none_text = i18n_tr_or("common.none", "None");
   const char *previous_word = index > 0
                                   ? bip39_get_word_by_index(wordlist, index - 1)
-                                  : "（无）";
+                                  : none_text;
   const char *next_word = index < 2047
                               ? bip39_get_word_by_index(wordlist, index + 1)
-                              : "（无）";
+                              : none_text;
   char weights[64];
   format_weight_line(index, weights, sizeof(weights));
   char body[256];
   snprintf(body, sizeof(body),
-           "编号：%04u\n单词：%s\n十六进制：0x%03x\n八进制：0o%04o\n前词：%s\n后词：%s\n钢板打孔：%s",
+           i18n_tr_or("bip39.index_result_format",
+                      "Index: %04u\nWord: %s\nHex: 0x%03x\nOctal: "
+                      "0o%04o\nPrevious: %s\nNext: %s\nSteel punch: %s"),
            (unsigned)index, word, (unsigned)index, (unsigned)index,
-           previous_word ? previous_word : "（无）",
-           next_word ? next_word : "（无）", weights);
-  lv_label_set_text(result_title, "BIP39 编号");
+           previous_word ? previous_word : none_text,
+           next_word ? next_word : none_text, weights);
+  lv_label_set_text(result_title,
+                    i18n_tr_or("bip39.index_result_title", "BIP39 index"));
   lv_label_set_text(result_body, body);
 }
 
@@ -244,10 +267,14 @@ void bip39_check_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_add_flag(check_screen, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scroll_dir(check_screen, LV_DIR_VER);
   lv_obj_set_scrollbar_mode(check_screen, LV_SCROLLBAR_MODE_OFF);
-  theme_create_page_title(check_screen, "BIP39 自检");
+  theme_create_page_title(check_screen,
+                          i18n_tr_or("bip39.self_check", "BIP39 Check"));
   back_btn = ui_create_back_button(check_screen, back_cb);
 
-  ui_text_input_create(&input, check_screen, "输入单词或编号", false, ready_cb);
+  ui_text_input_create(&input, check_screen,
+                       i18n_tr_or("bip39.word_or_index_placeholder",
+                                  "Word or index"),
+                       false, ready_cb);
   if (input.textarea) {
     lv_textarea_set_one_line(input.textarea, false);
     lv_obj_set_width(input.textarea, LV_PCT(86));
@@ -270,7 +297,7 @@ void bip39_check_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_add_event_cb(query_btn, query_btn_cb, LV_EVENT_CLICKED, NULL);
 
   lv_obj_t *label = lv_label_create(query_btn);
-  lv_label_set_text(label, "查询");
+  lv_label_set_text(label, i18n_tr_or("common.check", "Check"));
   lv_obj_set_style_text_font(label, theme_font_medium(), 0);
   lv_obj_set_style_text_color(label, highlight_color(), 0);
   lv_obj_center(label);

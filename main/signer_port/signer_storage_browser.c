@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "../i18n/i18n.h"
 #include "sd_card.h"
 
 #define SIGNER_STORAGE_BROWSER_MAX_FILES 12
@@ -176,14 +177,18 @@ esp_err_t signer_storage_browser_format_root(char *buf, size_t buf_len) {
   };
 
   esp_err_t ret = signer_storage_browser_append(
-      &out, "存储浏览\n挂载点：%s\n", SD_CARD_MOUNT_POINT);
+      &out, "%s\n%s: %s\n",
+      i18n_tr_or("tools.storage_card_root", "Storage card root"),
+      i18n_tr_or("address.path", "Path"), SD_CARD_MOUNT_POINT);
   if (ret != ESP_OK && ret != ESP_ERR_INVALID_SIZE)
     return ret;
 
   ret = sd_card_init();
   if (ret != ESP_OK) {
-    signer_storage_browser_append(&out, "错误：无法挂载 SD 卡（%s）。\n",
-                                esp_err_to_name(ret));
+    signer_storage_browser_append(
+        &out, "%s: %s (%s).\n", i18n_tr_or("common.error", "Error"),
+        i18n_tr_or("tools.storage_mount_failed", "Storage card mount failed"),
+        esp_err_to_name(ret));
     return ret;
   }
 
@@ -191,30 +196,39 @@ esp_err_t signer_storage_browser_format_root(char *buf, size_t buf_len) {
   signer_storage_browser_stats_t stats = {0};
   ret = signer_storage_browser_scan_root(files, &stats);
   if (ret != ESP_OK) {
-    signer_storage_browser_append(&out, "错误：无法读取 SD 卡根目录。\n");
+    signer_storage_browser_append(
+        &out, "%s: %s.\n", i18n_tr_or("common.error", "Error"),
+        i18n_tr_or("tools.read_failed", "Read failed"));
     return ret;
   }
 
   signer_storage_browser_append(
       &out,
-      "普通文件：%u 个\n目录：%u 个\n总大小：%llu 字节\n已跳过：%u 个不安全或非普通条目\n",
+      i18n_tr_or("storage.browser_stats_format",
+                 "Regular files: %u\nDirectories: %u\nTotal size: %llu bytes\nSkipped: %u unsafe or non-regular entries\n"),
       (unsigned int)stats.file_count, (unsigned int)stats.dir_count,
       stats.total_file_bytes, (unsigned int)stats.skipped_count);
 
   if (stats.file_count == 0) {
-    signer_storage_browser_append(&out, "根目录没有普通文件。\n");
+    signer_storage_browser_append(&out, "%s.\n",
+                                  i18n_tr_or("tools.no_files", "No files"));
   } else {
-    signer_storage_browser_append(&out, "按文件名排序，最多显示前 %d 个文件：\n",
-                                SIGNER_STORAGE_BROWSER_MAX_FILES);
+    signer_storage_browser_append(
+        &out,
+        i18n_tr_or("storage.browser_sorted_format",
+                   "Sorted by filename, showing up to %d files:\n"),
+        SIGNER_STORAGE_BROWSER_MAX_FILES);
     for (size_t i = 0; i < stats.shown_count; i++) {
-      signer_storage_browser_append(&out, "%u. %s（%lld 字节）\n",
-                                  (unsigned int)(i + 1), files[i].name,
-                                  (long long)files[i].size);
+      signer_storage_browser_append(
+          &out, i18n_tr_or("storage.browser_file_item_format",
+                           "%u. %s (%lld bytes)\n"),
+          (unsigned int)(i + 1), files[i].name, (long long)files[i].size);
     }
     if (stats.file_count > stats.shown_count) {
-      signer_storage_browser_append(&out, "还有 %u 个文件未显示。\n",
-                                  (unsigned int)(stats.file_count -
-                                                 stats.shown_count));
+      signer_storage_browser_append(
+          &out, i18n_tr_or("storage.browser_more_files_format",
+                           "%u more files are not shown.\n"),
+          (unsigned int)(stats.file_count - stats.shown_count));
     }
   }
 

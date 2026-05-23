@@ -2,6 +2,7 @@
 
 #include "address_checker.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include <stdlib.h>
 #include <string.h>
@@ -53,8 +54,11 @@ static void not_found_confirm_cb(bool confirmed, void *user_data) {
 // (especially for multisig) and blocks the LVGL loop. Show a progress overlay
 // first, then defer the work via a one-shot timer so LVGL can render it.
 static void perform_sweep(void) {
-  progress_dialog = dialog_show_progress("正在验证", "正在检查地址...",
-                                         DIALOG_STYLE_FULLSCREEN);
+  progress_dialog =
+      dialog_show_progress(i18n_tr_or("address.verifying", "Verifying"),
+                           i18n_tr_or("address.checking_address",
+                                      "Checking address..."),
+                           DIALOG_STYLE_FULLSCREEN);
   lv_timer_t *t = lv_timer_create(perform_sweep_deferred, 50, NULL);
   lv_timer_set_repeat_count(t, 1);
 }
@@ -80,9 +84,10 @@ static void perform_sweep_deferred(lv_timer_t *timer) {
       wally_free_string(address);
       dismiss_progress();
       char msg[64];
-      snprintf(msg, sizeof(msg), "收款地址 #%u", i);
-      dialog_show_info("地址已验证", msg, found_info_cb, NULL,
-                       DIALOG_STYLE_FULLSCREEN);
+      snprintf(msg, sizeof(msg), "%s #%u",
+               i18n_tr_or("address.receive", "Receive"), i);
+      dialog_show_info(i18n_tr_or("address.verified", "Address verified"),
+                       msg, found_info_cb, NULL, DIALOG_STYLE_FULLSCREEN);
       return;
     }
     wally_free_string(address);
@@ -105,9 +110,10 @@ static void perform_sweep_deferred(lv_timer_t *timer) {
       wally_free_string(address);
       dismiss_progress();
       char msg[64];
-      snprintf(msg, sizeof(msg), "找零地址 #%u", i);
-      dialog_show_info("地址已验证", msg, found_info_cb, NULL,
-                       DIALOG_STYLE_FULLSCREEN);
+      snprintf(msg, sizeof(msg), "%s #%u",
+               i18n_tr_or("address.change", "Change"), i);
+      dialog_show_info(i18n_tr_or("address.verified", "Address verified"),
+                       msg, found_info_cb, NULL, DIALOG_STYLE_FULLSCREEN);
       return;
     }
     wally_free_string(address);
@@ -118,9 +124,10 @@ static void perform_sweep_deferred(lv_timer_t *timer) {
   // Not found
   char msg[192];
   snprintf(msg, sizeof(msg),
-           "前 %u 个地址里没有找到。\n\n"
-           "请确认当前钱包设置和协调器一致。\n\n"
-           "继续多搜索 %u 个？",
+           i18n_tr_or("address.not_found_more_confirm_format",
+                      "Not found in the first %u addresses.\n\nConfirm this "
+                      "wallet's settings match the coordinator.\n\nSearch %u "
+                      "more?"),
            search_limit, SEARCH_BATCH);
   dialog_show_confirm(msg, not_found_confirm_cb, NULL, DIALOG_STYLE_FULLSCREEN);
 }
@@ -160,7 +167,9 @@ void address_checker_check(const char *raw_content, void (*found_cb)(void),
                                      &written) == WALLY_OK);
   if (!valid) {
     free(content);
-    dialog_show_error("地址无效", invalid_address_cb, 0);
+    dialog_show_error(i18n_tr_or("address.invalid_address",
+                                 "Invalid address"),
+                      invalid_address_cb, 0);
     return;
   }
 

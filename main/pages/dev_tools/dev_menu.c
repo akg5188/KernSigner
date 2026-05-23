@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
@@ -51,7 +52,7 @@ static void return_from_decode_cb(void) {
 static void decode_snapshots_cb(void) {
   if (!sd_card_is_mounted()) {
     if (sd_card_init() != ESP_OK) {
-      dialog_show_message("错误", "存储卡挂载失败");
+      dialog_show_message("Error", "Storage card mount failed");
       return;
     }
   }
@@ -185,7 +186,7 @@ static void decode_task(void *arg) {
 static void decode_snapshots_cb(void) {
   if (!sd_card_is_mounted()) {
     if (sd_card_init() != ESP_OK) {
-      dialog_show_message("错误", "存储卡挂载失败");
+      dialog_show_message("Error", "Storage card mount failed");
       return;
     }
   }
@@ -195,7 +196,7 @@ static void decode_snapshots_cb(void) {
   BaseType_t ret =
       xTaskCreate(decode_task, "decode", DECODE_TASK_STACK_SIZE, NULL, 5, NULL);
   if (ret != pdPASS) {
-    dialog_show_message("错误", "二维码解码任务启动失败");
+    dialog_show_message("Error", "QR decode task failed to start");
     return;
   }
 
@@ -205,13 +206,13 @@ static void decode_snapshots_cb(void) {
 
   char msg[128];
   if (decode_result.pgm_count == 0) {
-    snprintf(msg, sizeof(msg), "没有找到 .pgm 文件");
+    snprintf(msg, sizeof(msg), "No .pgm files found");
   } else {
-    snprintf(msg, sizeof(msg), "已解码：%d/%d\n失败：%d",
+    snprintf(msg, sizeof(msg), "Decoded: %d/%d\nFailed: %d",
              decode_result.decoded_count, decode_result.pgm_count,
              decode_result.failed_count);
   }
-  dialog_show_message("解码结果", msg);
+  dialog_show_message("Decode Result", msg);
 }
 
 #endif /* K_QUIRC_DEBUG */
@@ -231,12 +232,20 @@ void dev_menu_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   return_callback = return_cb;
   dev_menu_screen = theme_create_page_container(parent);
 
-  dev_menu = ui_menu_create(dev_menu_screen, "开发工具", back_cb);
+  dev_menu = ui_menu_create(
+      dev_menu_screen, i18n_tr_or("tools.developer_tools", "Developer Tools"),
+      back_cb);
   if (!dev_menu)
     return;
 
-  ui_menu_add_entry(dev_menu, "保存相机快照到存储卡", snapshot_cb);
-  ui_menu_add_entry(dev_menu, "解码相机快照", decode_snapshots_cb);
+  ui_menu_add_entry(dev_menu,
+                    i18n_tr_or("tools.save_camera_snapshot",
+                               "Save Camera Snapshot to SD"),
+                    snapshot_cb);
+  ui_menu_add_entry(dev_menu,
+                    i18n_tr_or("tools.decode_camera_snapshot",
+                               "Decode Camera Snapshots"),
+                    decode_snapshots_cb);
   ui_menu_show(dev_menu);
 }
 

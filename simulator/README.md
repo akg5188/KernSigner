@@ -46,28 +46,18 @@ cd simulator \
   && cmake --build build -- -j"$(sysctl -n hw.ncpu)"
 ```
 
-Or with just (from the repo root):
-
-```bash
-just sim-build
-```
-
 ## Run
 
 ### Linux
 
 ```bash
 ./simulator/build/signer_simulator
-# or, from the repo root:
-just sim
 ```
 
 ### macOS
 
 ```bash
 ./simulator/build/signer_simulator
-# or, from the repo root:
-just sim
 ```
 
 ## CLI Options
@@ -87,22 +77,22 @@ just sim
 
 ```bash
 # Run with default settings
-just sim
+./simulator/build/signer_simulator
 
 # Run with a QR code image
-just sim --qr-image path/to/qr.png
+./simulator/build/signer_simulator --qr-image path/to/qr.png
 
 # Run with a directory of QR images (cycled)
-just sim --qr-dir path/to/qr-images/
+./simulator/build/signer_simulator --qr-dir path/to/qr-images/
 
 # Run with custom data directory
-just sim --data-dir /tmp/signer-sim-data
+./simulator/build/signer_simulator --data-dir /tmp/signer-sim-data
 
 # Run with custom resolution
-just sim --width 480 --height 480
+./simulator/build/signer_simulator --width 480 --height 480
 
 # Combine options
-just sim --qr-image path/to/qr.png --data-dir /tmp/signer-sim-data
+./simulator/build/signer_simulator --qr-image path/to/qr.png --data-dir /tmp/signer-sim-data
 ```
 
 ## Data Directory Layout
@@ -133,6 +123,7 @@ real entropy (V4L2 on Linux, AVFoundation on macOS):
 ### Linux
 
 ```bash
+cd /home/ak/123/Kern/simulator
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DSIM_WEBCAM=ON
 cmake --build build -- -j$(nproc)
 ./build/signer_simulator --webcam
@@ -149,6 +140,7 @@ sudo usermod -aG video $USER   # then log out/in
 ### macOS
 
 ```bash
+cd /home/ak/123/Kern/simulator
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug -DSIM_WEBCAM=ON \
   -DCMAKE_PREFIX_PATH="$(brew --prefix mbedtls);$(brew --prefix sdl2)"
 cmake --build build -- -j"$(sysctl -n hw.ncpu)"
@@ -169,6 +161,7 @@ simulator falls back to blank-frame mode.
 ## Build-Time Resolution Override
 
 ```bash
+cd /home/ak/123/Kern/simulator
 cmake -B build -S . -DSIM_LCD_H_RES=480 -DSIM_LCD_V_RES=480
 ```
 
@@ -177,7 +170,7 @@ cmake -B build -S . -DSIM_LCD_H_RES=480 -DSIM_LCD_V_RES=480
 **White screen over SSH X forwarding (`ssh -X`):**
 
 ```bash
-SDL_VIDEODRIVER=x11 SDL_RENDER_DRIVER=software just sim
+SDL_VIDEODRIVER=x11 SDL_RENDER_DRIVER=software ./simulator/build/signer_simulator
 ```
 
 The RANDR extension is not available over forwarded X11.

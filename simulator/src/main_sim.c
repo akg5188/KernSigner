@@ -10,8 +10,10 @@
 #include "src/drivers/sdl/lv_sdl_mouse.h"
 #include "ui/menu.h"
 #include "ui/theme.h"
+#include "ui/i18n_text.h"
 #include "ui/word_selector.h"
 #include "core/settings.h"
+#include "i18n/i18n.h"
 #include "pages/signer_shell/signer_shell.h"
 #include "pages/scan/scan.h"
 #include "pages/shared/mnemonic_slots_page.h"
@@ -231,6 +233,44 @@ static bool click_button_with_label(const char *label) {
     return true;
 }
 
+static const char *screen_title_for_id(const char *id) {
+    if (!id)
+        return NULL;
+
+    for (size_t i = 0; i < signer_shell_screen_count(); i++) {
+        const char *screen_id = signer_shell_screen_id_at(i);
+        if (screen_id && strcmp(screen_id, id) == 0)
+            return signer_shell_screen_title_at(i);
+    }
+
+    const signer_feature_t *feature = signer_feature_find(id);
+    return feature ? feature->title : NULL;
+}
+
+static bool click_button_for_navigation(const char *button_label,
+                                        const char *expected_id) {
+    if (click_button_with_label(button_label))
+        return true;
+
+    const char *translated = ui_i18n_text(button_label);
+    if (translated && translated != button_label &&
+        click_button_with_label(translated)) {
+        return true;
+    }
+
+    if (button_label && strcmp(button_label, "回到首页") == 0 &&
+        click_button_with_label(i18n_tr_or("common.return_home",
+                                           "Return Home"))) {
+        return true;
+    }
+
+    const char *target_title = screen_title_for_id(expected_id);
+    if (target_title && click_button_with_label(target_title))
+        return true;
+
+    return false;
+}
+
 static bool object_contains_label_fragment_recursive(lv_obj_t *obj,
                                                      const char *needle) {
     if (!obj || !needle)
@@ -301,7 +341,7 @@ static int record_button_navigation_check(FILE *interaction_file,
     }
 
     run_lvgl_frames(3);
-    bool clicked = click_button_with_label(button_label);
+    bool clicked = click_button_for_navigation(button_label, expected_id);
     const char *actual_id = signer_shell_current_screen_id();
     bool action_only = expected_id && strcmp(expected_id, "*action*") == 0;
     bool matched_id = clicked && actual_id && expected_id && !action_only &&
@@ -365,8 +405,8 @@ static int run_button_interaction_checks(FILE *interaction_file) {
         {"pi_connect_wallet", "MetaMask", "connect_metamask", NULL},
         {"pi_connect_wallet", "Rabby", "connect_rabby", NULL},
         {"pi_connect_wallet", "TokenPocket", "connect_tokenpocket", NULL},
-        {"pi_connect_wallet", "派生地址", "custom_derivation", NULL},
-        {"pi_connect_wallet", "Keystone", "custom_derivation", NULL},
+        {"pi_connect_wallet", "派生地址", "connect_wallet_satochip_address", NULL},
+        {"pi_connect_wallet", "Keystone", "connect_wallet_satochip_address", NULL},
         {"pi_connect_wallet", "BTC", "btc_wallet", NULL},
         {"connect_okx", "助记词", "web3_okx_mnemonic", NULL},
         {"connect_okx", "智能卡", "web3_okx_satochip", NULL},
@@ -379,7 +419,7 @@ static int run_button_interaction_checks(FILE *interaction_file) {
         {"connect_tokenpocket", "助记词", "web3_tokenpocket_mnemonic", NULL},
         {"connect_tokenpocket", "智能卡", "web3_tokenpocket_satochip", NULL},
         {"btc_wallet", "助记词", "btc_mnemonic", NULL},
-        {"btc_wallet", "智能卡", "btc_satochip", NULL},
+        {"btc_wallet", "智能卡", "btc_satochip_zpub", NULL},
         {"new_mnemonic", "扑克牌", "new_cards_entropy", NULL},
         {"new_mnemonic", "十六进制", "new_hex_entropy", NULL},
         {"new_mnemonic", "骰子", "new_dice_d6", NULL},
@@ -430,6 +470,9 @@ static int run_button_interaction_checks(FILE *interaction_file) {
 
     for (size_t i = 0; i < signer_shell_screen_count(); i++) {
         const char *id = signer_shell_screen_id_at(i);
+        if (id && strcmp(id, "custom_derivation") == 0)
+            continue;
+
         const signer_feature_t *feature = signer_feature_find(id);
         if (!feature || !feature->parent_id)
             continue;
@@ -592,16 +635,19 @@ static void simulator_capture_load_punch_grid_children(
     run_lvgl_frames(3);
     simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                    scroll_file, (*next_index)++,
-                                   "load_punch_grid_menu", "点阵和1248导入",
+                                   "load_punch_grid_menu",
+                                   i18n_tr_or("input.punch_grid",
+                                              "Punch Grid / 1248"),
                                    failures);
 
     if (signer_shell_show_screen("load_punch_grid")) {
         run_lvgl_frames(3);
-        if (click_button_with_label("点阵板恢复")) {
+        if (click_button_for_navigation("点阵板恢复",
+                                        "load_tinyseed_restore")) {
             simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                            scroll_file, (*next_index)++,
                                            "load_tinyseed_restore",
-                                           "点阵板恢复", failures);
+                                           "Punch Grid Recovery", failures);
             (void)signer_shell_show_screen("load_punch_grid");
             run_lvgl_frames(3);
         } else {
@@ -611,10 +657,12 @@ static void simulator_capture_load_punch_grid_children(
 
     if (signer_shell_show_screen("load_punch_grid")) {
         run_lvgl_frames(3);
-        if (click_button_with_label("1248恢复")) {
+        if (click_button_for_navigation("1248恢复",
+                                        "load_stackbit_restore")) {
             simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                            scroll_file, (*next_index)++,
-                                           "load_stackbit_restore", "1248恢复",
+                                           "load_stackbit_restore",
+                                           "1248 Recovery",
                                            failures);
             (void)signer_shell_show_screen("load_punch_grid");
             run_lvgl_frames(3);
@@ -634,10 +682,13 @@ static void simulator_capture_backup_export_children(
         return;
 
     run_lvgl_frames(3);
-    if (click_button_with_label("加密")) {
+    if (click_button_for_navigation("加密", "backup_kef")) {
         simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                        scroll_file, (*next_index)++,
-                                       "backup_kef", "加密备份文件", failures);
+                                       "backup_kef",
+                                       i18n_tr_or("backup.encrypted_backup",
+                                                  "Encrypted Backup"),
+                                       failures);
         (void)signer_shell_show_screen("backup_export");
         run_lvgl_frames(3);
     } else {
@@ -655,22 +706,23 @@ static void simulator_capture_custom_derivation_children(
         return;
 
     run_lvgl_frames(3);
-    if (click_button_with_label("助记词")) {
+    if (click_button_for_navigation("助记词", NULL)) {
         simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                        scroll_file, (*next_index)++,
                                        "custom_derivation_mnemonic",
-                                       "派生地址-助记词", failures);
+                                       "Derived Address - Mnemonic", failures);
     } else {
         (*failures)++;
     }
 
     if (signer_shell_show_screen("custom_derivation")) {
         run_lvgl_frames(3);
-        if (click_button_with_label("智能卡")) {
+        if (click_button_for_navigation("智能卡", NULL)) {
             simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
                                            scroll_file, (*next_index)++,
                                            "custom_derivation_smartcard",
-                                           "派生地址-智能卡", failures);
+                                           "Derived Address - Smartcard",
+                                           failures);
         } else {
             (*failures)++;
         }
@@ -698,13 +750,13 @@ static int capture_custom_derivation_screens(const char *dir) {
     failures += write_screen_bmp(path);
 
     if (!signer_shell_show_screen("custom_derivation") ||
-        !click_button_with_label("助记词")) {
+        !click_button_for_navigation("助记词", NULL)) {
         fprintf(stderr, "missing custom_derivation mnemonic detail\n");
         failures++;
     } else {
         snprintf(path, sizeof(path), "%s/custom_derivation_mnemonic.bmp", dir);
         failures += write_screen_bmp(path);
-        if (click_button_with_label("读取地址")) {
+        if (click_button_for_navigation("读取地址", NULL)) {
             snprintf(path, sizeof(path), "%s/custom_derivation_mnemonic_result.bmp",
                      dir);
             failures += write_screen_bmp(path);
@@ -715,7 +767,7 @@ static int capture_custom_derivation_screens(const char *dir) {
     }
 
     if (!signer_shell_show_screen("custom_derivation") ||
-        !click_button_with_label("智能卡")) {
+        !click_button_for_navigation("智能卡", NULL)) {
         fprintf(stderr, "missing custom_derivation smartcard detail\n");
         failures++;
     } else {

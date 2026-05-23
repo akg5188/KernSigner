@@ -6,4 +6,4 @@
 	url = https://github.com/odudex/cUR.git
 [submodule "components/k_quirc"]
 	path = components/k_quirc
-	url = https://github.com/odudex/k_quirc.git
+	url = https://github.com/akg5188/k_quirc.git

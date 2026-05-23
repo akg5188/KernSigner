@@ -4,6 +4,7 @@
 #include "wallet_settings.h"
 #include "../../core/key.h"
 #include "../../core/wallet.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/assets/icons_24.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
@@ -60,10 +61,16 @@ static const char *numpad_map[] = {"1",
                                    "8",
                                    "9",
                                    "\n",
-                                   "删",
+                                   "Del",
                                    "0",
-                                   "完成",
+                                   "Done",
                                    ""};
+
+static const char **account_numpad_map(void) {
+  numpad_map[12] = i18n_tr_or("action.delete_short", "Del");
+  numpad_map[14] = i18n_tr_or("action.done", "Done");
+  return numpad_map;
+}
 
 static void update_apply_button_state(void);
 
@@ -96,7 +103,9 @@ static void update_account_display(void) {
   if (!account_value_label)
     return;
   char buf[24];
-  snprintf(buf, sizeof(buf), "账户：%u", selected_account);
+  snprintf(buf, sizeof(buf), i18n_tr_or("settings.account_format",
+                                        "Account: %u"),
+           selected_account);
   lv_label_set_text(account_value_label, buf);
 }
 
@@ -140,7 +149,7 @@ static void numpad_event_cb(lv_event_t *e) {
   uint32_t btn_id = lv_btnmatrix_get_selected_btn(btnm);
   const char *txt = lv_btnmatrix_get_btn_text(btnm, btn_id);
 
-  if (strcmp(txt, "完成") == 0) {
+  if (btn_id == 14) {
     if (account_input_len > 0) {
       unsigned long val = strtoul(account_input_buffer, NULL, 10);
       if (val <= 2147483647) {
@@ -152,7 +161,7 @@ static void numpad_event_cb(lv_event_t *e) {
       }
     }
     close_account_overlay();
-  } else if (strcmp(txt, "删") == 0) {
+  } else if (btn_id == 12) {
     if (account_input_len > 0) {
       account_input_len--;
       account_input_buffer[account_input_len] = '\0';
@@ -192,7 +201,7 @@ static void show_account_overlay(void) {
   lv_obj_set_style_pad_gap(modal, 15, 0);
 
   lv_obj_t *title = lv_label_create(modal);
-  lv_label_set_text(title, "账户");
+  lv_label_set_text(title, i18n_tr_or("settings.account", "Account"));
   lv_obj_set_style_text_font(title, theme_font_medium(), 0);
   lv_obj_set_style_text_color(title, main_color(), 0);
 
@@ -202,7 +211,7 @@ static void show_account_overlay(void) {
   update_account_input_display();
 
   account_numpad = lv_btnmatrix_create(modal);
-  lv_btnmatrix_set_map(account_numpad, numpad_map);
+  lv_btnmatrix_set_map(account_numpad, account_numpad_map());
   lv_obj_set_size(account_numpad, LV_PCT(100), LV_PCT(70));
   lv_obj_set_flex_grow(account_numpad, 1);
   theme_apply_btnmatrix(account_numpad);
@@ -404,7 +413,9 @@ static void do_apply_settings(void) {
 
   if (key_load_from_mnemonic(mnemonic_content, stored_passphrase, is_testnet)) {
     if (!wallet_init(selected_network)) {
-      dialog_show_error("钱包初始化失败", return_callback, 0);
+      dialog_show_error(i18n_tr_or("settings.wallet_init_failed",
+                                   "Wallet initialization failed"),
+                        return_callback, 0);
       return;
     }
     settings_changed = false;
@@ -413,7 +424,9 @@ static void do_apply_settings(void) {
     if (return_callback)
       return_callback();
   } else {
-    dialog_show_error("重新加载密钥失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("settings.key_reload_failed",
+                                 "Key reload failed"),
+                      NULL, 0);
   }
 }
 
@@ -430,9 +443,11 @@ static void apply_btn_cb(lv_event_t *e) {
     return;
 
   if (selected_account > 99) {
-    dialog_show_confirm("不建议使用 99 以上的账户编号。\n\n"
-                        "是否继续？",
-                        apply_with_warning_cb, NULL, DIALOG_STYLE_OVERLAY);
+    dialog_show_confirm(
+        i18n_tr_or("settings.account_index_warning",
+                   "Account numbers above 99 are not recommended.\n\n"
+                   "Continue?"),
+        apply_with_warning_cb, NULL, DIALOG_STYLE_OVERLAY);
     return;
   }
   do_apply_settings();
@@ -450,7 +465,9 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   // Get current mnemonic for later use
   if (!key_get_mnemonic(&mnemonic_content)) {
-    dialog_show_error("读取助记词失败", return_callback, 0);
+    dialog_show_error(i18n_tr_or("wallet.read_mnemonic_failed",
+                                 "Failed to read mnemonic"),
+                      return_callback, 0);
     return;
   }
   (void)key_get_session_passphrase(&stored_passphrase);
@@ -464,7 +481,9 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
       bip32_key_from_seed_alloc(seed, sizeof(seed), BIP32_VER_MAIN_PRIVATE, 0,
                                 &master_key) != WALLY_OK) {
     secure_memzero(seed, sizeof(seed));
-    dialog_show_error("助记词处理失败", return_callback, 0);
+    dialog_show_error(i18n_tr_or("wallet.mnemonic_processing_failed",
+                                 "Mnemonic processing failed"),
+                      return_callback, 0);
     return;
   }
 
@@ -476,7 +495,9 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   char *fingerprint_hex = NULL;
   if (wally_hex_from_bytes(fingerprint, BIP32_KEY_FINGERPRINT_LEN,
                            &fingerprint_hex) != WALLY_OK) {
-    dialog_show_error("指纹格式化失败", return_callback, 0);
+    dialog_show_error(i18n_tr_or("wallet.fingerprint_format_failed",
+                                 "Fingerprint formatting failed"),
+                      return_callback, 0);
     return;
   }
 
@@ -560,7 +581,7 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
                       NULL);
 
   lv_obj_t *pp_label = lv_label_create(passphrase_btn);
-  lv_label_set_text(pp_label, "附加口令");
+  lv_label_set_text(pp_label, i18n_tr_or("wallet.passphrase", "Passphrase"));
   lv_obj_set_style_text_font(pp_label, theme_font_medium(), 0);
   lv_obj_set_style_text_color(pp_label, main_color(), 0);
   lv_obj_center(pp_label);
@@ -572,7 +593,8 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
                       NULL);
 
   lv_obj_t *desc_label = lv_label_create(descriptor_btn);
-  lv_label_set_text(desc_label, "描述符");
+  lv_label_set_text(desc_label,
+                    i18n_tr_or("descriptor.descriptor", "Descriptor"));
   lv_obj_set_style_text_font(desc_label, theme_font_medium(), 0);
   lv_obj_set_style_text_color(desc_label, main_color(), 0);
   lv_obj_center(desc_label);
@@ -595,11 +617,15 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_pad_gap(net_col, 5, 0);
 
   lv_obj_t *net_label = lv_label_create(net_col);
-  lv_label_set_text(net_label, "网络");
+  lv_label_set_text(net_label, i18n_tr_or("settings.network", "Network"));
   lv_obj_set_style_text_font(net_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(net_label, secondary_color(), 0);
 
-  network_dropdown = theme_create_dropdown(net_col, "主网\n测试网");
+  char network_options[64];
+  snprintf(network_options, sizeof(network_options), "%s\n%s",
+           i18n_tr_or("settings.mainnet", "Mainnet"),
+           i18n_tr_or("settings.testnet", "Testnet"));
+  network_dropdown = theme_create_dropdown(net_col, network_options);
   lv_dropdown_set_selected(
       network_dropdown, (selected_network == WALLET_NETWORK_MAINNET) ? 0 : 1);
   lv_obj_set_width(network_dropdown, LV_PCT(100));
@@ -616,11 +642,15 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_pad_gap(policy_col, 5, 0);
 
   lv_obj_t *policy_label = lv_label_create(policy_col);
-  lv_label_set_text(policy_label, "策略");
+  lv_label_set_text(policy_label, i18n_tr_or("settings.policy", "Policy"));
   lv_obj_set_style_text_font(policy_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(policy_label, secondary_color(), 0);
 
-  policy_dropdown = theme_create_dropdown(policy_col, "单签\n多签");
+  char policy_options[64];
+  snprintf(policy_options, sizeof(policy_options), "%s\n%s",
+           i18n_tr_or("settings.single_sig", "Single-sig"),
+           i18n_tr_or("settings.multi_sig", "Multi-sig"));
+  policy_dropdown = theme_create_dropdown(policy_col, policy_options);
   lv_dropdown_set_selected(
       policy_dropdown, (selected_policy == WALLET_POLICY_SINGLESIG) ? 0 : 1);
   lv_obj_set_width(policy_dropdown, LV_PCT(100));
@@ -635,7 +665,9 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   account_value_label = lv_label_create(account_btn);
   char acc_buf[24];
-  snprintf(acc_buf, sizeof(acc_buf), "账户：%u", selected_account);
+  snprintf(acc_buf, sizeof(acc_buf),
+           i18n_tr_or("settings.account_format", "Account: %u"),
+           selected_account);
   lv_label_set_text(account_value_label, acc_buf);
   lv_obj_set_style_text_font(account_value_label, theme_font_medium(), 0);
   lv_obj_set_style_text_color(account_value_label, main_color(), 0);
@@ -649,7 +681,7 @@ void wallet_settings_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_add_state(apply_btn, LV_STATE_DISABLED); // Disabled until changes made
 
   apply_label = lv_label_create(apply_btn);
-  lv_label_set_text(apply_label, "应用");
+  lv_label_set_text(apply_label, i18n_tr_or("action.apply", "Apply"));
   lv_obj_set_style_text_font(apply_label, theme_font_medium(), 0);
   lv_obj_set_style_text_color(apply_label, disabled_color(),
                               0); // Start disabled

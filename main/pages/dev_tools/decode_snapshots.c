@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../i18n/i18n.h"
 #include "../../ui/theme.h"
 
 static const char *TAG = "decode_snapshots";
@@ -241,20 +242,25 @@ static void process_and_display_file(int index) {
   uint8_t *file_data = NULL;
   size_t file_len = 0;
   if (sd_card_read_file(filepath, &file_data, &file_len) != ESP_OK) {
-    lv_label_set_text_fmt(info_label, "%s\n读取失败", pgm_files[index]);
+    lv_label_set_text_fmt(info_label, "%s\n%s", pgm_files[index],
+                          i18n_tr_or("dialog.read_failed", "Read failed"));
     return;
   }
 
   int width, height;
   size_t data_offset;
   if (!parse_pgm_header(file_data, file_len, &width, &height, &data_offset)) {
-    lv_label_set_text_fmt(info_label, "%s\nPGM 格式无效", pgm_files[index]);
+    lv_label_set_text_fmt(info_label, "%s\nPGM %s", pgm_files[index],
+                          i18n_tr_or("dialog.invalid_format",
+                                     "Invalid format"));
     free(file_data);
     return;
   }
 
   if (width > IMG_SIZE || height > IMG_SIZE) {
-    lv_label_set_text_fmt(info_label, "%s\n尺寸过大：%dx%d", pgm_files[index],
+    lv_label_set_text_fmt(info_label, "%s\n%s: %dx%d", pgm_files[index],
+                          i18n_tr_or("dialog.out_of_range",
+                                     "Out of range"),
                           width, height);
     free(file_data);
     return;
@@ -264,7 +270,8 @@ static void process_and_display_file(int index) {
   size_t gray_size = file_len - data_offset;
 
   if (gray_size < (size_t)(width * height)) {
-    lv_label_set_text_fmt(info_label, "%s\n数据不完整", pgm_files[index]);
+    lv_label_set_text_fmt(info_label, "%s\n%s", pgm_files[index],
+                          i18n_tr_or("dialog.invalid_input", "Invalid data"));
     free(file_data);
     return;
   }
@@ -285,13 +292,17 @@ static void process_and_display_file(int index) {
   /* Decode with k_quirc lower-level API to access debug info */
   k_quirc_t *q = k_quirc_new();
   if (!q) {
-    lv_label_set_text_fmt(info_label, "%s\n内存分配失败", pgm_files[index]);
+    lv_label_set_text_fmt(info_label, "%s\n%s", pgm_files[index],
+                          i18n_tr_or("dialog.operation_failed",
+                                     "Operation failed"));
     free(file_data);
     return;
   }
 
   if (k_quirc_resize(q, width, height) < 0) {
-    lv_label_set_text_fmt(info_label, "%s\n解码器调整失败", pgm_files[index]);
+    lv_label_set_text_fmt(info_label, "%s\n%s", pgm_files[index],
+                          i18n_tr_or("dialog.operation_failed",
+                                     "Operation failed"));
     k_quirc_destroy(q);
     free(file_data);
     return;
@@ -342,13 +353,13 @@ static void process_and_display_file(int index) {
 
   if (decoded_ok) {
     lv_label_set_text_fmt(info_label,
-                          "%s\n解码成功  v%d  %d 字节\n%.1f ms  网格:%d  "
-                          "定位:%d  阈值:%d",
+                          "%s\nDecoded  v%d  %d bytes\n%.1f ms  grids:%d  "
+                          "capstones:%d  threshold:%d",
                           pgm_files[index], version, payload_len, elapsed_ms,
                           num_grids, num_capstones, thr_off);
   } else {
     lv_label_set_text_fmt(
-        info_label, "%s\n未解出二维码\n%.1f ms  网格:%d  定位:%d  阈值:%d",
+        info_label, "%s\nNo QR decoded\n%.1f ms  grids:%d  capstones:%d  threshold:%d",
         pgm_files[index], elapsed_ms, num_grids, num_capstones, thr_off);
   }
 
@@ -422,7 +433,8 @@ void decode_snapshots_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_add_event_cb(page_screen, touch_advance_cb, LV_EVENT_CLICKED, NULL);
 
   /* Title */
-  theme_create_page_title(page_screen, "二维码调试");
+  theme_create_page_title(
+      page_screen, i18n_tr_or("tools.decode_camera_snapshot", "QR Debug"));
 
   /* Navigation counter */
   nav_label = theme_create_label(page_screen, "", true);
@@ -446,7 +458,9 @@ void decode_snapshots_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_align(info_label, LV_ALIGN_TOP_MID, 0, 390);
 
   /* Hint label at bottom */
-  hint_label = theme_create_label(page_screen, "点击查看下一张", true);
+  hint_label =
+      theme_create_label(page_screen, i18n_tr_or("dialog.next", "Tap for next image"),
+                         true);
   lv_obj_align(hint_label, LV_ALIGN_BOTTOM_MID, 0, -10);
 
   /* Process first file */

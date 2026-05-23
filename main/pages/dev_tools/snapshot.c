@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "../../../../components/video/video.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/theme.h"
@@ -254,7 +255,7 @@ static void capture_btn_cb(lv_event_t *e) {
 
   if (!sd_card_is_mounted()) {
     if (sd_card_init() != ESP_OK) {
-      dialog_show_message("错误", "存储卡挂载失败");
+      dialog_show_message("Error", "Storage card mount failed");
       return;
     }
   }
@@ -267,10 +268,10 @@ static void capture_btn_cb(lv_event_t *e) {
 
   if (save_pgm_file(grayscale_buffer, filename) == ESP_OK) {
     char msg[80];
-    snprintf(msg, sizeof(msg), "已保存：%s", strrchr(filename, '/') + 1);
-    dialog_show_message("相机快照", msg);
+    snprintf(msg, sizeof(msg), "Saved: %s", strrchr(filename, '/') + 1);
+    dialog_show_message("Camera Snapshot", msg);
   } else {
-    dialog_show_message("错误", "快照保存失败");
+    dialog_show_message("Error", "Snapshot save failed");
   }
 }
 
@@ -306,13 +307,19 @@ void snapshot_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_bg_color(camera_img, lv_color_white(), 0);
   lv_obj_set_style_bg_opa(camera_img, LV_OPA_COVER, 0);
 
-  lv_obj_t *title = theme_create_label(snapshot_screen, "相机快照", false);
+  lv_obj_t *title =
+      theme_create_label(snapshot_screen,
+                         i18n_tr_or("tools.save_camera_snapshot",
+                                    "Camera Snapshot"),
+                         false);
   theme_apply_label(title, true);
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 8);
 
   back_btn = ui_create_back_button(snapshot_screen, back_btn_cb);
 
-  capture_btn = theme_create_button(snapshot_screen, "拍摄", true);
+  capture_btn = theme_create_button(snapshot_screen,
+                                    i18n_tr_or("common.scan", "Capture"),
+                                    true);
   lv_obj_align(capture_btn, LV_ALIGN_BOTTOM_MID, 0, -20);
   lv_obj_add_event_cb(capture_btn, capture_btn_cb, LV_EVENT_CLICKED, NULL);
 

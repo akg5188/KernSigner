@@ -2,6 +2,9 @@
 #include "../components/bbqr/src/bbqr.h"
 #include "../components/cUR/src/types/psbt.h"
 #include "../components/cUR/src/ur_encoder.h"
+#include "../core/base43.h"
+#include "../i18n/i18n.h"
+#include "../ui/i18n_text.h"
 #include "../ui/theme.h"
 #include "encoder.h"
 #include "parser.h"
@@ -248,13 +251,15 @@ static void print_update_page(void) {
 
   if (page_label) {
     char text[96];
+    const char *display_title =
+        ui_i18n_text(qr_viewer_title ? qr_viewer_title : "Backup");
     if (qr_parts_count > 1) {
-      snprintf(text, sizeof(text), "%s 第 %d/%d 页",
-               qr_viewer_title ? qr_viewer_title : "备份",
+      snprintf(text, sizeof(text), "%s %d/%d",
+               display_title ? display_title : "Backup",
                current_part_index + 1, qr_parts_count);
     } else {
-      snprintf(text, sizeof(text), "%s 低密度全屏",
-               qr_viewer_title ? qr_viewer_title : "备份");
+      snprintf(text, sizeof(text), "%s full screen",
+               display_title ? display_title : "Backup");
     }
     lv_label_set_text(page_label, text);
   }
@@ -280,7 +285,11 @@ static void print_prev_cb(lv_event_t *e) {
 }
 
 static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
-  const bool signed_tx_title = title && strcmp(title, "已签名交易") == 0;
+  const bool signed_tx_title =
+      title && (strcmp(title, i18n_tr_or("sign.signed_transaction",
+                                         "Signed transaction")) == 0 ||
+                strcmp(title, "Signed transaction") == 0 ||
+                strcmp(title, "Signed Transaction") == 0);
 
   qr_viewer_screen = lv_obj_create(parent);
   lv_obj_set_size(qr_viewer_screen, LV_PCT(100), LV_PCT(100));
@@ -341,8 +350,10 @@ static bool setup_qr_viewer_ui(lv_obj_t *parent, const char *title) {
     }
 
     char message[128];
-    snprintf(message, sizeof(message),
-             signed_tx_title ? "%s  点击返回" : "%s\n点击返回", title);
+    const char *display_title = ui_i18n_text(title);
+    const char *return_hint = i18n_tr_or("common.back", "Back");
+    snprintf(message, sizeof(message), signed_tx_title ? "%s  %s" : "%s\n%s",
+             display_title ? display_title : title, return_hint);
     lv_obj_t *msg_label = theme_create_label(msgbox, message, false);
     lv_obj_set_style_text_align(msg_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(msg_label, lv_color_hex(0xFFFFFF), 0);
@@ -401,7 +412,7 @@ static bool setup_print_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   lv_obj_add_event_cb(back_btn, back_button_cb, LV_EVENT_CLICKED, NULL);
   lv_obj_clear_flag(back_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
   lv_obj_t *back_label = lv_label_create(back_btn);
-  lv_label_set_text(back_label, "返回");
+  lv_label_set_text(back_label, i18n_tr_or("common.back", "Back"));
   lv_obj_center(back_label);
   theme_apply_button_label(back_label, false);
 
@@ -421,7 +432,7 @@ static bool setup_print_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   lv_obj_add_event_cb(prev_btn, print_prev_cb, LV_EVENT_CLICKED, NULL);
   lv_obj_clear_flag(prev_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
   lv_obj_t *prev_label = lv_label_create(prev_btn);
-  lv_label_set_text(prev_label, "上页");
+  lv_label_set_text(prev_label, i18n_tr_or("dialog.previous", "Previous"));
   lv_obj_center(prev_label);
   theme_apply_button_label(prev_label, false);
 
@@ -431,7 +442,7 @@ static bool setup_print_qr_viewer_ui(lv_obj_t *parent, const char *title) {
   lv_obj_add_event_cb(next_btn, print_next_cb, LV_EVENT_CLICKED, NULL);
   lv_obj_clear_flag(next_btn, LV_OBJ_FLAG_EVENT_BUBBLE);
   lv_obj_t *next_label = lv_label_create(next_btn);
-  lv_label_set_text(next_label, "下页");
+  lv_label_set_text(next_label, i18n_tr_or("dialog.next", "Next"));
   lv_obj_center(next_label);
   theme_apply_button_label(next_label, false);
 
@@ -603,7 +614,8 @@ bool qr_viewer_page_create_with_format(lv_obj_t *parent, int qr_format,
   if (qr_viewer_screen || qr_content_copy || qr_parts)
     qr_viewer_page_destroy();
 
-  if (qr_format != FORMAT_UR && qr_format != FORMAT_BBQR) {
+  if (qr_format != FORMAT_UR && qr_format != FORMAT_BBQR &&
+      qr_format != FORMAT_ELECTRUM) {
     return qr_viewer_page_create(parent, content, title, return_cb);
   }
 
@@ -620,6 +632,18 @@ bool qr_viewer_page_create_with_format(lv_obj_t *parent, int qr_format,
   if (ret != WALLY_OK) {
     free(psbt_bytes);
     return false;
+  }
+
+  if (qr_format == FORMAT_ELECTRUM) {
+    char *base43 = NULL;
+    size_t base43_len = 0;
+    bool ok = base43_encode(psbt_bytes, psbt_len, &base43, &base43_len);
+    free(psbt_bytes);
+    if (!ok || !base43)
+      return false;
+    bool created = qr_viewer_page_create(parent, base43, title, return_cb);
+    free(base43);
+    return created;
   }
 
   if (qr_format == FORMAT_BBQR) {

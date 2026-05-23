@@ -53,6 +53,7 @@ set(SIM_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/main_sim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/platform/esp_idf_stubs/stubs.c
     ${APP_UI_DIR}/font_policy.c
+    ${APP_UI_DIR}/i18n_text.c
     ${APP_UI_DIR}/menu.c
     ${APP_UI_DIR}/theme.c
     ${APP_UI_DIR}/word_selector.c
@@ -79,6 +80,7 @@ set(APP_UTIL_SOURCES)
 set(APP_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/core/crypto_utils.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/core/settings.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/i18n/i18n.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/signer_port/signer_camera_preview.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/signer_port/signer_feature_catalog.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/signer_port/signer_hardware_probe.c

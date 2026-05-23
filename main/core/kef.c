@@ -10,6 +10,7 @@
 #include "kef.h"
 #include "../utils/secure_mem.h"
 #include "crypto_utils.h"
+#include "i18n/i18n.h"
 
 /* Raw deflate compress / decompress (wbits = 10) */
 #include "../../components/bbqr/src/miniz.h"
@@ -769,25 +770,29 @@ bool kef_is_envelope(const uint8_t *data, size_t len) {
 const char *kef_error_str(kef_error_t err) {
   switch (err) {
   case KEF_OK:
-    return "成功";
+    return i18n_tr_or("kef.success", "Success");
   case KEF_ERR_INVALID_ARG:
-    return "参数无效";
+    return i18n_tr_or("kef.invalid_argument", "Invalid argument");
   case KEF_ERR_UNSUPPORTED_VERSION:
-    return "加密文件版本不支持";
+    return i18n_tr_or("kef.unsupported_version",
+                      "Encrypted file version is not supported");
   case KEF_ERR_ALLOC:
-    return "内存分配失败";
+    return i18n_tr_or("kef.memory_allocation_failed",
+                      "Memory allocation failed");
   case KEF_ERR_CRYPTO:
-    return "加密运算失败";
+    return i18n_tr_or("kef.crypto_failed", "Cryptographic operation failed");
   case KEF_ERR_AUTH:
-    return "认证失败";
+    return i18n_tr_or("kef.authentication_failed", "Authentication failed");
   case KEF_ERR_COMPRESS:
-    return "压缩失败";
+    return i18n_tr_or("kef.compression_failed", "Compression failed");
   case KEF_ERR_DECOMPRESS:
-    return "解压失败";
+    return i18n_tr_or("kef.decompression_failed", "Decompression failed");
   case KEF_ERR_ENVELOPE_TOO_SHORT:
-    return "加密文件太短";
+    return i18n_tr_or("kef.encrypted_file_too_short",
+                      "Encrypted file is too short");
   case KEF_ERR_DUPLICATE_BLOCKS:
-    return "检测到重复加密块";
+    return i18n_tr_or("kef.duplicate_encrypted_blocks",
+                      "Duplicate encrypted blocks detected");
   }
-  return "未知错误";
+  return i18n_tr_or("kef.unknown_error", "Unknown error");
 }

@@ -1,8 +1,8 @@
-# Kern/Krux 真钱包功能版交付状态与验收清单
+# KernSigner 测试资金功能版交付状态与验收清单
 
 > 2026-05-22 智能卡迁移更新：外接供电后 ACR39U-NF + Satochip/SeedKeeper 已跑通。Satochip 已可用于 Web3 连接码、OKX/Bitget 测试转账签名、路径地址和 BTC 观察公钥；SeedKeeper 已可测设置 PIN、改 PIN、写入助记词、查看/导入条目和重置。新版 SeedKeeper 重置不走旧 `B0 FF`，必须用 `错PIN一步` 和 `错PUK一步` 到 `FF00`。当前仍是测试资金验收版，不是已审计量产资金版。
 
-本文档面向 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 真机交付验收，记录当前 Kern/Krux 真钱包功能版的可交付范围、真机验收步骤和下一阶段建议。
+本文档面向 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3 真机交付验收，记录当前 KernSigner 测试资金功能版的可交付范围、真机验收步骤和下一阶段建议。
 
 交付前先看：
 
@@ -29,7 +29,7 @@
 - 备份导出直达入口现在也必须经过 PIN 和敏感数据确认，不能绕过备份菜单保护。
 - 助记词确认页、相机生成助记词缓存、通用文本输入销毁路径已补安全擦除；密码短语输入默认隐藏。
 - 相机/二维码初始化中的 abort 型 `ESP_ERROR_CHECK` 已改为错误返回，减少硬件异常导致蓝屏重启。
-- 新增并加严 `tools/kern_delivery.sh prodcheck` / `tools/kern_production_check.sh`，商业真钱包生产发布前会检查 Secure Boot、Flash Encryption、NVS 加密、蓝牙/WiFi 关闭、USB Serial/JTAG 关闭、GDB stub 关闭、UART/USB 控制台关闭、panic 静默重启、WDT panic 和发布工作区干净等硬条件。
+- 新增并加严 `tools/signer_delivery.sh prodcheck` / `tools/signer_production_check.sh`，商业真钱包生产发布前会检查 Secure Boot、Flash Encryption、NVS 加密、蓝牙/WiFi 关闭、USB Serial/JTAG 关闭、GDB stub 关闭、UART/USB 控制台关闭、panic 静默重启、WDT panic 和发布工作区干净等硬条件。
 - Waveshare 4.3 寸显示底包已收紧启动失败路径：显示、触摸、LVGL 适配层初始化失败时不再走未初始化句柄、`assert` 或直接 abort，而是记录日志并由主程序可控重启。
 
 2026-05-22 智能卡同步说明：用户确认外接供电后 ACR39U-NF 读卡器可识别，Satochip 卡已可生成 Web3 连接码并完成 OKX/Bitget Web3 转账签名。SeedKeeper 已修正为新版重置流程：旧 `B0 FF` 返回 `9C20` 时不是驱动坏，而是应使用错 PIN/错 PUK 流程直到 `FF00`。当前智能卡菜单包含 Satochip 和 SeedKeeper 两类：Satochip 侧用于连接、签名、地址、公钥、PIN/维护；SeedKeeper 侧用于设置 PIN、改 PIN、保存和查看秘密、导入本机、重置。
@@ -61,8 +61,8 @@
 - 设备检查/交付验收页：集中展示固件信息、硬件快照和可用范围，并提供扫码、二维码、存储、触摸、亮度和钱包验收入口。
 - 自动验收：模拟器生成 `manifest.tsv`、`glyph_check.tsv`、`smoke_check.tsv`、`scroll_check.tsv`、`interaction_check.tsv`、首屏/底部截图、关键截图 PNG、全页面拼图和 `ACCEPTANCE_REPORT.txt`。
 - 未接专项：BIP85 的密码/原始熵、打印机、Satochip PSBT/BTC 消息签名等未放进本轮生产可交付范围，不冒充已完成。智能卡维护和写卡功能只按测试卡验收能力说明。
-- 开发者交付脚本：`tools/kern_delivery.sh` 提供常用检查、刷写和串口观察命令。
-- 生产发布检查：`tools/kern_delivery.sh prodcheck` 会阻止未启用 Secure Boot、Flash Encryption、NVS 加密、仍开启调试/控制台通道或工作区未提交的固件被标记为商业资金版。
+- 开发者交付脚本：`tools/signer_delivery.sh` 提供常用检查、刷写和串口观察命令。
+- 生产发布检查：`tools/signer_delivery.sh prodcheck` 会阻止未启用 Secure Boot、Flash Encryption、NVS 加密、仍开启调试/控制台通道或工作区未提交的固件被标记为商业资金版。
 
 ## 真实资金使用边界
 
@@ -111,15 +111,16 @@
 ### 4. 相机预览
 
 1. 进入加载相机、设备测试相机或相机设置相关页面。
-2. 对准有明显纹理或文字的物体。
-3. 确认预览画面可见、方向合理、刷新稳定。
-4. 调整相机参数后确认页面仍可返回，不出现卡死或重启。
+2. 第一次使用或拆装摄像头后，先用普通黑白二维码在 10-20 cm 距离手动调 OV5647 镜头焦距。
+3. 对准有明显纹理或文字的物体。
+4. 确认预览画面可见、方向合理、刷新稳定。
+5. 调整相机参数后确认页面仍可返回，不出现卡死或重启。
 
 ### 5. 二维码分类识别
 
 1. 使用手机或电脑显示一个非敏感普通二维码，例如普通文本或 URL。
 2. 进入二维码扫描或相机加载相关页面。
-3. 对准二维码，确认页面显示二维码类型、长度和安全动作。
+3. 对准二维码，确认页面显示二维码类型、长度和安全动作；普通二维码不灵敏时先回到相机对焦，不要直接判定协议失败。
 4. 普通文本、URL 或公开收款 URI 可显示公开内容；UR、BBQR、PSBT、SeedQR、二进制等高风险内容只能显示分类和拦截提示。
 5. 不使用助记词、私钥、PSBT、SeedQR 或任何真实资产二维码验收。
 
@@ -149,7 +150,7 @@
 1. 自动截图与按钮验收应覆盖 `自定义路径`、`加载助记词`、`钢板数字恢复`、`点阵和1248导入`，并单独覆盖 `点阵板恢复`、`1248恢复`。
 2. `点阵和1248导入`、`点阵板恢复`、`1248恢复` 当前都已纳入自动截图范围；按钮验收对旧页面栈不切 `screen_id` 的入口允许按目标页面关键文字或 `ok_action` 判定通过。
 3. 自动截图与按钮验收应覆盖 `备份导出` 下的 `BIP39序号`、`原始熵`、`点阵板`、`钢板打孔`、`1248打孔`、`二维码备份`。
-4. 如果后续菜单文案继续调整，需同步更新 `simulator/src/main_sim.c` 和 `tools/kern_delivery.sh` 的按钮文案与关键截图清单。
+4. 如果后续菜单文案继续调整，需同步更新 `simulator/src/main_sim.c` 和 `tools/signer_delivery.sh` 的按钮文案与关键截图清单。
 
 ### 10. 真钱包流程
 
@@ -171,7 +172,7 @@ cd /home/ak/123/Kern
 ### 交付前检查
 
 ```bash
-tools/kern_delivery.sh check
+tools/signer_delivery.sh check
 ```
 
 用途：
@@ -189,7 +190,7 @@ tools/kern_delivery.sh check
 ### 真机 app-only 刷写
 
 ```bash
-ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
+ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh appflash
 ```
 
 用途：
@@ -204,7 +205,7 @@ ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh appflash
 ### 串口观察
 
 ```bash
-ESPPORT=/dev/ttyACM0 tools/kern_delivery.sh monitor
+ESPPORT=/dev/ttyACM0 tools/signer_delivery.sh monitor
 ```
 
 用途：
@@ -218,7 +219,7 @@ ESPPORT=/dev/ttyACM0 tools/kern_delivery.sh monitor
 ### 交付打包
 
 ```bash
-tools/kern_delivery.sh ship
+tools/signer_delivery.sh ship
 ```
 
 用途：
@@ -227,25 +228,25 @@ tools/kern_delivery.sh ship
 - 构建模拟器并采集首屏/底部截图。
 - 校验关键页面截图、UI 烟测、滚动截图和按钮导航。
 - 构建最新 ESP32-P4 固件二进制。
-- 生成 `_release/kern_delivery_YYYYMMDD_HHMMSS` 交付目录。
+- 生成 `_release/signer_delivery_YYYYMMDD_HHMMSS` 交付目录。
 - 输出 `RELEASE_SUMMARY.txt`、`SHA256SUMS.txt`、`kernsigner.bin`、关键截图拼图、全页面拼图和完整截图目录。
 - 输出 `ACCEPTANCE_REPORT.txt`，并在 `RELEASE_SUMMARY.txt` 写入 `kernsigner.bin SHA256`、源码 git commit 和 worktree 状态。
 - 输出 `FINAL_READINESS.txt`，集中记录固件、截图、启动日志和安全边界是否满足最终交付。
 - 输出 `README_FIRST.txt`、`FLASH_COMMANDS.txt`、`flash_app_linux.sh`、`flash_app_windows.ps1` 和 `RELEASE_INDEX.tsv`，让交付包打开后就能知道怎么验收、刷机和复核。
 - Linux/Windows 刷机脚本会先校验 `kernsigner.bin` SHA256，校验失败拒绝刷机。
-- 同时生成 `_release/kern_delivery_YYYYMMDD_HHMMSS.tar.gz`，便于归档或传输。
+- 同时生成 `_release/signer_delivery_YYYYMMDD_HHMMSS.tar.gz`，便于归档或传输。
 - 最后自动执行最终交付校验，必须看到 `final verify: PASS`。
 
 如果需要“刷写真机 + 抓启动日志 + 重新打包 + 最终校验”一次完成：
 
 ```bash
-JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/kern_delivery.sh shipflash
+JOBS=2 ESPPORT=/dev/ttyACM0 ESPBAUD=115200 tools/signer_delivery.sh shipflash
 ```
 
 ### 最终交付校验
 
 ```bash
-tools/kern_delivery.sh final
+tools/signer_delivery.sh final
 ```
 
 用途：

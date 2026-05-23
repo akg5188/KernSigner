@@ -13,6 +13,8 @@ static const char *KEY_BRIGHTNESS = "bright";
 static const char *KEY_AE_TARGET = "ae_tgt";
 static const char *KEY_FOCUS_POS = "focus";
 static const char *KEY_PERMISSIVE_SIGNING = "perm_sign";
+static const char *KEY_LANGUAGE = "lang";
+static const char *KEY_LANGUAGE_CODE = "lang_code";
 
 static nvs_handle_t settings_nvs;
 static bool initialized = false;
@@ -142,6 +144,44 @@ esp_err_t settings_set_permissive_signing(bool permissive) {
     return ESP_ERR_INVALID_STATE;
   uint8_t val = permissive ? 1 : 0;
   esp_err_t err = nvs_set_u8(settings_nvs, KEY_PERMISSIVE_SIGNING, val);
+  if (err != ESP_OK)
+    return err;
+  return nvs_commit(settings_nvs);
+}
+
+i18n_language_t settings_get_language(void) {
+  if (!initialized)
+    return I18N_LANG_EN;
+
+  char code[24] = {0};
+  size_t code_len = sizeof(code);
+  if (nvs_get_str(settings_nvs, KEY_LANGUAGE_CODE, code, &code_len) == ESP_OK)
+    return i18n_language_from_code(code);
+
+  uint8_t val = I18N_LANG_EN;
+  if (nvs_get_u8(settings_nvs, KEY_LANGUAGE, &val) != ESP_OK)
+    return I18N_LANG_EN;
+  i18n_language_t language =
+      i18n_language_valid((i18n_language_t)val) ? (i18n_language_t)val
+                                                : I18N_LANG_EN;
+  const i18n_language_info_t *info = i18n_language_info(language);
+  if (info && info->code)
+    (void)nvs_set_str(settings_nvs, KEY_LANGUAGE_CODE, info->code);
+  (void)nvs_commit(settings_nvs);
+  return language;
+}
+
+esp_err_t settings_set_language(i18n_language_t language) {
+  if (!initialized)
+    return ESP_ERR_INVALID_STATE;
+  if (!i18n_language_valid(language))
+    language = I18N_LANG_EN;
+  const i18n_language_info_t *info = i18n_language_info(language);
+  esp_err_t err =
+      nvs_set_str(settings_nvs, KEY_LANGUAGE_CODE, info ? info->code : "en");
+  if (err != ESP_OK)
+    return err;
+  err = nvs_set_u8(settings_nvs, KEY_LANGUAGE, (uint8_t)language);
   if (err != ESP_OK)
     return err;
   return nvs_commit(settings_nvs);

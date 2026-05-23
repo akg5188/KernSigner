@@ -4,6 +4,7 @@
  */
 
 #include "word_selector.h"
+#include "../i18n/i18n.h"
 #include <stdlib.h>
 
 typedef struct {
@@ -60,16 +61,19 @@ void ui_word_count_selector_create(lv_obj_t *parent, ui_menu_callback_t back_cb,
 
   selector->on_select = on_select;
   selector->on_back = back_cb;
-  selector->menu = ui_menu_create(parent, "助记词长度",
-                                  back_cb ? back_wrapper_cb : NULL);
+  selector->menu =
+      ui_menu_create(parent, i18n_tr_or("wallet.word_count", "Word count"),
+                     back_cb ? back_wrapper_cb : NULL);
 
   if (!selector->menu) {
     free(selector);
     return;
   }
 
-  ui_menu_add_entry(selector->menu, "12 个单词", word_count_12_cb);
-  ui_menu_add_entry(selector->menu, "24 个单词", word_count_24_cb);
+  ui_menu_add_entry(selector->menu, i18n_tr_or("wallet.12_words", "12 words"),
+                    word_count_12_cb);
+  ui_menu_add_entry(selector->menu, i18n_tr_or("wallet.24_words", "24 words"),
+                    word_count_24_cb);
 
   active_selector = selector;
   ui_menu_show(selector->menu);

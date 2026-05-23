@@ -11,6 +11,7 @@
 #include "kef_encrypt_page.h"
 #include "../../core/kef.h"
 #include "../../core/key.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/theme.h"
@@ -105,13 +106,13 @@ static key_strength_t calculate_key_strength(const char *text) {
 static const char *strength_text(key_strength_t s) {
   switch (s) {
   case KEY_STRENGTH_WEAK:
-    return "较弱";
+    return i18n_tr_or("backup.key_strength_weak", "Weak");
   case KEY_STRENGTH_FAIR:
-    return "一般";
+    return i18n_tr_or("backup.key_strength_fair", "Fair");
   case KEY_STRENGTH_GOOD:
-    return "良好";
+    return i18n_tr_or("backup.key_strength_good", "Good");
   case KEY_STRENGTH_STRONG:
-    return "较强";
+    return i18n_tr_or("backup.key_strength_strong", "Strong");
   default:
     return "";
   }
@@ -278,7 +279,9 @@ static void encrypt_poll_timer_cb(lv_timer_t *timer) {
     progress_dialog = NULL;
   }
   if (overlay_title)
-    lv_label_set_text(overlay_title, "加密密钥");
+    lv_label_set_text(overlay_title,
+                      i18n_tr_or("backup.encryption_key",
+                                 "Encryption key"));
   ui_text_input_show(&text_input);
   if (text_input.textarea)
     lv_textarea_set_text(text_input.textarea, "");
@@ -306,7 +309,8 @@ static void password_ready_cb(lv_event_t *e) {
     confirm_key_len = len;
     lv_textarea_set_text(text_input.textarea, "");
     if (overlay_title)
-      lv_label_set_text(overlay_title, "确认密钥");
+      lv_label_set_text(overlay_title,
+                        i18n_tr_or("backup.confirm_key", "Confirm key"));
     if (strength_label)
       lv_obj_add_flag(strength_label, LV_OBJ_FLAG_HIDDEN);
     return;
@@ -318,10 +322,14 @@ static void password_ready_cb(lv_event_t *e) {
     confirm_key_len = 0;
     lv_textarea_set_text(text_input.textarea, "");
     if (overlay_title)
-      lv_label_set_text(overlay_title, "加密密钥");
+      lv_label_set_text(overlay_title,
+                        i18n_tr_or("backup.encryption_key",
+                                   "Encryption key"));
     if (strength_label)
       lv_obj_clear_flag(strength_label, LV_OBJ_FLAG_HIDDEN);
-    dialog_show_error("两次密钥不一致", NULL, 0);
+    dialog_show_error(i18n_tr_or("backup.key_mismatch",
+                                 "Keys do not match"),
+                      NULL, 0);
     return;
   }
 
@@ -336,7 +344,10 @@ static void password_ready_cb(lv_event_t *e) {
   /* Show loading state */
   ui_text_input_hide(&text_input);
   progress_dialog =
-      dialog_show_progress("加密备份", "正在加密...", DIALOG_STYLE_OVERLAY);
+      dialog_show_progress(i18n_tr_or("backup.encrypted_backup",
+                                      "Encrypted backup"),
+                           i18n_tr_or("backup.encrypting", "Encrypting..."),
+                           DIALOG_STYLE_OVERLAY);
 
   /* Launch encryption on CPU 1 */
   encrypt_done = false;
@@ -349,7 +360,9 @@ static void password_ready_cb(lv_event_t *e) {
       progress_dialog = NULL;
     }
     ui_text_input_show(&text_input);
-    dialog_show_error("任务创建失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("dialog.task_create_failed",
+                                 "Task creation failed"),
+                      NULL, 0);
     return;
   }
 
@@ -357,7 +370,8 @@ static void password_ready_cb(lv_event_t *e) {
 }
 
 static void show_password_input(void) {
-  create_overlay("加密密钥", "密钥", true, password_ready_cb);
+  create_overlay(i18n_tr_or("backup.encryption_key", "Encryption key"),
+                 i18n_tr_or("backup.key", "Key"), true, password_ready_cb);
 }
 
 /* ---------- ID input ---------- */
@@ -383,7 +397,9 @@ static void id_confirm_cb(bool confirmed, void *user_data) {
   if (confirmed) {
     show_password_input();
   } else {
-    create_overlay("自定义名称", "名称", false, id_keyboard_ready_cb);
+    create_overlay(i18n_tr_or("backup.custom_name", "Custom name"),
+                   i18n_tr_or("backup.name", "Name"), false,
+                   id_keyboard_ready_cb);
   }
 }
 
@@ -412,18 +428,26 @@ void kef_encrypt_page_create(lv_obj_t *parent, void (*return_cb)(void),
   if (suggested_id && suggested_id[0] != '\0') {
     /* Caller-provided ID (e.g. descriptor checksum) */
     snprintf(kef_id, sizeof(kef_id), "%s", suggested_id);
-    snprintf(msg, sizeof(msg), "使用 %s 作为备份名称？", suggested_id);
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("backup.use_id_as_name_confirm_format",
+                        "Use %s as the backup name?"),
+             suggested_id);
   } else {
     /* Fall back to wallet fingerprint */
     char fp_hex[9] = {0};
     if (!key_get_fingerprint_hex(fp_hex)) {
       SECURE_FREE_BUFFER(data_copy, data_copy_len);
       data_copy_len = 0;
-      dialog_show_error("读取钱包指纹失败", return_cb, 0);
+      dialog_show_error(i18n_tr_or("wallet.read_fingerprint_failed",
+                                   "Read wallet fingerprint failed"),
+                        return_cb, 0);
       return;
     }
     snprintf(kef_id, sizeof(kef_id), "%s", fp_hex);
-    snprintf(msg, sizeof(msg), "使用钱包指纹 %s 作为备份名称？", fp_hex);
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("backup.use_fingerprint_as_name_confirm_format",
+                        "Use wallet fingerprint %s as the backup name?"),
+             fp_hex);
   }
 
   dialog_show_confirm(msg, id_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);

@@ -76,7 +76,7 @@
 - `/home/ak/123/Kern/main/pages/home/backup/mnemonic_grid.c`
 - `/home/ak/123/Kern/main/pages/home/backup/mnemonic_steel.c`
 - `/home/ak/123/Kern/main/pages/home/backup/mnemonic_1248.c`
-- `/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c`
+- `/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c`
 
 问题：
 
@@ -96,7 +96,7 @@
 
 文件：
 
-- `/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c`
+- `/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c`
 - `/home/ak/123/Kern/main/core/evm.c`
 - `/home/ak/123/Kern/main/core/key.c`
 
@@ -118,7 +118,7 @@
 文件：
 
 - `/home/ak/123/Kern/main/core/key.c`
-- `/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c`
+- `/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c`
 - `/home/ak/123/Kern/main/core/descriptor_validator.c`
 
 问题：
@@ -164,7 +164,7 @@
 
 修复方向：
 
-- index/total 严格限制到 `1..RELAY_MAX_PARTS`。
+- index/total 严格限制在有效范围内。
 - `index <= total`。
 - 完整性检查改成逐个 expected index 查找。
 
@@ -206,7 +206,7 @@
 
 文件：
 
-- `/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c`
+- `/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c`
 
 问题：
 
@@ -230,7 +230,7 @@
 文件：
 
 - `/home/ak/123/Kern/main/ui/menu.c`
-- `/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c`
+- `/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c`
 
 问题：
 
@@ -287,7 +287,7 @@
 
 文件：
 
-- `/home/ak/123/Kern/main/pages/krux_shell/krux_shell.c`
+- `/home/ak/123/Kern/main/pages/signer_shell/signer_shell.c`
 
 问题：
 

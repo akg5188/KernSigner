@@ -3,6 +3,7 @@
 #include "mnemonic_qr.h"
 #include "../../../core/base43.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../qr/encoder.h"
 #include "../../../qr/viewer.h"
 #include "../../../ui/dialog.h"
@@ -93,8 +94,9 @@ static void build_mnemonic_index_summary(const char *mnemonic, char *out,
       written = snprintf(out + pos, out_len - pos, "%s%04d",
                          word_count > 0 ? " " : "", word_index);
     } else {
-      written = snprintf(out + pos, out_len - pos, "%s未知",
-                         word_count > 0 ? " " : "");
+      written = snprintf(out + pos, out_len - pos, "%s%s",
+                         word_count > 0 ? " " : "",
+                         i18n_tr_or("common.unknown", "Unknown"));
     }
     if (written < 0)
       break;
@@ -359,15 +361,15 @@ static void grid_btn_cb(lv_event_t *e) {
 static const char *current_qr_title(void) {
   switch (current_qr_type) {
   case QR_TYPE_PLAINTEXT:
-    return "明文备份";
+    return i18n_tr_or("backup.plaintext_backup", "Plaintext backup");
   case QR_TYPE_SEEDQR:
-    return "助记词QR";
+    return i18n_tr_or("backup.seedqr", "SeedQR");
   case QR_TYPE_COMPACT_SEEDQR:
-    return "紧凑QR";
+    return i18n_tr_or("backup.compact_seedqr", "Compact QR");
   case QR_TYPE_ENCRYPTED:
-    return "加密备份";
+    return i18n_tr_or("backup.encrypted_backup", "Encrypted backup");
   default:
-    return "备份QR";
+    return i18n_tr_or("backup.qr", "Backup QR");
   }
 }
 
@@ -400,16 +402,23 @@ static void open_fullscreen_qr(void) {
   const char *data = current_text_qr_data();
   if (!data || data[0] == '\0') {
     if (current_qr_type == QR_TYPE_COMPACT_SEEDQR) {
-      dialog_show_error("紧凑QR不适合复印，请选助记词QR", NULL, 2000);
+      dialog_show_error(
+          i18n_tr_or("backup.compact_seedqr_no_print",
+                     "Compact QR is not suitable for print; choose SeedQR"),
+          NULL, 2000);
     } else {
-      dialog_show_error("没有可显示的数据", NULL, 2000);
+      dialog_show_error(i18n_tr_or("backup.no_display_data",
+                                   "No data to display"),
+                        NULL, 2000);
     }
     return;
   }
 
   if (!qr_viewer_page_create_print(lv_screen_active(), data, current_qr_title(),
                                    return_from_print_qr_cb, 180)) {
-    dialog_show_error("全屏二维码创建失败", NULL, 2000);
+    dialog_show_error(i18n_tr_or("backup.fullscreen_qr_failed",
+                                 "Failed to create fullscreen QR"),
+                      NULL, 2000);
     return;
   }
 
@@ -440,7 +449,8 @@ static void encrypt_success_cb(const char *id, const uint8_t *envelope,
   size_t b43_len = 0;
   if (!base43_encode(envelope, len, &b43, &b43_len)) {
     kef_encrypt_page_destroy();
-    dialog_show_error("编码失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("backup.encoding_failed", "Encoding failed"),
+                      NULL, 0);
     current_qr_type = previous_qr_type;
     lv_dropdown_set_selected(qr_type_dropdown, (uint32_t)current_qr_type);
     return;
@@ -460,7 +470,9 @@ static void start_encrypted_flow(void) {
   previous_qr_type = current_qr_type;
 
   if (!compact_seedqr_data || compact_seedqr_len == 0) {
-    dialog_show_error("无可加密数据", NULL, 0);
+    dialog_show_error(i18n_tr_or("backup.no_encryptable_data",
+                                 "No encryptable data"),
+                      NULL, 0);
     return;
   }
 
@@ -496,10 +508,12 @@ static void update_qr_code(void) {
       lv_label_set_text(qr_status_label, "");
       lv_obj_set_style_text_color(qr_status_label, secondary_color(), 0);
     } else if (current_qr_type == QR_TYPE_ENCRYPTED) {
-      lv_label_set_text(qr_status_label, "内容较长");
+      lv_label_set_text(qr_status_label,
+                        i18n_tr_or("backup.content_long", "Content is long"));
       lv_obj_set_style_text_color(qr_status_label, highlight_color(), 0);
     } else {
-      lv_label_set_text(qr_status_label, "二维码过长");
+      lv_label_set_text(qr_status_label,
+                        i18n_tr_or("backup.qr_too_large", "QR is too large"));
       lv_obj_set_style_text_color(qr_status_label, highlight_color(), 0);
     }
   }
@@ -532,7 +546,10 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   return_callback = return_cb;
 
   if (!key_mnemonic_is_valid()) {
-    dialog_show_error("临时助记词不能显示助记词二维码", return_cb, 0);
+    dialog_show_error(
+        i18n_tr_or("backup.no_temporary_seedqr",
+                   "Temporary mnemonic cannot show mnemonic QR"),
+        return_cb, 0);
     return;
   }
 
@@ -574,8 +591,13 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   back_button = ui_create_back_button(parent, back_cb);
 
-  qr_type_dropdown =
-      theme_create_dropdown(top_bar, "明文\n助记词QR\n紧凑QR\n加密QR");
+  char qr_type_options[128];
+  snprintf(qr_type_options, sizeof(qr_type_options), "%s\n%s\n%s\n%s",
+           i18n_tr_or("descriptor.plaintext_qr", "Plaintext"),
+           i18n_tr_or("backup.seedqr", "SeedQR"),
+           i18n_tr_or("backup.compact_seedqr", "Compact QR"),
+           i18n_tr_or("backup.encrypted_qr", "Encrypted QR"));
+  qr_type_dropdown = theme_create_dropdown(top_bar, qr_type_options);
   lv_obj_set_width(qr_type_dropdown, LV_PCT(58));
   lv_obj_align(qr_type_dropdown, LV_ALIGN_CENTER, -theme_get_min_touch_size() / 2,
                0);
@@ -606,7 +628,8 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
                       NULL);
 
   lv_obj_t *fullscreen_label = lv_label_create(fullscreen_btn);
-  lv_label_set_text(fullscreen_label, "全屏");
+  lv_label_set_text(fullscreen_label,
+                    i18n_tr_or("common.fullscreen", "Full"));
   lv_obj_set_style_text_font(fullscreen_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(fullscreen_label, bg_color(), 0);
   lv_obj_center(fullscreen_label);
@@ -652,7 +675,9 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   char fingerprint_hex[9] = "--------";
   key_get_fingerprint_hex(fingerprint_hex);
   char fp_text[32];
-  snprintf(fp_text, sizeof(fp_text), "钱包指纹 %s", fingerprint_hex);
+  snprintf(fp_text, sizeof(fp_text), "%s %s",
+           i18n_tr_or("wallet.wallet_fingerprint", "Wallet fingerprint"),
+           fingerprint_hex);
   fingerprint_label = theme_create_label(content_area, fp_text, false);
   lv_obj_set_style_text_font(fingerprint_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(fingerprint_label, highlight_color(), 0);
@@ -663,7 +688,8 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   char index_summary[128];
   build_mnemonic_index_summary(mnemonic_data, index_summary,
                                sizeof(index_summary));
-  snprintf(index_text, sizeof(index_text), "序号 %s", index_summary);
+  snprintf(index_text, sizeof(index_text), "%s %s",
+           i18n_tr_or("backup.word_indexes", "Word indexes"), index_summary);
   index_label = theme_create_label(content_area, index_text, false);
   lv_obj_set_style_text_font(index_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(index_label, secondary_color(), 0);

@@ -1,5 +1,6 @@
 #include "mnemonic_tinyseed.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
 #include "../../../utils/bip39_filter.h"
@@ -53,7 +54,7 @@ static lv_obj_t *add_text_cell(lv_obj_t *row, const char *text, int w, int h,
   lv_label_set_text(label, text ? text : "");
   lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
   lv_obj_set_width(label, w);
-  lv_obj_set_style_text_font(label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_font(label, theme_font_small(), 0);
   lv_obj_set_style_text_color(label, color, 0);
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_center(label);
@@ -77,8 +78,8 @@ static lv_obj_t *create_grid_row(lv_obj_t *list) {
 
 static void add_header_row(lv_obj_t *list, int cell_size, bool weights) {
   lv_obj_t *row = create_grid_row(list);
-  add_text_cell(row, weights ? "词" : "", WORD_LABEL_WIDTH, cell_size,
-                secondary_color());
+  add_text_cell(row, weights ? i18n_tr_or("wallet.word", "Word") : "",
+                WORD_LABEL_WIDTH, cell_size, secondary_color());
   for (int col = 0; col < 11; col++) {
     char text[8];
     snprintf(text, sizeof(text), "%d", weights ? COLUMN_WEIGHTS[col] : col + 1);
@@ -101,7 +102,8 @@ void mnemonic_tinyseed_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
     return;
 
   tinyseed_screen = theme_create_page_container(parent);
-  theme_create_page_title(tinyseed_screen, "点阵板");
+  theme_create_page_title(tinyseed_screen,
+                          i18n_tr_or("input.punch_grid", "Punch grid"));
   (void)ui_create_back_button(tinyseed_screen, back_cb);
 
   lv_obj_t *list = lv_obj_create(tinyseed_screen);

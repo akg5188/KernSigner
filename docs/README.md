@@ -1,14 +1,14 @@
-# Kern Documentation
+# KernSigner Documentation
 
-This directory contains the engineering notes, delivery records, and safety gates for the current Kern validation build.
+This directory contains the user guides, engineering notes, delivery records, and safety gates for the current KernSigner validation build.
 
 The short version: the codebase contains real wallet functionality and real-device validation work, but it is still a test-funds build until the production release gate passes.
 
 ## Start Here
 
-- [小白照抄完整使用手册.zh-CN.md](小白照抄完整使用手册.zh-CN.md): complete copy-and-follow guide from flashing to first signing, smart cards, relay app, and safe exit.
+- [小白照抄完整使用手册.zh-CN.md](小白照抄完整使用手册.zh-CN.md): complete copy-and-follow guide from flashing to first signing, smart cards, direct QR scanning, and safe exit. New users should start here.
+- [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md): symptom-first troubleshooting table for flashing, PIN, QR, wallet, and smart-card issues.
 - [功能菜单逐项索引.zh-CN.md](功能菜单逐项索引.zh-CN.md): screen-by-screen menu tree and function index.
-- [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md): symptom-first troubleshooting table for flashing, PIN, QR, wallet, smart-card, and Android issues.
 - [零基础第一次上手教程.zh-CN.md](零基础第一次上手教程.zh-CN.md): step-by-step first-use path for complete beginners.
 - [USER_QUICK_START.zh-CN.md](USER_QUICK_START.zh-CN.md): first-use guide for beginners.
 - [全功能操作总手册.zh-CN.md](全功能操作总手册.zh-CN.md): practical operation map for all current user-facing flows.
@@ -21,9 +21,8 @@ The short version: the codebase contains real wallet functionality and real-devi
 - [THIRD_PARTY.md](THIRD_PARTY.md): third-party code, licenses, and attribution.
 - [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md): board details, OTG power rules, and smart-card cabling.
 - [连接钱包教程.zh-CN.md](连接钱包教程.zh-CN.md): beginner guide for connecting Web3 wallets, Bitcoin watch-only wallets, and signing QR/PSBT transactions.
-- [docs/screens/](screens/README.md): current KernSigner GitHub screenshots and acceptance artifacts. The old upstream Kern gallery has been removed; the public batch is `current_20260522_193505`.
-- [ANDROID_RELAY_WALLET_GUIDE.zh-CN.md](ANDROID_RELAY_WALLET_GUIDE.zh-CN.md): Android relay app guide for high-density Web3 QR codes.
-- Android relay APK mirror: https://github.com/akg5188/satochip-signer/releases
+- [OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md](OKX_QR_SCAN_INCIDENT_20260523.zh-CN.md): OKX circular/dot dynamic QR incident write-up covering ESP32-P4 camera focus, ZBar fallback, UR assembly, scan performance, font corruption, and flash verification.
+- [screens/](screens/README.md): current KernSigner GitHub screenshots and acceptance artifacts. The old upstream Kern gallery has been removed; the public English batch is `current_20260523_163539`.
 - [MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md](MNEMONIC_CREATION_BIP39_VERIFY.zh-CN.md): beginner guide for creating mnemonics and verifying them with the BIP39 tool.
 - [BACKUP_AND_RECOVERY_GUIDE.zh-CN.md](BACKUP_AND_RECOVERY_GUIDE.zh-CN.md): backup and recovery guide for mnemonics, entropy, QR, metal backups, KEF, and smart cards.
 - [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md): Satochip/SeedKeeper real-device guide for powered OTG, PIN, write/read, reset, and fingerprint pitfalls.
@@ -32,7 +31,6 @@ The short version: the codebase contains real wallet functionality and real-devi
 ## Build And Troubleshooting
 
 - [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md): build, flash, debug, simulator, and delivery commands.
-- [安卓构建环境准备.zh-CN.md](安卓构建环境准备.zh-CN.md): Android SDK/JDK setup and APK build guide for `wallet/`.
 - [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md): beginner-friendly stop/check/collect troubleshooting workflow.
 - [TROUBLESHOOTING_GENERAL.zh-CN.md](TROUBLESHOOTING_GENERAL.zh-CN.md): general troubleshooting for display, touch, camera, QR, wallet, build, and flash issues.
 - [DOCUMENTATION_COVERAGE.md](DOCUMENTATION_COVERAGE.md): documentation coverage map and update rules.

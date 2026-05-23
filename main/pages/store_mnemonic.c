@@ -3,6 +3,7 @@
 #include "store_mnemonic.h"
 #include "../core/key.h"
 #include "../core/storage.h"
+#include "../i18n/i18n.h"
 #include "../qr/encoder.h"
 #include "../ui/dialog.h"
 #include "../ui/theme.h"
@@ -62,15 +63,19 @@ static void do_save(void) {
   kef_encrypt_page_destroy();
 
   if (ret == ESP_OK) {
-    const char *loc_name =
-        (target_location == STORAGE_FLASH) ? "闪存" : "存储卡";
+    const char *loc_name = (target_location == STORAGE_FLASH)
+                               ? i18n_tr_or("storage.flash_storage", "Flash")
+                               : i18n_tr_or("storage.storage_card", "SD card");
     char msg[128];
-    snprintf(msg, sizeof(msg), "助记词已保存到%s，名称：%s", loc_name,
-             saved_id);
-    dialog_show_info("已保存", msg, save_success_dialog_cb, NULL,
-                     DIALOG_STYLE_OVERLAY);
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("wallet.mnemonic_saved_to_location_format",
+                        "Mnemonic saved to %s\nName: %s"),
+             loc_name, saved_id);
+    dialog_show_info(i18n_tr_or("common.success", "Saved"), msg,
+                     save_success_dialog_cb, NULL, DIALOG_STYLE_OVERLAY);
   } else {
-    dialog_show_error("保存失败", go_back, 0);
+    dialog_show_error(i18n_tr_or("dialog.save_failed", "Save failed"), go_back,
+                      0);
   }
 }
 
@@ -101,7 +106,8 @@ static void deferred_save_cb(lv_timer_t *timer) {
       progress_dialog = NULL;
     }
     dialog_show_danger_confirm(
-        "同名备份已经存在，是否覆盖？",
+        i18n_tr_or("backup.overwrite_confirm",
+                   "A backup with this name already exists. Overwrite?"),
         overwrite_confirm_cb, NULL, DIALOG_STYLE_OVERLAY);
     return;
   }
@@ -126,7 +132,10 @@ static void encrypt_success_cb(const char *id, const uint8_t *envelope,
   /* Show "Saving..." and defer the actual save so LVGL can render
      before the potentially-blocking storage call */
   progress_dialog =
-      dialog_show_progress("加密备份", "正在保存...", DIALOG_STYLE_OVERLAY);
+      dialog_show_progress(i18n_tr_or("backup.encrypted_backup",
+                                      "Encrypted backup"),
+                           i18n_tr_or("storage.saving", "Saving..."),
+                           DIALOG_STYLE_OVERLAY);
   save_timer = lv_timer_create(deferred_save_cb, 50, NULL);
   lv_timer_set_repeat_count(save_timer, 1);
 }
@@ -139,12 +148,17 @@ void store_mnemonic_page_create(lv_obj_t *parent, void (*return_cb)(void),
     return;
 
   if (location == STORAGE_FLASH) {
-    dialog_show_error("无状态模式不保存助记词到本机闪存", return_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.stateless_flash_save_disabled",
+                                 "Stateless mode does not save mnemonics to "
+                                 "local flash"),
+                      return_cb, 0);
     return;
   }
 
   if (!key_mnemonic_is_valid()) {
-    dialog_show_error("临时助记词不能加密备份", return_cb, 0);
+    dialog_show_error(i18n_tr_or("backup.no_temporary_export",
+                                 "Temporary mnemonics cannot be backed up"),
+                      return_cb, 0);
     return;
   }
 
@@ -154,7 +168,9 @@ void store_mnemonic_page_create(lv_obj_t *parent, void (*return_cb)(void),
   /* Get mnemonic and convert to compact SeedQR (binary entropy) */
   char *mnemonic = NULL;
   if (!key_get_mnemonic(&mnemonic) || !mnemonic) {
-    dialog_show_error("读取助记词失败", return_cb, 0);
+    dialog_show_error(i18n_tr_or("wallet.read_mnemonic_failed",
+                                 "Read mnemonic failed"),
+                      return_cb, 0);
     return;
   }
 
@@ -164,12 +180,14 @@ void store_mnemonic_page_create(lv_obj_t *parent, void (*return_cb)(void),
   SECURE_FREE_STRING(mnemonic);
 
   if (!compact_seedqr_data) {
-    dialog_show_error("准备数据失败", return_cb, 0);
+    dialog_show_error(i18n_tr_or("backup.prepare_data_failed",
+                                 "Preparing data failed"),
+                      return_cb, 0);
     return;
   }
 
   /* Create background screen */
-  const char *title = "保存到存储卡";
+  const char *title = i18n_tr_or("storage.save_to_sd", "Save to SD");
   main_screen = theme_create_page_container(parent);
   lv_obj_t *title_label = lv_label_create(main_screen);
   lv_label_set_text(title_label, title);

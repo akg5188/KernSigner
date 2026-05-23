@@ -4,6 +4,8 @@
 #include "../../core/pin.h"
 #include "../../core/session.h"
 #include "../../core/settings.h"
+#include "../../i18n/i18n.h"
+#include "../../ui/dialog.h"
 #include "../../ui/input_helpers.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
@@ -11,6 +13,7 @@
 #include "../pin/pin_settings.h"
 #include <bsp/display.h>
 #include <lvgl.h>
+#include <stdint.h>
 
 // -- Top-level settings menu --
 static ui_menu_t *settings_menu = NULL;
@@ -27,11 +30,17 @@ static lv_obj_t *brightness_screen = NULL;
 static lv_obj_t *brightness_slider = NULL;
 static lv_obj_t *brightness_label = NULL;
 
+// -- Language detail page --
+static lv_obj_t *language_screen = NULL;
+
 // Forward declarations
 static void show_detail_page(void);
 static void destroy_detail_page(void);
 static void show_brightness_page(void);
 static void destroy_brightness_page(void);
+static void show_language_page(void);
+static void destroy_language_page(void);
+static void rebuild_menu(void);
 
 // ── Default Wallet detail page ──
 
@@ -61,15 +70,22 @@ static void show_detail_page(void) {
   detail_screen = theme_create_page_container(lv_screen_active());
 
   ui_create_back_button(detail_screen, detail_back_cb);
-  theme_create_page_title(detail_screen, "钱包默认项");
+  theme_create_page_title(
+      detail_screen, i18n_tr_or("settings.default_wallet", "Default wallet"));
 
   int32_t dd_width = LV_HOR_RES * 35 / 100;
 
   // Network label + dropdown
-  lv_obj_t *net_label = theme_create_label(detail_screen, "网络", true);
+  lv_obj_t *net_label =
+      theme_create_label(detail_screen, i18n_tr_or("settings.network", "Network"),
+                         true);
   lv_obj_align(net_label, LV_ALIGN_CENTER, -(LV_HOR_RES / 4), -30);
 
-  network_dropdown = theme_create_dropdown(detail_screen, "主网\n测试网");
+  char network_options[64];
+  snprintf(network_options, sizeof(network_options), "%s\n%s",
+           i18n_tr_or("settings.mainnet", "Mainnet"),
+           i18n_tr_or("settings.testnet", "Testnet"));
+  network_dropdown = theme_create_dropdown(detail_screen, network_options);
   wallet_network_t cur_net = settings_get_default_network();
   lv_dropdown_set_selected(network_dropdown,
                            (cur_net == WALLET_NETWORK_MAINNET) ? 0 : 1);
@@ -79,11 +95,16 @@ static void show_detail_page(void) {
   lv_obj_align_to(network_dropdown, net_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 
   // Policy label + dropdown
-  lv_obj_t *pol_label = theme_create_label(detail_screen, "策略", true);
+  lv_obj_t *pol_label =
+      theme_create_label(detail_screen, i18n_tr_or("settings.policy", "Policy"),
+                         true);
   lv_obj_align(pol_label, LV_ALIGN_CENTER, LV_HOR_RES / 4, -30);
 
-  policy_dropdown =
-      theme_create_dropdown(detail_screen, "单签\n多签");
+  char policy_options[64];
+  snprintf(policy_options, sizeof(policy_options), "%s\n%s",
+           i18n_tr_or("settings.single_sig", "Single-sig"),
+           i18n_tr_or("settings.multi_sig", "Multi-sig"));
+  policy_dropdown = theme_create_dropdown(detail_screen, policy_options);
   wallet_policy_t cur_pol = settings_get_default_policy();
   lv_dropdown_set_selected(policy_dropdown,
                            (cur_pol == WALLET_POLICY_SINGLESIG) ? 0 : 1);
@@ -125,7 +146,9 @@ static void show_brightness_page(void) {
   brightness_screen = theme_create_page_container(lv_screen_active());
 
   ui_create_back_button(brightness_screen, brightness_back_cb);
-  theme_create_page_title(brightness_screen, "屏幕亮度");
+  theme_create_page_title(
+      brightness_screen,
+      i18n_tr_or("settings.screen_brightness", "Screen brightness"));
 
   // Percentage label
   uint8_t cur = settings_get_brightness();
@@ -163,9 +186,83 @@ static void destroy_brightness_page(void) {
   brightness_label = NULL;
 }
 
-// ── PIN setup/settings ──
+// ── Language detail page ──
 
-static void rebuild_menu(void);
+static void language_select_cb(lv_event_t *e) {
+  i18n_language_t language =
+      (i18n_language_t)(uintptr_t)lv_event_get_user_data(e);
+  if (!i18n_language_valid(language))
+    language = I18N_LANG_EN;
+
+  esp_err_t err = settings_set_language(language);
+  if (err != ESP_OK) {
+    dialog_show_error(i18n_tr_or("dialog.save_failed", "Save failed"), NULL,
+                      1600);
+    return;
+  }
+
+  i18n_set_language(language);
+  destroy_language_page();
+  rebuild_menu();
+  show_language_page();
+}
+
+static void language_back_cb(lv_event_t *e) {
+  (void)e;
+  destroy_language_page();
+  rebuild_menu();
+  ui_menu_show(settings_menu);
+}
+
+static void show_language_page(void) {
+  ui_menu_hide(settings_menu);
+
+  language_screen = theme_create_page_container(lv_screen_active());
+  lv_obj_add_flag(language_screen, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scroll_dir(language_screen, LV_DIR_VER);
+  lv_obj_set_style_pad_top(language_screen, theme_get_default_padding(), 0);
+  lv_obj_set_style_pad_bottom(language_screen, theme_get_default_padding(), 0);
+
+  ui_create_back_button(language_screen, language_back_cb);
+  theme_create_page_title(language_screen,
+                          i18n_tr_or("settings.language", "Language"));
+
+  lv_obj_t *panel = theme_create_flex_column(language_screen);
+  lv_obj_set_width(panel, LV_PCT(92));
+  lv_obj_set_height(panel, LV_SIZE_CONTENT);
+  lv_obj_set_style_pad_all(panel, theme_get_default_padding(), 0);
+  lv_obj_set_style_pad_gap(panel, theme_get_small_padding(), 0);
+  lv_obj_align(panel, LV_ALIGN_TOP_MID, 0, 72);
+
+  const i18n_language_info_t *current = i18n_language_info(i18n_get_language());
+  char status[128];
+  snprintf(status, sizeof(status), "%s: %s (%s)",
+           i18n_tr_or("settings.current_language", "Current Language"),
+           current->english_name, current->code);
+  theme_create_label(panel, status, false);
+
+  for (size_t i = 0; i < i18n_language_count(); i++) {
+    const i18n_language_info_t *info = i18n_language_info((i18n_language_t)i);
+    char label[128];
+    snprintf(label, sizeof(label), "%s%s (%s)",
+             info->id == i18n_get_language() ? "> " : "", info->native_name,
+             info->code);
+    lv_obj_t *btn = theme_create_button(panel, label,
+                                        info->id == i18n_get_language());
+    lv_obj_set_width(btn, LV_PCT(100));
+    lv_obj_add_event_cb(btn, language_select_cb, LV_EVENT_CLICKED,
+                        (void *)(uintptr_t)info->id);
+  }
+}
+
+static void destroy_language_page(void) {
+  if (language_screen) {
+    lv_obj_del(language_screen);
+    language_screen = NULL;
+  }
+}
+
+// ── PIN setup/settings ──
 
 static void pin_setup_complete(void) {
   pin_page_destroy();
@@ -212,6 +309,7 @@ static void pin_settings_cb(void) {
 
 static void default_wallet_cb(void) { show_detail_page(); }
 static void brightness_cb(void) { show_brightness_page(); }
+static void language_cb(void) { show_language_page(); }
 
 static void settings_back_cb(void) {
   if (return_callback)
@@ -223,14 +321,25 @@ static void rebuild_menu(void) {
     ui_menu_destroy(settings_menu);
     settings_menu = NULL;
   }
-  settings_menu = ui_menu_create(settings_screen, "设置", settings_back_cb);
+  settings_menu =
+      ui_menu_create(settings_screen, i18n_tr_or("menu.settings", "Settings"),
+                     settings_back_cb);
   if (pin_is_configured()) {
-    ui_menu_add_entry(settings_menu, "PIN 设置", pin_settings_cb);
+    ui_menu_add_entry(settings_menu, i18n_tr_or("pin.settings", "PIN Settings"),
+                      pin_settings_cb);
   } else {
-    ui_menu_add_entry(settings_menu, "设置 PIN", setup_pin_cb);
+    ui_menu_add_entry(settings_menu, i18n_tr_or("pin.set", "Set PIN"),
+                      setup_pin_cb);
   }
-  ui_menu_add_entry(settings_menu, "钱包默认项", default_wallet_cb);
-  ui_menu_add_entry(settings_menu, "屏幕亮度", brightness_cb);
+  ui_menu_add_entry(settings_menu,
+                    i18n_tr_or("settings.default_wallet", "Default wallet"),
+                    default_wallet_cb);
+  ui_menu_add_entry(settings_menu, i18n_tr_or("settings.language", "Language"),
+                    language_cb);
+  ui_menu_add_entry(settings_menu,
+                    i18n_tr_or("settings.screen_brightness",
+                               "Screen brightness"),
+                    brightness_cb);
 }
 
 // ── Public lifecycle ──
@@ -255,6 +364,7 @@ void login_settings_page_destroy(void) {
   pin_settings_page_destroy();
   destroy_detail_page();
   destroy_brightness_page();
+  destroy_language_page();
   if (settings_menu) {
     ui_menu_destroy(settings_menu);
     settings_menu = NULL;

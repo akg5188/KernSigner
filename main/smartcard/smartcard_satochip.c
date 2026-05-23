@@ -10,6 +10,7 @@
 #include "core/crypto_utils.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "i18n/i18n.h"
 #include "mbedtls/base64.h"
 #include "mbedtls/aes.h"
 #include "mbedtls/ecp.h"
@@ -173,7 +174,52 @@ typedef struct {
   uint16_t sw;
 } satochip_session_t;
 
-static const char *yes_no_cn(bool value) { return value ? "是" : "否"; }
+static const char *yes_no_text(bool value) {
+  return value ? i18n_tr_or("common.yes", "Yes")
+               : i18n_tr_or("common.no", "No");
+}
+
+static const char *sc_fmt_not_selected(void) {
+  return i18n_tr_or("smartcard.ccid.applet.not_detected", "Not selected");
+}
+
+static const char *sc_fmt_detected(void) {
+  return i18n_tr_or("smartcard.ccid.reader.detected", "Detected");
+}
+
+static const char *sc_fmt_empty(void) {
+  return i18n_tr_or("dialog.empty_value", "(empty)");
+}
+
+static const char *sc_fmt_no_status(void) {
+  return i18n_tr_or("dialog.empty_value", "No status.");
+}
+
+static const char *sc_fmt_no_label(void) {
+  return i18n_tr_or("dialog.empty_value", "No label.");
+}
+
+static const char *sc_fmt_detail(const char *detail) {
+  if (!detail || !detail[0])
+    return "";
+  if (strcmp(detail, "Satochip detected; the card is not initialized.") == 0)
+    return i18n_tr_or("smartcard.ccid.card_not_initialized", detail);
+  if (strcmp(detail, "Satochip status fields are incomplete.") == 0 ||
+      strcmp(detail, "SeedKeeper status response is too short.") == 0)
+    return i18n_tr_or("dialog.invalid_format", detail);
+  if (strcmp(detail, "Satochip status read successfully.") == 0 ||
+      strcmp(detail, "SeedKeeper status read successfully.") == 0)
+    return i18n_tr_or("smartcard.ccid.status_read_passed", detail);
+  if (strcmp(detail, "Label read successfully.") == 0)
+    return i18n_tr_or("dialog.success", detail);
+  if (strcmp(detail, "This card does not support labels.") == 0)
+    return i18n_tr_or("dialog.not_supported", detail);
+  if (strcmp(detail, "SeedKeeper is not initialized.") == 0)
+    return i18n_tr_or("sign.card_not_initialized", detail);
+  if (strcmp(detail, "SeedKeeper requires a PIN.") == 0)
+    return i18n_tr_or("dialog.pin_required", detail);
+  return detail;
+}
 
 static uint64_t rotl64(uint64_t x, unsigned s) {
   return (x << s) | (x >> (64U - s));
@@ -1330,7 +1376,7 @@ static esp_err_t satochip_verify_der_signature_against_compressed_pubkey(
                                                                : ESP_FAIL;
   if (err != ESP_OK) {
     if (error && error_len > 0)
-      snprintf(error, error_len, "消息摘要计算失败。");
+      snprintf(error, error_len, "Message digest calculation failed.");
     return err;
   }
 
@@ -1338,7 +1384,7 @@ static esp_err_t satochip_verify_der_signature_against_compressed_pubkey(
   err = satochip_parse_der_signature_compact(der_sig, der_sig_len, compact);
   if (err != ESP_OK) {
     if (error && error_len > 0)
-      snprintf(error, error_len, "DER 签名解析失败。");
+      snprintf(error, error_len, "DER signature parsing failed.");
     secure_zero(digest, sizeof(digest));
     secure_zero(compact, sizeof(compact));
     return err;
@@ -1350,7 +1396,7 @@ static esp_err_t satochip_verify_der_signature_against_compressed_pubkey(
   secure_zero(digest, sizeof(digest));
   secure_zero(compact, sizeof(compact));
   if (err != ESP_OK && error && error_len > 0)
-    snprintf(error, error_len, "签名校验失败。");
+    snprintf(error, error_len, "Signature verification failed.");
   return err;
 }
 
@@ -1825,7 +1871,7 @@ static esp_err_t ensure_reader_ready(uint32_t timeout_ms,
   esp_err_t probe_err =
       smartcard_ccid_probe(timeout_ms ? timeout_ms : SATOCHIP_DEFAULT_TIMEOUT_MS);
   if (probe_err != ESP_OK && detail && detail_len > 0) {
-    snprintf(detail, detail_len, "读卡器或卡片还没准备好：%s。",
+    snprintf(detail, detail_len, "Reader or card is not ready: %s.",
              esp_err_to_name(probe_err));
   }
   return probe_err;
@@ -1860,13 +1906,13 @@ static esp_err_t satochip_session_open(satochip_session_t *session,
   satochip_log_response("SELECT", err, sw, payload_len);
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "SELECT Satochip 发送失败：%s。",
+      snprintf(detail, detail_len, "SELECT Satochip send failed: %s.",
                esp_err_to_name(err));
     return err;
   }
   if (sw != 0x9000) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "没有选中 Satochip Applet，SW=%04X。", sw);
+      snprintf(detail, detail_len, "Satochip applet was not selected, SW=%04X.", sw);
     return ESP_ERR_NOT_FOUND;
   }
 
@@ -1877,35 +1923,35 @@ static esp_err_t satochip_session_open(satochip_session_t *session,
   satochip_log_response("GET_STATUS", err, sw, payload_len);
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "GET_STATUS 发送失败：%s。",
+      snprintf(detail, detail_len, "GET_STATUS send failed: %s.",
                esp_err_to_name(err));
     return err;
   }
   if (sw == 0x9C04) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "Satochip 尚未 setup，拒绝写卡初始化。");
+      snprintf(detail, detail_len, "Satochip is not set up; card write initialization is refused.");
     return ESP_ERR_INVALID_STATE;
   }
   if (sw != 0x9000) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "GET_STATUS 返回 SW=%04X。", sw);
+      snprintf(detail, detail_len, "GET_STATUS returned SW=%04X.", sw);
     return ESP_ERR_INVALID_RESPONSE;
   }
 
   parse_status_payload(&session->status, response, payload_len);
   if (!session->status.status_valid) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "Satochip 状态字段不足。");
+      snprintf(detail, detail_len, "Satochip status fields are incomplete.");
     return ESP_ERR_INVALID_RESPONSE;
   }
   if (!session->status.setup_done) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "Satochip 尚未 setup，拒绝写卡初始化。");
+      snprintf(detail, detail_len, "Satochip is not set up; card write initialization is refused.");
     return ESP_ERR_INVALID_STATE;
   }
   if (!session->status.is_seeded) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "Satochip 未导入种子，拒绝 import seed。");
+      snprintf(detail, detail_len, "Satochip has no seed; import seed is refused.");
     return ESP_ERR_INVALID_STATE;
   }
   if (session->status.needs_secure_channel) {
@@ -1916,14 +1962,14 @@ static esp_err_t satochip_session_open(satochip_session_t *session,
     satochip_log_response("INIT_SECURE_CHANNEL", err, sw, payload_len);
     if (err != ESP_OK) {
       if (detail && detail_len)
-        snprintf(detail, detail_len, "安全通道初始化失败：%s SW=%04X。",
+        snprintf(detail, detail_len, "Secure channel initialization failed: %s SW=%04X.",
                  esp_err_to_name(err), sw);
       return err;
     }
   }
 
   if (detail && detail_len)
-    snprintf(detail, detail_len, "Satochip 会话已建立。");
+    snprintf(detail, detail_len, "Satochip session established.");
   return ESP_OK;
 }
 
@@ -1949,13 +1995,13 @@ static esp_err_t satochip_seed_import_session_open(satochip_session_t *session,
   satochip_log_response("SELECT", err, sw, payload_len);
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "SELECT Satochip 失败：%s。",
+      snprintf(detail, detail_len, "SELECT Satochip failed: %s.",
                esp_err_to_name(err));
     return err;
   }
   if (sw != 0x9000) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "未选中 Satochip，SW=%04X。", sw);
+      snprintf(detail, detail_len, "Satochip was not selected, SW=%04X.", sw);
     return ESP_ERR_NOT_FOUND;
   }
 
@@ -1966,29 +2012,29 @@ static esp_err_t satochip_seed_import_session_open(satochip_session_t *session,
   satochip_log_response("GET_STATUS", err, sw, payload_len);
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "读取状态失败：%s。", esp_err_to_name(err));
+      snprintf(detail, detail_len, "Status read failed: %s.", esp_err_to_name(err));
     return err;
   }
   if (sw == 0x9C04) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "Satochip 未初始化，请先 setup。");
+      snprintf(detail, detail_len, "Satochip is not initialized. Run setup first.");
     return ESP_ERR_INVALID_STATE;
   }
   if (sw != 0x9000) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "状态返回 SW=%04X。", sw);
+      snprintf(detail, detail_len, "Status returned SW=%04X.", sw);
     return ESP_ERR_INVALID_RESPONSE;
   }
 
   parse_status_payload(&session->status, response, payload_len);
   if (!session->status.status_valid) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "Satochip 状态字段不足。");
+      snprintf(detail, detail_len, "Satochip status fields are incomplete.");
     return ESP_ERR_INVALID_RESPONSE;
   }
   if (!session->status.setup_done) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "Satochip 未初始化，请先 setup。");
+      snprintf(detail, detail_len, "Satochip is not initialized. Run setup first.");
     return ESP_ERR_INVALID_STATE;
   }
 
@@ -2000,14 +2046,14 @@ static esp_err_t satochip_seed_import_session_open(satochip_session_t *session,
     satochip_log_response("INIT_SECURE_CHANNEL", err, sw, payload_len);
     if (err != ESP_OK) {
       if (detail && detail_len)
-        snprintf(detail, detail_len, "安全通道失败：%s SW=%04X。",
+        snprintf(detail, detail_len, "Secure channel failed: %s SW=%04X.",
                  esp_err_to_name(err), sw);
       return err;
     }
   }
 
   if (detail && detail_len)
-    snprintf(detail, detail_len, "Satochip 写入会话已建立。");
+    snprintf(detail, detail_len, "Satochip write session established.");
   return ESP_OK;
 }
 
@@ -2032,18 +2078,18 @@ static esp_err_t satochip_session_load_authentikey(satochip_session_t *session,
   satochip_log_response("GET_AUTHENTIKEY", err, sw, payload_len);
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "BIP32_GET_AUTHENTIKEY 发送失败：%s。",
+      snprintf(detail, detail_len, "BIP32_GET_AUTHENTIKEY send failed: %s.",
                esp_err_to_name(err));
     return err;
   }
   if (sw == 0x9C06) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "卡片要求先验证 PIN，SW=%04X。", sw);
+      snprintf(detail, detail_len, "Card requires PIN verification first, SW=%04X.", sw);
     return ESP_ERR_INVALID_STATE;
   }
   if (sw != 0x9000) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "BIP32_GET_AUTHENTIKEY 返回 SW=%04X。", sw);
+      snprintf(detail, detail_len, "BIP32_GET_AUTHENTIKEY returned SW=%04X.", sw);
     return ESP_ERR_INVALID_RESPONSE;
   }
 
@@ -2052,7 +2098,7 @@ static esp_err_t satochip_session_load_authentikey(satochip_session_t *session,
                                             session->authentikey_coordx);
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "BIP32_GET_AUTHENTIKEY 响应签名恢复失败。");
+      snprintf(detail, detail_len, "BIP32_GET_AUTHENTIKEY response signature recovery failed.");
     return err;
   }
   session->has_authentikey = true;
@@ -2087,7 +2133,7 @@ static esp_err_t satochip_session_verify_pin(satochip_session_t *session,
   size_t pin_len = strlen(pin);
   if (pin_len == 0 || pin_len > 64) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "PIN 长度无效。");
+      snprintf(detail, detail_len, "Invalid PIN length.");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -2120,28 +2166,28 @@ static esp_err_t satochip_session_verify_pin(satochip_session_t *session,
   satochip_log_response("VERIFY_PIN", err, sw, payload_len);
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "VERIFY_PIN 发送失败：%s。",
+      snprintf(detail, detail_len, "VERIFY_PIN send failed: %s.",
                esp_err_to_name(err));
     return err;
   }
   if (sw == 0x9C0C) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "PIN 已锁定，SW=%04X。", sw);
+      snprintf(detail, detail_len, "PIN is locked, SW=%04X.", sw);
     return ESP_ERR_INVALID_STATE;
   }
   if ((sw & 0xFFC0U) == 0x63C0U) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "PIN 错误，剩余 %u 次，SW=%04X。",
+      snprintf(detail, detail_len, "Wrong PIN, %u attempts remaining, SW=%04X.",
                (unsigned)(sw & 0x000FU), sw);
     return ESP_ERR_INVALID_STATE;
   }
   if (sw != 0x9000) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "VERIFY_PIN 返回 SW=%04X。", sw);
+      snprintf(detail, detail_len, "VERIFY_PIN returned SW=%04X.", sw);
     return ESP_ERR_INVALID_RESPONSE;
   }
   if (detail && detail_len)
-    snprintf(detail, detail_len, "PIN 验证成功。");
+    snprintf(detail, detail_len, "PIN verified.");
   session->pin_verified = true;
   return ESP_OK;
 }
@@ -2178,7 +2224,7 @@ static esp_err_t seedkeeper_select_and_verify(const char *pin, bool verify_pin,
     if (!pin || pin[0] == '\0') {
       secure_zero(&session, sizeof(session));
       if (detail && detail_len)
-        snprintf(detail, detail_len, "请输入 SeedKeeper PIN。");
+        snprintf(detail, detail_len, "Enter the SeedKeeper PIN.");
       return ESP_ERR_INVALID_ARG;
     }
     err = satochip_session_verify_pin(&session, pin, timeout_ms, detail,
@@ -2195,7 +2241,7 @@ static esp_err_t seedkeeper_select_and_verify(const char *pin, bool verify_pin,
   }
 
   if (detail && detail_len)
-    snprintf(detail, detail_len, "SeedKeeper 会话已建立。");
+    snprintf(detail, detail_len, "SeedKeeper session established.");
   secure_zero(&session, sizeof(session));
   return ESP_OK;
 }
@@ -2233,7 +2279,7 @@ static esp_err_t seedkeeper_transmit_checked_compat(
   }
 
   if (err != ESP_OK && detail && detail_len) {
-    snprintf(detail, detail_len, "%s 发送失败：%s。",
+    snprintf(detail, detail_len, "%s send failed: %s.",
              stage ? stage : "SeedKeeper", esp_err_to_name(err));
   }
   return err;
@@ -2258,13 +2304,13 @@ static esp_err_t seedkeeper_session_open(satochip_session_t *session,
   session->sw = sw;
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "选择 SeedKeeper 失败：%s。",
+      snprintf(detail, detail_len, "Selecting SeedKeeper failed: %s.",
                esp_err_to_name(err));
     return err;
   }
   if (!selected) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "未选中 SeedKeeper，SW=%04X。", sw);
+      snprintf(detail, detail_len, "SeedKeeper was not selected, SW=%04X.", sw);
     return ESP_ERR_NOT_FOUND;
   }
 
@@ -2289,26 +2335,26 @@ static esp_err_t seedkeeper_session_open(satochip_session_t *session,
   session->sw = sw;
   if (err != ESP_OK) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "SeedKeeper 状态读取失败：%s。",
+      snprintf(detail, detail_len, "SeedKeeper status read failed: %s.",
                esp_err_to_name(err));
     return err;
   }
   if (sw == 0x9C04) {
     session->status.setup_done = false;
     if (detail && detail_len)
-      snprintf(detail, detail_len, "SeedKeeper 尚未初始化。");
+      snprintf(detail, detail_len, "SeedKeeper is not initialized.");
     return ESP_OK;
   }
   if (sw == 0x9C06) {
     session->status.setup_done = true;
     session->status.status_valid = false;
     if (detail && detail_len)
-      snprintf(detail, detail_len, "SeedKeeper 需要 PIN。");
+      snprintf(detail, detail_len, "SeedKeeper requires a PIN.");
     return ESP_OK;
   }
   if (sw != 0x9000) {
     if (detail && detail_len)
-      snprintf(detail, detail_len, "SeedKeeper 状态返回 SW=%04X。", sw);
+      snprintf(detail, detail_len, "SeedKeeper status returned SW=%04X.", sw);
     return ESP_ERR_INVALID_RESPONSE;
   }
 
@@ -2317,7 +2363,7 @@ static esp_err_t seedkeeper_session_open(satochip_session_t *session,
   session->status.needs_secure_channel = session->sc.active;
 
   if (detail && detail_len)
-    snprintf(detail, detail_len, "SeedKeeper 会话已建立。");
+    snprintf(detail, detail_len, "SeedKeeper session established.");
   return ESP_OK;
 }
 
@@ -2337,7 +2383,7 @@ static esp_err_t seedkeeper_transmit_card(
                                         timeout_ms);
     if (err != ESP_OK) {
       if (detail && detail_len)
-        snprintf(detail, detail_len, "%s 安全通道失败：%s SW=%04X。",
+        snprintf(detail, detail_len, "%s secure channel failed: %s SW=%04X.",
                  stage ? stage : "SeedKeeper", esp_err_to_name(err), *sw);
       return err;
     }
@@ -2382,13 +2428,13 @@ static esp_err_t seedkeeper_execute_apdu(
       satochip_apdu_result_fill(out, response, payload_len, sw, ESP_OK,
                                 detail);
     } else {
-      snprintf(detail, sizeof(detail), "%s 发送失败：%s。",
+      snprintf(detail, sizeof(detail), "%s send failed: %s.",
                stage ? stage : "SeedKeeper", esp_err_to_name(err));
       satochip_apdu_result_fill(out, NULL, 0, sw, err, detail);
     }
   } else {
     char final_detail[256];
-    snprintf(final_detail, sizeof(final_detail), "%s 会话失败：%s。%s%s",
+    snprintf(final_detail, sizeof(final_detail), "%s session failed: %s.%s%s",
              stage ? stage : "SeedKeeper", esp_err_to_name(err),
              detail[0] ? "\n" : "", detail);
     satochip_apdu_result_fill(out, NULL, 0, 0, err, final_detail);
@@ -2443,12 +2489,12 @@ static esp_err_t satochip_execute_apdu(const char *pin, bool verify_pin,
     if (err == ESP_OK) {
       satochip_apdu_result_fill(out, response, payload_len, sw, ESP_OK, detail);
     } else {
-      snprintf(detail, sizeof(detail), "%s 发送失败：%s。",
+      snprintf(detail, sizeof(detail), "%s send failed: %s.",
                stage ? stage : "APDU", esp_err_to_name(err));
       satochip_apdu_result_fill(out, NULL, 0, sw, err, detail);
     }
   } else {
-    snprintf(detail, sizeof(detail), "%s 会话失败：%s。",
+    snprintf(detail, sizeof(detail), "%s session failed: %s.",
              stage ? stage : "APDU", esp_err_to_name(err));
     satochip_apdu_result_fill(out, NULL, 0, 0, err, detail);
   }
@@ -2462,9 +2508,9 @@ static void satochip_fill_simple_detail(char *dst, size_t dst_len,
   if (!dst || dst_len == 0)
     return;
   if (prefix && prefix[0])
-    snprintf(dst, dst_len, "%s SW=%04X。", prefix, sw);
+    snprintf(dst, dst_len, "%s SW=%04X.", prefix, sw);
   else
-    snprintf(dst, dst_len, "SW=%04X。", sw);
+    snprintf(dst, dst_len, "SW=%04X.", sw);
 }
 
 static bool satochip_pubkey_fingerprint(const uint8_t pubkey[33],
@@ -2713,7 +2759,7 @@ static esp_err_t satochip_session_read_key(satochip_session_t *session,
   if (err != ESP_OK) {
     out->err = err;
     snprintf(out->detail, sizeof(out->detail),
-             "BIP32 路径无效或过长：%s。", path);
+             "BIP32 path is invalid or too long: %s.", path);
     return err;
   }
 
@@ -2748,13 +2794,13 @@ static esp_err_t satochip_session_read_key(satochip_session_t *session,
   if (err != ESP_OK) {
     out->err = err;
     snprintf(out->detail, sizeof(out->detail),
-             "BIP32_GET_EXTENDED_KEY 发送失败：%s。", esp_err_to_name(err));
+             "BIP32_GET_EXTENDED_KEY send failed: %s.", esp_err_to_name(err));
     return err;
   }
   if (sw != 0x9000) {
     out->err = ESP_ERR_INVALID_RESPONSE;
     snprintf(out->detail, sizeof(out->detail),
-             "BIP32_GET_EXTENDED_KEY 返回 SW=%04X。", sw);
+             "BIP32_GET_EXTENDED_KEY returned SW=%04X.", sw);
     return out->err;
   }
 
@@ -2766,7 +2812,7 @@ static esp_err_t satochip_session_read_key(satochip_session_t *session,
     satochip_log_parse_error("GET_EXTENDED_KEY", err, payload_len);
     out->err = err;
     snprintf(out->detail, sizeof(out->detail),
-             "extended key 响应解析失败：coordx/DER 签名无法恢复或校验。");
+             "Extended key response parsing failed: coordx/DER signature cannot be recovered or verified.");
     secure_zero(&ext, sizeof(ext));
     return err;
   }
@@ -2782,7 +2828,7 @@ static esp_err_t satochip_session_read_key(satochip_session_t *session,
                                      sizeof(out->uncompressed_pubkey)) !=
       WALLY_OK) {
     out->err = ESP_ERR_INVALID_RESPONSE;
-    snprintf(out->detail, sizeof(out->detail), "公钥解压失败。");
+    snprintf(out->detail, sizeof(out->detail), "Public key decompression failed.");
     secure_zero(&ext, sizeof(ext));
     return out->err;
   }
@@ -2791,13 +2837,13 @@ static esp_err_t satochip_session_read_key(satochip_session_t *session,
   err = evm_address_from_uncompressed(out->uncompressed_pubkey, out->address);
   if (err != ESP_OK) {
     out->err = err;
-    snprintf(out->detail, sizeof(out->detail), "EVM 地址计算失败。");
+    snprintf(out->detail, sizeof(out->detail), "EVM address calculation failed.");
     secure_zero(&ext, sizeof(ext));
     return err;
   }
   out->has_address = true;
   out->err = ESP_OK;
-  snprintf(out->detail, sizeof(out->detail), "Satochip key 读取成功：%s。",
+  snprintf(out->detail, sizeof(out->detail), "Satochip key read successfully: %s.",
            path);
   secure_zero(&ext, sizeof(ext));
   return ESP_OK;
@@ -2851,7 +2897,7 @@ esp_err_t smartcard_satochip_read_status(smartcard_satochip_status_t *out,
 
   memset(out, 0, sizeof(*out));
   out->transport_error = ESP_ERR_INVALID_STATE;
-  snprintf(out->detail, sizeof(out->detail), "正在连接 Satochip。");
+  snprintf(out->detail, sizeof(out->detail), "Connecting to Satochip.");
 
   smartcard_ccid_report_t ccid_report;
   smartcard_ccid_snapshot(&ccid_report);
@@ -2861,7 +2907,7 @@ esp_err_t smartcard_satochip_read_status(smartcard_satochip_status_t *out,
     if (probe_err != ESP_OK) {
       out->transport_error = probe_err;
       snprintf(out->detail, sizeof(out->detail),
-               "读卡器或卡片还没准备好：%s。", esp_err_to_name(probe_err));
+               "Reader or card is not ready: %s.", esp_err_to_name(probe_err));
       return probe_err;
     }
   }
@@ -2877,13 +2923,13 @@ esp_err_t smartcard_satochip_read_status(smartcard_satochip_status_t *out,
   out->transport_error = err;
   out->select_sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "SELECT Satochip 发送失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "SELECT Satochip send failed: %s.",
              esp_err_to_name(err));
     return err;
   }
   if (sw != 0x9000) {
     snprintf(out->detail, sizeof(out->detail),
-             "没有选中 Satochip Applet，SW=%04X。", sw);
+             "Satochip applet was not selected, SW=%04X.", sw);
     return ESP_ERR_NOT_FOUND;
   }
   out->app_selected = true;
@@ -2898,7 +2944,7 @@ esp_err_t smartcard_satochip_read_status(smartcard_satochip_status_t *out,
   out->transport_error = err;
   out->status_sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "GET STATUS 发送失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "GET STATUS send failed: %s.",
              esp_err_to_name(err));
     return err;
   }
@@ -2912,26 +2958,26 @@ esp_err_t smartcard_satochip_read_status(smartcard_satochip_status_t *out,
 
   if (sw == 0x9C04) {
     out->setup_done = false;
-    snprintf(out->detail, sizeof(out->detail), "Satochip 已识别，卡片尚未初始化。");
+    snprintf(out->detail, sizeof(out->detail), "Satochip detected; the card is not initialized.");
     return ESP_OK;
   }
   if (sw != 0x9000) {
     snprintf(out->detail, sizeof(out->detail),
-             "Satochip 状态返回非成功码，SW=%04X。", sw);
+             "Satochip status returned a non-success code, SW=%04X.", sw);
     return ESP_OK;
   }
   if (response_len < 2) {
-    snprintf(out->detail, sizeof(out->detail), "Satochip 状态响应太短。");
+    snprintf(out->detail, sizeof(out->detail), "Satochip status response is too short.");
     return ESP_ERR_INVALID_RESPONSE;
   }
 
   parse_status_payload(out, response, response_len - 2);
   if (!out->status_valid) {
-    snprintf(out->detail, sizeof(out->detail), "Satochip 状态字段不足。");
+    snprintf(out->detail, sizeof(out->detail), "Satochip status fields are incomplete.");
     return ESP_ERR_INVALID_RESPONSE;
   }
 
-  snprintf(out->detail, sizeof(out->detail), "Satochip 状态读取成功。");
+  snprintf(out->detail, sizeof(out->detail), "Satochip status read successfully.");
   return ESP_OK;
 }
 
@@ -2942,7 +2988,7 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
 
   memset(out, 0, sizeof(*out));
   out->err = ESP_ERR_INVALID_STATE;
-  snprintf(out->detail, sizeof(out->detail), "正在读取卡标签。");
+  snprintf(out->detail, sizeof(out->detail), "Reading card label.");
 
   smartcard_ccid_report_t ccid_report;
   smartcard_ccid_snapshot(&ccid_report);
@@ -2952,7 +2998,7 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
     if (probe_err != ESP_OK) {
       out->err = probe_err;
       snprintf(out->detail, sizeof(out->detail),
-               "读卡器或卡片还没准备好：%s。", esp_err_to_name(probe_err));
+               "Reader or card is not ready: %s.", esp_err_to_name(probe_err));
       return probe_err;
     }
   }
@@ -2965,7 +3011,7 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
   out->select_sw = sw;
   if (err != ESP_OK) {
     out->err = err;
-    snprintf(out->detail, sizeof(out->detail), "选择 Satochip 失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Selecting Satochip failed: %s.",
              esp_err_to_name(err));
     return err;
   }
@@ -2980,7 +3026,7 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
     if (err != ESP_OK) {
       out->err = err;
       snprintf(out->detail, sizeof(out->detail),
-               "选择 SeedKeeper 失败：%s。", esp_err_to_name(err));
+               "Selecting SeedKeeper failed: %s.", esp_err_to_name(err));
       return err;
     }
     if (selected) {
@@ -2991,7 +3037,7 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
 
   if (!out->app_selected) {
     snprintf(out->detail, sizeof(out->detail),
-             "未能选中 Satochip 或 SeedKeeper，SW=%04X。", out->select_sw);
+             "Could not select Satochip or SeedKeeper, SW=%04X.", out->select_sw);
     out->err = ESP_ERR_NOT_FOUND;
     return out->err;
   }
@@ -3019,7 +3065,7 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
   out->label_sw = label_sw;
   if (err != ESP_OK) {
     out->err = err;
-    snprintf(out->detail, sizeof(out->detail), "读取标签失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Label read failed: %s.",
              esp_err_to_name(err));
     return err;
   }
@@ -3039,7 +3085,7 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
     out->raw_label_len = payload_len < sizeof(out->raw_label) ? payload_len
                                                               : sizeof(out->raw_label);
     memcpy(out->raw_label, response, out->raw_label_len);
-    snprintf(out->detail, sizeof(out->detail), "标签读取成功。");
+    snprintf(out->detail, sizeof(out->detail), "Label read successfully.");
     out->err = ESP_OK;
     return ESP_OK;
   }
@@ -3047,12 +3093,12 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
   if (label_sw == 0x6D00) {
     snprintf(out->label, sizeof(out->label), "(none)");
     out->has_label = true;
-    snprintf(out->detail, sizeof(out->detail), "当前卡片不支持标签。");
+    snprintf(out->detail, sizeof(out->detail), "This card does not support labels.");
     out->err = ESP_OK;
     return ESP_OK;
   }
 
-  snprintf(out->detail, sizeof(out->detail), "标签读取失败，SW=%04X。",
+  snprintf(out->detail, sizeof(out->detail), "Label read failed, SW=%04X.",
            label_sw);
   out->err = ESP_OK;
   return ESP_OK;
@@ -3066,7 +3112,7 @@ esp_err_t smartcard_seedkeeper_read_status(const char *pin,
 
   memset(out, 0, sizeof(*out));
   out->err = ESP_ERR_INVALID_STATE;
-  snprintf(out->detail, sizeof(out->detail), "正在读取 SeedKeeper。");
+  snprintf(out->detail, sizeof(out->detail), "Reading SeedKeeper.");
 
   satochip_session_t session;
   char detail[192] = {0};
@@ -3094,7 +3140,7 @@ esp_err_t smartcard_seedkeeper_read_status(const char *pin,
   if (session.sw == 0x9C04) {
     out->status_sw = session.sw;
     out->err = ESP_OK;
-    snprintf(out->detail, sizeof(out->detail), "SeedKeeper 尚未初始化。");
+    snprintf(out->detail, sizeof(out->detail), "SeedKeeper is not initialized.");
     out->status_valid = false;
     secure_zero(&session, sizeof(session));
     return ESP_OK;
@@ -3102,7 +3148,7 @@ esp_err_t smartcard_seedkeeper_read_status(const char *pin,
   if (session.sw == 0x9C06 && (!pin || pin[0] == '\0')) {
     out->status_sw = session.sw;
     out->err = ESP_OK;
-    snprintf(out->detail, sizeof(out->detail), "SeedKeeper 需要 PIN。");
+    snprintf(out->detail, sizeof(out->detail), "SeedKeeper requires a PIN.");
     out->status_valid = false;
     secure_zero(&session, sizeof(session));
     return ESP_OK;
@@ -3114,7 +3160,7 @@ esp_err_t smartcard_seedkeeper_read_status(const char *pin,
   err = seedkeeper_transmit_card(
       &session, k_seedkeeper_get_status_apdu,
       sizeof(k_seedkeeper_get_status_apdu), response, sizeof(response),
-      &payload_len, &status_sw, timeout_ms, "SeedKeeper 状态", detail,
+      &payload_len, &status_sw, timeout_ms, "SeedKeeper status", detail,
       sizeof(detail));
   out->status_sw = status_sw;
   if (err != ESP_OK) {
@@ -3127,10 +3173,10 @@ esp_err_t smartcard_seedkeeper_read_status(const char *pin,
   if (status_sw != 0x9000) {
     out->err = ESP_OK;
     if (status_sw == 0x9C06)
-      snprintf(out->detail, sizeof(out->detail), "SeedKeeper 需要 PIN。");
+      snprintf(out->detail, sizeof(out->detail), "SeedKeeper requires a PIN.");
     else
       snprintf(out->detail, sizeof(out->detail),
-               "SeedKeeper 状态返回 SW=%04X。", status_sw);
+               "SeedKeeper status returned SW=%04X.", status_sw);
     secure_zero(&session, sizeof(session));
     return ESP_OK;
   }
@@ -3141,7 +3187,7 @@ esp_err_t smartcard_seedkeeper_read_status(const char *pin,
   out->raw_status_len = copy_len;
   if (payload_len < 17) {
     out->err = ESP_ERR_INVALID_RESPONSE;
-    snprintf(out->detail, sizeof(out->detail), "SeedKeeper 状态响应太短。");
+    snprintf(out->detail, sizeof(out->detail), "SeedKeeper status response is too short.");
     secure_zero(&session, sizeof(session));
     return out->err;
   }
@@ -3155,7 +3201,7 @@ esp_err_t smartcard_seedkeeper_read_status(const char *pin,
   out->last_log_len = sizeof(out->last_log);
   out->status_valid = true;
   out->err = ESP_OK;
-  snprintf(out->detail, sizeof(out->detail), "SeedKeeper 状态读取成功。");
+  snprintf(out->detail, sizeof(out->detail), "SeedKeeper status read successfully.");
   secure_zero(&session, sizeof(session));
   return ESP_OK;
 }
@@ -3169,7 +3215,7 @@ esp_err_t smartcard_satochip_get_eth_account(const char *pin, const char *path,
   memset(out, 0, sizeof(*out));
   out->err = ESP_ERR_INVALID_STATE;
   snprintf(out->path, sizeof(out->path), "%s", path);
-  snprintf(out->detail, sizeof(out->detail), "正在读取 Satochip ETH 账户。");
+  snprintf(out->detail, sizeof(out->detail), "Reading Satochip ETH account.");
 
   satochip_session_t session;
   esp_err_t err =
@@ -3215,7 +3261,7 @@ esp_err_t smartcard_satochip_get_web3_account(
 
   memset(out, 0, sizeof(*out));
   out->err = ESP_ERR_INVALID_STATE;
-  snprintf(out->detail, sizeof(out->detail), "正在读取 Satochip Web3 账户。");
+  snprintf(out->detail, sizeof(out->detail), "Reading Satochip Web3 account.");
 
   satochip_session_t session;
   esp_err_t err =
@@ -3233,14 +3279,14 @@ esp_err_t smartcard_satochip_get_web3_account(
   err = satochip_session_read_key(&session, "m/44'/60'/0'/0/0",
                                   &out->address_key, timeout_ms);
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "地址路径读取失败：%s",
+    snprintf(out->detail, sizeof(out->detail), "Address path read failed: %s",
              out->address_key.detail);
     goto out;
   }
   err = satochip_session_read_key(&session, "m/44'/60'/0'",
                                   &out->account_key, timeout_ms);
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "账户路径读取失败：%s",
+    snprintf(out->detail, sizeof(out->detail), "Account path read failed: %s",
              out->account_key.detail);
     goto out;
   }
@@ -3284,7 +3330,7 @@ esp_err_t smartcard_satochip_get_web3_account(
 
   out->err = ESP_OK;
   snprintf(out->detail, sizeof(out->detail),
-           "Satochip Web3 账户读取成功：EVM %s，OKX %u，BTC %u。",
+           "Satochip Web3 account read successfully: EVM %s, OKX %u, BTC %u.",
            out->address_key.address, (unsigned)out->ledger_live_count,
            (unsigned)out->btc_count);
 
@@ -3339,7 +3385,7 @@ esp_err_t smartcard_satochip_get_btc_xpub(
   out->err = ESP_ERR_INVALID_STATE;
   snprintf(out->path, sizeof(out->path), "%s", path);
   snprintf(out->xtype, sizeof(out->xtype), "%s", xtype ? xtype : "xpub");
-  snprintf(out->detail, sizeof(out->detail), "正在读取 Satochip BTC 公钥。");
+  snprintf(out->detail, sizeof(out->detail), "Reading Satochip BTC public key.");
 
   uint32_t indices[SATOCHIP_MAX_PATH_COMPONENTS];
   size_t depth = 0;
@@ -3348,7 +3394,7 @@ esp_err_t smartcard_satochip_get_btc_xpub(
                                sizeof(indices) / sizeof(indices[0]), &depth);
   if (err != ESP_OK || depth == 0) {
     out->err = err == ESP_OK ? ESP_ERR_INVALID_ARG : err;
-    snprintf(out->detail, sizeof(out->detail), "BTC 账户路径无效：%s。", path);
+    snprintf(out->detail, sizeof(out->detail), "Invalid BTC account path: %s.", path);
     return out->err;
   }
 
@@ -3374,7 +3420,7 @@ esp_err_t smartcard_satochip_get_btc_xpub(
 
   err = satochip_session_read_key(&session, path, &account, timeout_ms);
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "读取账户公钥失败：%s",
+    snprintf(out->detail, sizeof(out->detail), "Account public key read failed: %s",
              account.detail);
     goto done;
   }
@@ -3383,7 +3429,7 @@ esp_err_t smartcard_satochip_get_btc_xpub(
   char parent_path[96];
   if (!satochip_parent_path(path, parent_path, sizeof(parent_path))) {
     err = ESP_ERR_INVALID_ARG;
-    snprintf(out->detail, sizeof(out->detail), "父路径解析失败。");
+    snprintf(out->detail, sizeof(out->detail), "Parent path parsing failed.");
     goto done;
   }
   err = satochip_session_read_key(&session, parent_path, &parent, timeout_ms);
@@ -3391,7 +3437,7 @@ esp_err_t smartcard_satochip_get_btc_xpub(
       wally_hash160(parent.compressed_pubkey, EC_PUBLIC_KEY_LEN, parent160,
                    sizeof(parent160)) != WALLY_OK) {
     err = err == ESP_OK ? ESP_ERR_INVALID_RESPONSE : err;
-    snprintf(out->detail, sizeof(out->detail), "读取父公钥失败：%s",
+    snprintf(out->detail, sizeof(out->detail), "Parent public key read failed: %s",
              parent.detail);
     goto done;
   }
@@ -3402,7 +3448,7 @@ esp_err_t smartcard_satochip_get_btc_xpub(
                                sizeof(out->xpub));
   secure_zero(parent160, sizeof(parent160));
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "扩展公钥编码失败。");
+    snprintf(out->detail, sizeof(out->detail), "Extended public key encoding failed.");
     goto done;
   }
   out->has_xpub = true;
@@ -3436,7 +3482,7 @@ esp_err_t smartcard_satochip_get_btc_xpub(
     }
   }
 
-  snprintf(out->detail, sizeof(out->detail), "%s 导出成功：%s。", out->xtype,
+  snprintf(out->detail, sizeof(out->detail), "%s exported successfully: %s.", out->xtype,
            path);
   err = ESP_OK;
 
@@ -3444,7 +3490,7 @@ done:
   out->sw = session.sw;
   out->err = err;
   if (err != ESP_OK && out->detail[0] == '\0')
-    snprintf(out->detail, sizeof(out->detail), "Satochip BTC 公钥读取失败。");
+    snprintf(out->detail, sizeof(out->detail), "Satochip BTC public key read failed.");
   secure_zero(&account, sizeof(account));
   secure_zero(&parent, sizeof(parent));
   secure_zero(&master, sizeof(master));
@@ -3462,7 +3508,7 @@ esp_err_t smartcard_satochip_get_btc_address(
   memset(out, 0, sizeof(*out));
   out->err = ESP_ERR_INVALID_STATE;
   snprintf(out->path, sizeof(out->path), "%s", path);
-  snprintf(out->detail, sizeof(out->detail), "正在读取 Satochip BTC 地址。");
+  snprintf(out->detail, sizeof(out->detail), "Reading Satochip BTC address.");
 
   satochip_session_t session;
   memset(&session, 0, sizeof(session));
@@ -3480,7 +3526,7 @@ esp_err_t smartcard_satochip_get_btc_address(
   if (err == ESP_OK) {
     err = satochip_session_read_key(&session, path, &account, timeout_ms);
     if (err != ESP_OK) {
-      snprintf(out->detail, sizeof(out->detail), "读取地址公钥失败：%s",
+      snprintf(out->detail, sizeof(out->detail), "Address public key read failed: %s",
                account.detail);
     }
   }
@@ -3489,11 +3535,11 @@ esp_err_t smartcard_satochip_get_btc_address(
                                            is_testnet, out->address,
                                            sizeof(out->address));
     if (err != ESP_OK)
-      snprintf(out->detail, sizeof(out->detail), "BTC 地址编码失败。");
+      snprintf(out->detail, sizeof(out->detail), "BTC address encoding failed.");
   }
   if (err == ESP_OK) {
     out->has_address = true;
-    snprintf(out->detail, sizeof(out->detail), "BTC 地址读取成功：%s。",
+    snprintf(out->detail, sizeof(out->detail), "BTC address read successfully: %s.",
              out->address);
   }
 
@@ -3514,7 +3560,7 @@ esp_err_t smartcard_satochip_sign_evm_digest(
   out->err = ESP_ERR_INVALID_STATE;
   snprintf(out->path, sizeof(out->path), "%s", path);
   snprintf(out->detail, sizeof(out->detail),
-           "正在用 Satochip 签名 EVM hash。");
+           "Signing EVM hash with Satochip.");
 
   satochip_session_t session;
   memset(&session, 0, sizeof(session));
@@ -3535,7 +3581,7 @@ esp_err_t smartcard_satochip_sign_evm_digest(
   if (err == ESP_OK) {
     err = satochip_session_read_key(&session, path, &account, timeout_ms);
     if (err != ESP_OK) {
-      snprintf(out->detail, sizeof(out->detail), "读取签名路径失败：%s",
+      snprintf(out->detail, sizeof(out->detail), "Signing path read failed: %s",
                account.detail);
     }
   }
@@ -3561,20 +3607,20 @@ esp_err_t smartcard_satochip_sign_evm_digest(
   out->sw = sw;
   satochip_log_response("SIGN_HASH", err, sw, payload_len);
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "SIGN_HASH 发送失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "SIGN_HASH send failed: %s.",
              esp_err_to_name(err));
     goto done;
   }
   if (sw != 0x9000) {
     err = ESP_ERR_INVALID_RESPONSE;
-    snprintf(out->detail, sizeof(out->detail), "SIGN_HASH 返回 SW=%04X。", sw);
+    snprintf(out->detail, sizeof(out->detail), "SIGN_HASH returned SW=%04X.", sw);
     goto done;
   }
 
   err = satochip_parse_der_signature_compact(response, payload_len,
                                              out->compact);
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "签名 DER 解析失败。");
+    snprintf(out->detail, sizeof(out->detail), "Signature DER parsing failed.");
     goto done;
   }
 
@@ -3582,7 +3628,7 @@ esp_err_t smartcard_satochip_sign_evm_digest(
       digest, out->compact, account.compressed_pubkey, &out->recovery_id);
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail),
-             "签名恢复失败，无法确认来自当前路径。");
+             "Signature recovery failed; could not confirm it comes from the current path.");
     goto done;
   }
 
@@ -3594,7 +3640,7 @@ esp_err_t smartcard_satochip_sign_evm_digest(
   out->has_signature = true;
   out->has_address = account.has_address;
   out->has_compressed_pubkey = account.has_compressed_pubkey;
-  snprintf(out->detail, sizeof(out->detail), "Satochip 签名成功：%s。",
+  snprintf(out->detail, sizeof(out->detail), "Satochip signing succeeded: %s.",
            out->address);
   err = ESP_OK;
 
@@ -3613,25 +3659,27 @@ void smartcard_satochip_format_status(const smartcard_satochip_status_t *status,
   out[0] = '\0';
 
   if (!status) {
-    snprintf(out, out_len, "没有状态。");
+    snprintf(out, out_len, "%s", sc_fmt_no_status());
     return;
   }
 
   snprintf(out, out_len,
-           "应用：%s\n"
-           "SELECT SW：%04X\n"
-           "状态 SW：%04X\n"
-           "版本：%u.%u-%u.%u\n"
-           "PIN 剩余：PIN0=%u PUK0=%u PIN1=%u PUK1=%u\n"
-           "已初始化：%s\n"
-           "已有种子：%s\n"
-           "2FA：%s\n"
-           "安全通道：%s\n"
-           "NFC 策略：%u\n"
-           "Schnorr：%u Nostr：%u Liquid：%u\n"
+           "%s: %s\n"
+           "SELECT SW: %04X\n"
+           "Status SW: %04X\n"
+           "%s: %u.%u-%u.%u\n"
+           "PIN remaining: PIN0=%u PUK0=%u PIN1=%u PUK1=%u\n"
+           "%s: %s\n"
+           "%s: %s\n"
+           "2FA: %s\n"
+           "%s: %s\n"
+           "NFC %s: %u\n"
+           "Schnorr: %u Nostr: %u Liquid: %u\n"
            "%s",
-           status->app_selected ? "Satochip" : "未选中",
+           i18n_tr_or("smartcard.smartcard", "App"),
+           status->app_selected ? "Satochip" : sc_fmt_not_selected(),
            status->select_sw, status->status_sw,
+           i18n_tr_or("tools.version", "Version"),
            (unsigned)status->protocol_major,
            (unsigned)status->protocol_minor,
            (unsigned)status->applet_major,
@@ -3640,14 +3688,18 @@ void smartcard_satochip_format_status(const smartcard_satochip_status_t *status,
            (unsigned)status->puk0_remaining,
            (unsigned)status->pin1_remaining,
            (unsigned)status->puk1_remaining,
-           yes_no_cn(status->setup_done), yes_no_cn(status->is_seeded),
-           yes_no_cn(status->needs_2fa),
-           yes_no_cn(status->needs_secure_channel),
+           i18n_tr_or("sign.card_initialized", "Initialized"),
+           yes_no_text(status->setup_done),
+           i18n_tr_or("wallet.loaded_mnemonic", "Seeded"),
+           yes_no_text(status->is_seeded), yes_no_text(status->needs_2fa),
+           i18n_tr_or("settings.security", "Secure channel"),
+           yes_no_text(status->needs_secure_channel),
+           i18n_tr_or("settings.policy", "policy"),
            (unsigned)status->nfc_policy,
            (unsigned)status->feature_schnorr_policy,
            (unsigned)status->feature_nostr_policy,
            (unsigned)status->feature_liquid_policy,
-           status->detail);
+           sc_fmt_detail(status->detail));
 }
 
 void smartcard_satochip_format_label(const smartcard_satochip_label_t *label,
@@ -3657,20 +3709,24 @@ void smartcard_satochip_format_label(const smartcard_satochip_label_t *label,
   out[0] = '\0';
 
   if (!label) {
-    snprintf(out, out_len, "没有标签。");
+    snprintf(out, out_len, "%s", sc_fmt_no_label());
     return;
   }
 
   snprintf(out, out_len,
-           "应用：%s\n"
-           "SELECT SW：%04X\n"
-           "标签 SW：%04X\n"
-           "标签：%s\n"
+           "%s: %s\n"
+           "SELECT SW: %04X\n"
+           "Label SW: %04X\n"
+           "%s: %s\n"
            "%s",
-           label->app_selected ? (label->applet[0] ? label->applet : "已识别")
-                               : "未选中",
+           i18n_tr_or("smartcard.smartcard", "App"),
+           label->app_selected ? (label->applet[0] ? label->applet
+                                                   : sc_fmt_detected())
+                               : sc_fmt_not_selected(),
            label->select_sw, label->label_sw,
-           label->has_label ? label->label : "(empty)", label->detail);
+           i18n_tr_or("sign.secret_label", "Label"),
+           label->has_label ? label->label : sc_fmt_empty(),
+           sc_fmt_detail(label->detail));
 }
 
 static void seedkeeper_last_log_hex(const smartcard_seedkeeper_status_t *status,
@@ -3680,7 +3736,7 @@ static void seedkeeper_last_log_hex(const smartcard_seedkeeper_status_t *status,
   }
   out[0] = '\0';
   if (!status || status->last_log_len == 0) {
-    snprintf(out, out_len, "(none)");
+    snprintf(out, out_len, "%s", sc_fmt_empty());
     return;
   }
 
@@ -3704,7 +3760,7 @@ void smartcard_seedkeeper_format_status(
   out[0] = '\0';
 
   if (!status) {
-    snprintf(out, out_len, "没有状态。");
+    snprintf(out, out_len, "%s", sc_fmt_no_status());
     return;
   }
 
@@ -3712,21 +3768,31 @@ void smartcard_seedkeeper_format_status(
   seedkeeper_last_log_hex(status, last_log_hex, sizeof(last_log_hex));
 
   snprintf(out, out_len,
-           "应用：%s\n"
-           "SELECT SW：%04X\n"
-           "状态 SW：%04X\n"
-           "秘密数：%u\n"
-           "总内存：%u\n"
-           "空闲内存：%u\n"
-           "日志总数：%u\n"
-           "可用日志：%u\n"
-           "最后日志：%s\n"
+           "%s: %s\n"
+           "SELECT SW: %04X\n"
+           "Status SW: %04X\n"
+           "%s: %u\n"
+           "%s: %u\n"
+           "%s: %u\n"
+           "%s: %u\n"
+           "%s: %u\n"
+           "%s: %s\n"
            "%s",
-           status->app_selected ? "SeedKeeper" : "未选中",
-           status->select_sw, status->status_sw, (unsigned)status->nb_secrets,
-           (unsigned)status->total_memory, (unsigned)status->free_memory,
-           (unsigned)status->nb_logs_total, (unsigned)status->nb_logs_avail,
-           last_log_hex, status->detail);
+           i18n_tr_or("smartcard.smartcard", "App"),
+           status->app_selected ? "SeedKeeper" : sc_fmt_not_selected(),
+           status->select_sw, status->status_sw,
+           i18n_tr_or("dialog.sensitive_data", "Secrets"),
+           (unsigned)status->nb_secrets,
+           i18n_tr_or("tools.memory", "Total memory"),
+           (unsigned)status->total_memory,
+           i18n_tr_or("tools.free_space", "Free memory"),
+           (unsigned)status->free_memory,
+           i18n_tr_or("tools.report", "Total logs"),
+           (unsigned)status->nb_logs_total,
+           i18n_tr_or("feature.status.available", "Available logs"),
+           (unsigned)status->nb_logs_avail,
+           i18n_tr_or("tools.report", "Last log"),
+           last_log_hex, sc_fmt_detail(status->detail));
 }
 
 static bool satochip_parse_seedkeeper_header_block(
@@ -3766,17 +3832,17 @@ static void satochip_seedkeeper_header_text(
     return;
   }
   if (!header) {
-    snprintf(out, out_len, "无条目。");
+    snprintf(out, out_len, "No entries.");
     return;
   }
 
   snprintf(out, out_len,
            "ID=%u\n"
-           "标题=%s\n"
-           "类型=%u 子类型=%u\n"
-           "来源=%u 权限=%u\n"
-           "明文次数=%u 安全次数=%u 计数=%u\n"
-           "指纹=%02X%02X%02X%02X",
+           "Title=%s\n"
+           "Type=%u subtype=%u\n"
+           "Origin=%u rights=%u\n"
+           "Plain exports=%u secure exports=%u counter=%u\n"
+           "Fingerprint=%02X%02X%02X%02X",
            (unsigned)header->id, header->label, (unsigned)header->type,
            (unsigned)header->subtype, (unsigned)header->origin,
            (unsigned)header->export_rights, (unsigned)header->export_nbplain,
@@ -3837,11 +3903,11 @@ esp_err_t smartcard_satochip_card_set_label(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "卡标签已更新。");
+    snprintf(out->detail, sizeof(out->detail), "Card label updated.");
   } else if (out->sw == 0x6D00) {
-    snprintf(out->detail, sizeof(out->detail), "卡片不支持标签。");
+    snprintf(out->detail, sizeof(out->detail), "Card does not support labels.");
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "标签写入",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Write label",
                                 out->sw);
   }
   return ESP_OK;
@@ -3855,7 +3921,7 @@ esp_err_t smartcard_satochip_card_set_nfc_policy(
       satochip_apdu_result_reset(out);
       out->err = ESP_ERR_INVALID_ARG;
       snprintf(out->detail, sizeof(out->detail),
-               "NFC 策略只能是 0/1/2。");
+               "NFC policy must be 0, 1, or 2.");
     }
     return ESP_ERR_INVALID_ARG;
   }
@@ -3867,15 +3933,15 @@ esp_err_t smartcard_satochip_card_set_nfc_policy(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "NFC 策略已更新：%u。",
+    snprintf(out->detail, sizeof(out->detail), "NFC policy updated: %u.",
              (unsigned)policy);
   } else if (out->sw == 0x9C48) {
-    snprintf(out->detail, sizeof(out->detail), "需要接触式接口才能改 NFC 策略。");
+    snprintf(out->detail, sizeof(out->detail), "A contact interface is required to change the NFC policy.");
   } else if (out->sw == 0x9C49) {
-    snprintf(out->detail, sizeof(out->detail), "NFC 已被阻止，只能恢复出厂。");
+    snprintf(out->detail, sizeof(out->detail), "NFC is blocked; only factory reset can recover it.");
   } else {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "NFC 策略设置", out->sw);
+                                "Set NFC policy", out->sw);
   }
   return ESP_OK;
 }
@@ -3888,7 +3954,7 @@ esp_err_t smartcard_satochip_card_set_feature_policy(
       satochip_apdu_result_reset(out);
       out->err = ESP_ERR_INVALID_ARG;
       snprintf(out->detail, sizeof(out->detail),
-               "功能和策略只能是 0/1/2。");
+               "Feature and policy must be 0, 1, or 2.");
     }
     return ESP_ERR_INVALID_ARG;
   }
@@ -3900,13 +3966,13 @@ esp_err_t smartcard_satochip_card_set_feature_policy(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "功能策略已更新：%u/%u。",
+    snprintf(out->detail, sizeof(out->detail), "Feature policy updated: %u/%u.",
              (unsigned)feature_id, (unsigned)policy);
   } else if (out->sw == 0x9C4B) {
-    snprintf(out->detail, sizeof(out->detail), "该功能已被阻止，只能恢复出厂。");
+    snprintf(out->detail, sizeof(out->detail), "This feature is blocked; only factory reset can recover it.");
   } else {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "功能策略设置", out->sw);
+                                "Set feature policy", out->sw);
   }
   return ESP_OK;
 }
@@ -3937,15 +4003,15 @@ static esp_err_t smartcard_reset_factory_select_plain(
     *select_sw = primary_sw;
   if (err != ESP_OK) {
     if (detail && detail_len > 0) {
-      snprintf(detail, detail_len, "选择 %s 失败：%s。",
-               primary_name ? primary_name : "智能卡", esp_err_to_name(err));
+      snprintf(detail, detail_len, "Selecting %s failed: %s.",
+               primary_name ? primary_name : "Smartcard", esp_err_to_name(err));
     }
     return err;
   }
   if (selected) {
     if (selected_name && selected_name_len > 0) {
       snprintf(selected_name, selected_name_len, "%s",
-               primary_name ? primary_name : "智能卡");
+               primary_name ? primary_name : "Smartcard");
     }
     return ESP_OK;
   }
@@ -3959,8 +4025,8 @@ static esp_err_t smartcard_reset_factory_select_plain(
       *select_sw = fallback_sw;
     if (err != ESP_OK) {
       if (detail && detail_len > 0) {
-        snprintf(detail, detail_len, "选择 %s 失败：%s。",
-                 fallback_name ? fallback_name : "备用应用",
+        snprintf(detail, detail_len, "Selecting %s failed: %s.",
+                 fallback_name ? fallback_name : "fallback app",
                  esp_err_to_name(err));
       }
       return err;
@@ -3968,14 +4034,14 @@ static esp_err_t smartcard_reset_factory_select_plain(
     if (selected) {
       if (selected_name && selected_name_len > 0) {
         snprintf(selected_name, selected_name_len, "%s",
-                 fallback_name ? fallback_name : "智能卡");
+                 fallback_name ? fallback_name : "Smartcard");
       }
       return ESP_OK;
     }
   }
 
   if (detail && detail_len > 0) {
-    snprintf(detail, detail_len, "未选中智能卡应用，SW=%04X/%04X。",
+    snprintf(detail, detail_len, "No smartcard app selected, SW=%04X/%04X.",
              primary_sw, fallback_sw);
   }
   return ESP_ERR_NOT_FOUND;
@@ -4020,7 +4086,7 @@ static esp_err_t smartcard_reset_factory_signal_plain(
                                   sizeof(response), &payload_len, &sw,
                                   timeout_ms);
   if (err != ESP_OK) {
-    snprintf(detail, sizeof(detail), "恢复出厂发送失败：%s。",
+    snprintf(detail, sizeof(detail), "Factory reset send failed: %s.",
              esp_err_to_name(err));
     satochip_apdu_result_fill(out, NULL, 0, sw, err, detail);
     smartcard_ccid_set_factory_reset_mode(false);
@@ -4032,29 +4098,29 @@ static esp_err_t smartcard_reset_factory_signal_plain(
     smartcard_ccid_set_factory_reset_mode(false);
   if (sw == 0xFF00) {
     snprintf(out->detail, sizeof(out->detail),
-             "%s 已恢复为空白卡。请拔插后重新设置 PIN。",
-             selected_name[0] ? selected_name : "智能卡");
+             "%s has been restored to a blank card. Reinsert it, then set the PIN again.",
+             selected_name[0] ? selected_name : "Smartcard");
   } else if (sw == 0xFFFF) {
     snprintf(out->detail, sizeof(out->detail),
-             "已中止：上次执行后没有拔插卡。请从第一次拔插重新开始。");
+             "Aborted: the card was not reinserted after the last step. Start again from the first reinsertion.");
   } else if ((sw & 0xFF00U) == 0xFF00U) {
     snprintf(out->detail, sizeof(out->detail),
-             "剩余 %u 次。现在拔出卡，再插入，然后点重新执行。",
+             "%u attempts remaining. Remove the card, insert it again, then run the step again.",
              (unsigned)(sw & 0x00FFU));
   } else if (sw == 0x9C04) {
     snprintf(out->detail, sizeof(out->detail),
-             "卡片尚未初始化，无需恢复出厂。");
+             "The card is not initialized; factory reset is not needed.");
   } else if (sw == 0x9C20 || sw == 0x9C21) {
     snprintf(out->detail, sizeof(out->detail),
-             "重置序列未完成。请拔出卡，再插入后立即重试，不要先执行其他卡操作。");
+             "Reset sequence is incomplete. Remove and reinsert the card, then retry before any other card operation.");
   } else if (sw == 0x6D00) {
     snprintf(out->detail, sizeof(out->detail),
-             "卡片不支持该恢复命令，SW=6D00。");
+             "The card does not support this reset command, SW=6D00.");
   } else if (sw == 0x6F00) {
     snprintf(out->detail, sizeof(out->detail),
-             "卡片内部错误，SW=6F00。请拔插后重试。");
+             "Card internal error, SW=6F00. Reinsert the card and retry.");
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "恢复出厂",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Factory reset",
                                 sw);
   }
   return ESP_OK;
@@ -4078,7 +4144,7 @@ esp_err_t smartcard_satochip_card_setup_pin(
   size_t new_pin_len = new_pin ? strlen(new_pin) : 0;
   if (new_pin_len < 4 || new_pin_len > 16) {
     out->err = ESP_ERR_INVALID_ARG;
-    snprintf(out->detail, sizeof(out->detail), "PIN 需 4-16 位。");
+    snprintf(out->detail, sizeof(out->detail), "PIN must be 4-16 characters.");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -4086,7 +4152,7 @@ esp_err_t smartcard_satochip_card_setup_pin(
   esp_err_t err = smartcard_satochip_read_status(&status, timeout_ms);
   if (err != ESP_OK) {
     out->err = err;
-    snprintf(out->detail, sizeof(out->detail), "读取 Satochip 状态失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Reading Satochip status failed: %s.",
              esp_err_to_name(err));
     return err;
   }
@@ -4180,7 +4246,7 @@ esp_err_t smartcard_satochip_card_setup_pin(
   secure_zero(pin1, sizeof(pin1));
   secure_zero(unblock_pin1, sizeof(unblock_pin1));
   if (err != ESP_OK) {
-    satochip_apdu_result_fill(out, NULL, 0, sw, err, "Satochip 设置PIN 发送失败。");
+    satochip_apdu_result_fill(out, NULL, 0, sw, err, "Satochip setup PIN send failed.");
     secure_zero(apdu, sizeof(apdu));
     secure_zero(&sc, sizeof(sc));
     return err;
@@ -4189,17 +4255,17 @@ esp_err_t smartcard_satochip_card_setup_pin(
   satochip_apdu_result_fill(out, response, payload_len, sw, ESP_OK, NULL);
   if (sw == 0x9000) {
     snprintf(out->detail, sizeof(out->detail),
-             "设置完成。请继续写入助记词。");
+             "Setup complete. Continue by writing the mnemonic.");
   } else if (satochip_sw_needs_secure_channel(sw)) {
     snprintf(out->detail, sizeof(out->detail),
-             "设置PIN 需要安全通道；请重新插卡后再试。SW=%04X。", sw);
+             "Setup PIN requires a secure channel. Reinsert the card and retry. SW=%04X.", sw);
   } else if (sw == 0x9C03) {
     snprintf(out->detail, sizeof(out->detail),
-             "卡已初始化；改 PIN 请用改PIN。");
+             "Card is already initialized. Use Change PIN to change it.");
   } else if (sw == 0x9C0F || sw == 0x6700) {
-    snprintf(out->detail, sizeof(out->detail), "PIN 或参数无效。");
+    snprintf(out->detail, sizeof(out->detail), "PIN or parameter is invalid.");
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "设置PIN",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Set PIN",
                                 sw);
   }
   out->err = ESP_OK;
@@ -4234,9 +4300,9 @@ esp_err_t smartcard_satochip_card_reset_seed(
     return err;
   if (out->sw == 0x9000)
     snprintf(out->detail, sizeof(out->detail),
-             "种子已重置。请重新设 PIN 并写入助记词。");
+             "Seed reset. Set the PIN again and write the mnemonic.");
   else
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "重置种子",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Reset seed",
                                 out->sw);
   return ESP_OK;
 }
@@ -4250,7 +4316,7 @@ esp_err_t smartcard_satochip_card_import_mnemonic_seed(
 
   if (!pin || pin[0] == '\0' || !mnemonic || mnemonic[0] == '\0') {
     out->err = ESP_ERR_INVALID_ARG;
-    snprintf(out->detail, sizeof(out->detail), "请输入 PIN 和助记词。");
+    snprintf(out->detail, sizeof(out->detail), "Enter the PIN and mnemonic.");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -4259,7 +4325,7 @@ esp_err_t smartcard_satochip_card_import_mnemonic_seed(
                                 sizeof(seed)) != WALLY_OK) {
     secure_zero(seed, sizeof(seed));
     out->err = ESP_ERR_INVALID_ARG;
-    snprintf(out->detail, sizeof(out->detail), "助记词转种子失败。");
+    snprintf(out->detail, sizeof(out->detail), "Mnemonic-to-seed conversion failed.");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -4277,7 +4343,7 @@ esp_err_t smartcard_satochip_card_import_mnemonic_seed(
   if (session.status.is_seeded) {
     secure_zero(seed, sizeof(seed));
     snprintf(out->detail, sizeof(out->detail),
-             "Satochip 已有种子；请先重置种子再写入。");
+             "Satochip already has a seed. Reset the seed before writing.");
     out->sw = session.sw;
     out->err = ESP_OK;
     secure_zero(&session, sizeof(session));
@@ -4289,7 +4355,7 @@ esp_err_t smartcard_satochip_card_import_mnemonic_seed(
   if (err != ESP_OK) {
     secure_zero(seed, sizeof(seed));
     satochip_apdu_result_fill(out, NULL, 0, session.sw, err,
-                              detail[0] ? detail : "PIN 验证失败。");
+                              detail[0] ? detail : "PIN verification failed.");
     secure_zero(&session, sizeof(session));
     return err;
   }
@@ -4312,7 +4378,7 @@ esp_err_t smartcard_satochip_card_import_mnemonic_seed(
   secure_zero(seed, sizeof(seed));
   session.sw = sw;
   if (err != ESP_OK) {
-    satochip_apdu_result_fill(out, NULL, 0, sw, err, "写入种子发送失败。");
+    satochip_apdu_result_fill(out, NULL, 0, sw, err, "Write seed send failed.");
     secure_zero(&session, sizeof(session));
     return err;
   }
@@ -4328,19 +4394,19 @@ esp_err_t smartcard_satochip_card_import_mnemonic_seed(
     }
     if (auth_err == ESP_OK) {
       snprintf(out->detail, sizeof(out->detail),
-               "Satochip 助记词已写入。");
+               "Satochip mnemonic written.");
     } else {
       snprintf(out->detail, sizeof(out->detail),
-               "种子已写入；认证钥缓存失败，可重新插卡后再读地址。");
+               "Seed written; authentikey cache failed. Reinsert the card before reading addresses.");
     }
   } else if (sw == 0x9C17) {
     snprintf(out->detail, sizeof(out->detail),
-             "Satochip 已有种子；请先重置种子再写入。");
+             "Satochip already has a seed. Reset the seed before writing.");
   } else if (sw == 0x9C0F || sw == 0x6700) {
-    snprintf(out->detail, sizeof(out->detail), "写入参数无效。");
+    snprintf(out->detail, sizeof(out->detail), "Write parameters are invalid.");
   } else {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "写入 Satochip", sw);
+                                "Write Satochip", sw);
   }
 
   out->err = ESP_OK;
@@ -4377,12 +4443,12 @@ esp_err_t smartcard_satochip_card_change_pin(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "PIN 已修改。");
+    snprintf(out->detail, sizeof(out->detail), "PIN changed.");
   } else if ((out->sw & 0xFFC0U) == 0x63C0U) {
-    snprintf(out->detail, sizeof(out->detail), "PIN 错误，剩余 %u 次。",
+    snprintf(out->detail, sizeof(out->detail), "Wrong PIN, %u attempts remaining.",
              (unsigned)(out->sw & 0x000FU));
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "修改 PIN",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Change PIN",
                                 out->sw);
   }
   return ESP_OK;
@@ -4407,16 +4473,16 @@ esp_err_t smartcard_satochip_card_unblock_pin(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "PIN 已解锁。");
+    snprintf(out->detail, sizeof(out->detail), "PIN unlocked.");
   } else if ((out->sw & 0xFFC0U) == 0x63C0U) {
-    snprintf(out->detail, sizeof(out->detail), "PUK 错误，剩余 %u 次。",
+    snprintf(out->detail, sizeof(out->detail), "Wrong PUK, %u attempts remaining.",
              (unsigned)(out->sw & 0x000FU));
   } else if (out->sw == 0xFF00) {
     snprintf(out->detail, sizeof(out->detail),
-             "卡已恢复出厂。请重新设置 PIN。");
+             "Card has been factory reset. Set the PIN again.");
   } else {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "解锁 PIN", out->sw);
+                                "Unlock PIN", out->sw);
   }
   return ESP_OK;
 }
@@ -4442,9 +4508,9 @@ esp_err_t smartcard_satochip_card_set_2fa_key(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000)
-    snprintf(out->detail, sizeof(out->detail), "2FA 已启用。");
+    snprintf(out->detail, sizeof(out->detail), "2FA enabled.");
   else
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "设置 2FA",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Set 2FA",
                                 out->sw);
   return ESP_OK;
 }
@@ -4468,9 +4534,9 @@ esp_err_t smartcard_satochip_card_reset_2fa_key(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000)
-    snprintf(out->detail, sizeof(out->detail), "2FA 已关闭。");
+    snprintf(out->detail, sizeof(out->detail), "2FA disabled.");
   else
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "关闭 2FA",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Disable 2FA",
                                 out->sw);
   return ESP_OK;
 }
@@ -4506,7 +4572,7 @@ esp_err_t smartcard_satochip_card_export_perso_certificate(
       satochip_session_open(&session, timeout_ms, detail, sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s",
-             detail[0] ? detail : "需要先完成设备初始化。");
+             detail[0] ? detail : "Device initialization must be completed first.");
     out->err = err;
     return err;
   }
@@ -4521,14 +4587,14 @@ esp_err_t smartcard_satochip_card_export_perso_certificate(
                                timeout_ms);
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "证书导出失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Certificate export failed: %s.",
              esp_err_to_name(err));
     out->err = err;
     secure_zero(&session, sizeof(session));
     return err;
   }
   if (sw != 0x9000 || response_len < 2) {
-    snprintf(out->detail, sizeof(out->detail), "证书导出返回 SW=%04X。", sw);
+    snprintf(out->detail, sizeof(out->detail), "Certificate export returned SW=%04X.", sw);
     out->err = ESP_OK;
     secure_zero(&session, sizeof(session));
     return ESP_OK;
@@ -4536,7 +4602,7 @@ esp_err_t smartcard_satochip_card_export_perso_certificate(
 
   size_t certificate_size = ((size_t)response[0] << 8) | response[1];
   if (certificate_size == 0) {
-    snprintf(out->detail, sizeof(out->detail), "证书为空。");
+    snprintf(out->detail, sizeof(out->detail), "Certificate is empty.");
     out->err = ESP_OK;
     return ESP_OK;
   }
@@ -4563,14 +4629,14 @@ esp_err_t smartcard_satochip_card_export_perso_certificate(
                                  &sw, timeout_ms);
     out->sw = sw;
     if (err != ESP_OK || sw != 0x9000) {
-      snprintf(out->detail, sizeof(out->detail), "证书块读取失败，SW=%04X。",
+      snprintf(out->detail, sizeof(out->detail), "Certificate block read failed, SW=%04X.",
                sw);
       out->err = err;
       secure_zero(&session, sizeof(session));
       return err;
     }
     if (response_len < this_chunk) {
-      snprintf(out->detail, sizeof(out->detail), "证书块长度不足。");
+      snprintf(out->detail, sizeof(out->detail), "Certificate block is too short.");
       out->err = ESP_ERR_INVALID_RESPONSE;
       secure_zero(&session, sizeof(session));
       return out->err;
@@ -4582,12 +4648,12 @@ esp_err_t smartcard_satochip_card_export_perso_certificate(
   out->der_len = copied;
   err = satochip_export_pem_certificate(out->der, out->der_len, out);
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "证书 PEM 转换失败。");
+    snprintf(out->detail, sizeof(out->detail), "Certificate PEM conversion failed.");
     out->err = err;
     secure_zero(&session, sizeof(session));
     return err;
   }
-  snprintf(out->detail, sizeof(out->detail), "证书已导出。");
+  snprintf(out->detail, sizeof(out->detail), "Certificate exported.");
   out->err = ESP_OK;
   secure_zero(&session, sizeof(session));
   return ESP_OK;
@@ -4605,7 +4671,7 @@ esp_err_t smartcard_satochip_card_import_perso_certificate(
   size_t der_len = 0;
   esp_err_t err = satochip_pem_to_der(cert_text, der, sizeof(der), &der_len);
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "证书解析失败。");
+    snprintf(out->detail, sizeof(out->detail), "Certificate parsing failed.");
     out->err = err;
     return err;
   }
@@ -4624,7 +4690,7 @@ esp_err_t smartcard_satochip_card_import_perso_certificate(
     return err;
   if (out->sw != 0x9000) {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "证书导入初始化", out->sw);
+                                "Certificate import init", out->sw);
     out->err = ESP_OK;
     return ESP_OK;
   }
@@ -4651,7 +4717,7 @@ esp_err_t smartcard_satochip_card_import_perso_certificate(
       return err;
     if (out->sw != 0x9000) {
       satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                  "证书导入", out->sw);
+                                  "Certificate import", out->sw);
       out->err = ESP_OK;
       return ESP_OK;
     }
@@ -4659,7 +4725,7 @@ esp_err_t smartcard_satochip_card_import_perso_certificate(
   }
 
   out->err = ESP_OK;
-  snprintf(out->detail, sizeof(out->detail), "证书已导入。");
+  snprintf(out->detail, sizeof(out->detail), "Certificate imported.");
   return ESP_OK;
 }
 
@@ -4680,10 +4746,10 @@ esp_err_t smartcard_satochip_card_import_ndef_authentikey(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000)
-    snprintf(out->detail, sizeof(out->detail), "NDEF authentikey 已导入。");
+    snprintf(out->detail, sizeof(out->detail), "NDEF authentikey imported.");
   else
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "导入 NDEF authentikey", out->sw);
+                                "Import NDEF authentikey", out->sw);
   return ESP_OK;
 }
 
@@ -4703,7 +4769,7 @@ esp_err_t smartcard_satochip_card_export_authentikey(
                                             sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s",
-             detail[0] ? detail : "authentikey 导出失败。");
+             detail[0] ? detail : "Authentikey export failed.");
     secure_zero(&session, sizeof(session));
     out->err = err;
     return err;
@@ -4719,7 +4785,7 @@ esp_err_t smartcard_satochip_card_export_authentikey(
                                timeout_ms);
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "导出 authentikey 失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Exporting authentikey failed: %s.",
              esp_err_to_name(err));
     secure_zero(&session, sizeof(session));
     out->err = err;
@@ -4727,17 +4793,17 @@ esp_err_t smartcard_satochip_card_export_authentikey(
   }
   if (sw != 0x9000) {
     if (sw == 0x9C04)
-      snprintf(out->detail, sizeof(out->detail), "设备未初始化。");
+      snprintf(out->detail, sizeof(out->detail), "Device is not initialized.");
     else
       satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                  "导出 authentikey", sw);
+                                  "Export authentikey", sw);
     secure_zero(&session, sizeof(session));
     out->err = ESP_OK;
     return ESP_OK;
   }
 
   satochip_apdu_result_fill(out, response, response_len, sw, ESP_OK,
-                            "authentikey 已导出。");
+                            "Authentikey exported.");
   out->err = ESP_OK;
   secure_zero(&session, sizeof(session));
   return ESP_OK;
@@ -4767,12 +4833,12 @@ esp_err_t smartcard_satochip_card_import_trusted_pubkey(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000)
-    snprintf(out->detail, sizeof(out->detail), "Trusted pubkey 已导入。");
+    snprintf(out->detail, sizeof(out->detail), "Trusted pubkey imported.");
   else if (out->sw == 0x6D00)
-    snprintf(out->detail, sizeof(out->detail), "卡片不支持 trusted pubkey。");
+    snprintf(out->detail, sizeof(out->detail), "Card does not support trusted pubkey.");
   else
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "导入 trusted pubkey", out->sw);
+                                "Import trusted pubkey", out->sw);
   return ESP_OK;
 }
 
@@ -4792,7 +4858,7 @@ esp_err_t smartcard_satochip_card_export_trusted_pubkey(
                                             sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s",
-             detail[0] ? detail : "trusted pubkey 导出失败。");
+             detail[0] ? detail : "Trusted pubkey export failed.");
     secure_zero(&session, sizeof(session));
     out->err = err;
     return err;
@@ -4808,34 +4874,34 @@ esp_err_t smartcard_satochip_card_export_trusted_pubkey(
                                timeout_ms);
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "导出 trusted pubkey 失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Exporting trusted pubkey failed: %s.",
              esp_err_to_name(err));
     secure_zero(&session, sizeof(session));
     out->err = err;
     return err;
   }
   if (sw == 0x9C35) {
-    snprintf(out->detail, sizeof(out->detail), "未配置 trusted pubkey。");
+    snprintf(out->detail, sizeof(out->detail), "Trusted pubkey is not configured.");
     secure_zero(&session, sizeof(session));
     out->err = ESP_OK;
     return ESP_OK;
   }
   if (sw == 0x6D00) {
-    snprintf(out->detail, sizeof(out->detail), "卡片不支持 trusted pubkey。");
+    snprintf(out->detail, sizeof(out->detail), "Card does not support trusted pubkey.");
     secure_zero(&session, sizeof(session));
     out->err = ESP_OK;
     return ESP_OK;
   }
   if (sw != 0x9000) {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "导出 trusted pubkey", sw);
+                                "Export trusted pubkey", sw);
     secure_zero(&session, sizeof(session));
     out->err = ESP_OK;
     return ESP_OK;
   }
 
   satochip_apdu_result_fill(out, response, response_len, sw, ESP_OK,
-                            "trusted pubkey 已导出。");
+                            "Trusted pubkey exported.");
   secure_zero(&session, sizeof(session));
   out->err = ESP_OK;
   return ESP_OK;
@@ -4852,10 +4918,10 @@ esp_err_t smartcard_satochip_card_logout_all(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000)
-    snprintf(out->detail, sizeof(out->detail), "已清除会话。");
+    snprintf(out->detail, sizeof(out->detail), "Session cleared.");
   else
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "清除会话", out->sw);
+                                "Clear session", out->sw);
   return ESP_OK;
 }
 
@@ -4877,7 +4943,7 @@ esp_err_t smartcard_satochip_card_challenge_response_pki(
                                             sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s",
-             detail[0] ? detail : "challenge-response 会话失败。");
+             detail[0] ? detail : "Challenge-response session failed.");
     secure_zero(&session, sizeof(session));
     out->err = err;
     return err;
@@ -4899,7 +4965,7 @@ esp_err_t smartcard_satochip_card_challenge_response_pki(
                                timeout_ms);
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "挑战响应发送失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Challenge-response send failed: %s.",
              esp_err_to_name(err));
     secure_zero(&session, sizeof(session));
     out->err = err;
@@ -4907,7 +4973,7 @@ esp_err_t smartcard_satochip_card_challenge_response_pki(
   }
   if (sw != 0x9000 || response_len < 34) {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "挑战响应", sw);
+                                "Challenge response", sw);
     secure_zero(&session, sizeof(session));
     out->err = ESP_OK;
     return ESP_OK;
@@ -4916,7 +4982,7 @@ esp_err_t smartcard_satochip_card_challenge_response_pki(
   uint16_t sig_len = read_be16(response + 32);
   if (sig_len == 0 || response_len != (size_t)(34U + sig_len)) {
     snprintf(out->detail, sizeof(out->detail),
-             "挑战响应长度异常：期望 %u，实际 %u。", (unsigned)(34U + sig_len),
+             "Challenge-response length mismatch: expected %u, got %u.", (unsigned)(34U + sig_len),
              (unsigned)response_len);
     secure_zero(&session, sizeof(session));
     out->err = ESP_ERR_INVALID_RESPONSE;
@@ -4924,7 +4990,7 @@ esp_err_t smartcard_satochip_card_challenge_response_pki(
   }
 
   satochip_apdu_result_fill(out, response, response_len, sw, ESP_OK,
-                            "挑战响应已读取。");
+                            "Challenge response read.");
   secure_zero(&session, sizeof(session));
   out->err = ESP_OK;
   return ESP_OK;
@@ -4942,7 +5008,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
   char *subca_text = calloc(1, sizeof(out->subca_text));
   smartcard_satochip_apdu_result_t *chal = calloc(1, sizeof(*chal));
   if (!cert || !ca_text || !subca_text || !chal) {
-    snprintf(out->error, sizeof(out->error), "内存不足，真伪检查已取消。");
+    snprintf(out->error, sizeof(out->error), "Out of memory; authenticity check canceled.");
     out->err = ESP_ERR_NO_MEM;
     free(cert);
     free(ca_text);
@@ -4954,7 +5020,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
   esp_err_t err = smartcard_satochip_card_export_perso_certificate(cert,
                                                                     timeout_ms);
   if (err != ESP_OK) {
-    snprintf(out->error, sizeof(out->error), "证书导出失败：%s。",
+    snprintf(out->error, sizeof(out->error), "Certificate export failed: %s.",
              esp_err_to_name(err));
     out->err = err;
     secure_zero(cert, sizeof(*cert));
@@ -4965,7 +5031,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
     return err;
   }
   if (!cert->has_certificate) {
-    snprintf(out->error, sizeof(out->error), "设备证书为空。");
+    snprintf(out->error, sizeof(out->error), "Device certificate is empty.");
     out->err = ESP_OK;
     secure_zero(cert, sizeof(*cert));
     free(cert);
@@ -4986,7 +5052,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
       cert->pem, subject_cn, sizeof(subject_cn), out->device_text,
       sizeof(out->device_text), device_pubkey);
   if (err != ESP_OK) {
-    snprintf(out->error, sizeof(out->error), "设备证书解析失败。");
+    snprintf(out->error, sizeof(out->error), "Device certificate parsing failed.");
     out->err = err;
     secure_zero(device_pubkey, sizeof(device_pubkey));
     secure_zero(cert, sizeof(*cert));
@@ -5001,7 +5067,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
   char uid_sha1[41] = {0};
   err = satochip_extract_uid_sha1_via_apdu(uid_sha1, timeout_ms);
   if (err != ESP_OK) {
-    snprintf(out->error, sizeof(out->error), "UID 读取失败。");
+    snprintf(out->error, sizeof(out->error), "UID read failed.");
     secure_zero(device_pubkey, sizeof(device_pubkey));
     out->err = err;
     secure_zero(cert, sizeof(*cert));
@@ -5014,7 +5080,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
 
   if (!satochip_ascii_ieq(subject_cn, uid_sha1)) {
     snprintf(out->error, sizeof(out->error),
-             "证书 CN 与 UID_SHA1 不一致。");
+             "Certificate CN does not match UID_SHA1.");
     out->authentic = false;
     secure_zero(device_pubkey, sizeof(device_pubkey));
     out->err = ESP_OK;
@@ -5050,14 +5116,14 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
       break;
     }
     if (chain_error[0] == '\0') {
-      snprintf(chain_error, sizeof(chain_error), "%s 证书链校验失败。",
+      snprintf(chain_error, sizeof(chain_error), "%s certificate chain verification failed.",
                candidates[i].label ? candidates[i].label : "cert");
     }
   }
 
   if (!chain_ok) {
     snprintf(out->error, sizeof(out->error), "%s",
-             chain_error[0] ? chain_error : "证书链校验失败。");
+             chain_error[0] ? chain_error : "Certificate chain verification failed.");
     out->authentic = false;
     secure_zero(device_pubkey, sizeof(device_pubkey));
     out->err = ESP_OK;
@@ -5074,7 +5140,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
   err = smartcard_satochip_card_challenge_response_pki(challenge_from_host,
                                                        chal, timeout_ms);
   if (err != ESP_OK || chal->sw != 0x9000 || chal->response_len < 34) {
-    snprintf(out->error, sizeof(out->error), "挑战响应失败。");
+    snprintf(out->error, sizeof(out->error), "Challenge response failed.");
     secure_zero(challenge_from_host, sizeof(challenge_from_host));
     secure_zero(device_pubkey, sizeof(device_pubkey));
     out->err = err != ESP_OK ? err : ESP_ERR_INVALID_RESPONSE;
@@ -5092,7 +5158,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
   const uint8_t *device_sig = chal->response + 34;
   if (device_sig_len == 0 ||
       chal->response_len != (size_t)(34U + device_sig_len)) {
-    snprintf(out->error, sizeof(out->error), "挑战响应长度异常。");
+    snprintf(out->error, sizeof(out->error), "Challenge-response length mismatch.");
     out->authentic = false;
     secure_zero(challenge_from_host, sizeof(challenge_from_host));
     secure_zero(device_pubkey, sizeof(device_pubkey));
@@ -5121,7 +5187,7 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
       device_pubkey_compressed, chal_error, sizeof(chal_error));
   if (err != ESP_OK) {
     snprintf(out->error, sizeof(out->error), "%s",
-             chal_error[0] ? chal_error : "挑战签名验证失败。");
+             chal_error[0] ? chal_error : "Challenge signature verification failed.");
     out->authentic = false;
     secure_zero(challenge_from_host, sizeof(challenge_from_host));
     secure_zero(device_pubkey, sizeof(device_pubkey));
@@ -5137,10 +5203,10 @@ esp_err_t smartcard_satochip_card_verify_authenticity(
 
   if (test_chain) {
     snprintf(out->error, sizeof(out->error),
-             "证书链通过测试 CA 验证，非生产证书。");
+             "Certificate chain was verified by the test CA; this is not a production certificate.");
     out->authentic = false;
   } else {
-    snprintf(out->error, sizeof(out->error), "证书链与挑战响应校验通过。");
+    snprintf(out->error, sizeof(out->error), "Certificate chain and challenge response verified.");
     out->authentic = true;
   }
   out->err = ESP_OK;
@@ -5170,7 +5236,7 @@ esp_err_t smartcard_seedkeeper_list_secret_headers(
                                    detail, sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s", detail[0] ? detail
-                                                                : "SeedKeeper 连接失败。");
+                                                                : "SeedKeeper connection failed.");
     out->err = err;
     return err;
   }
@@ -5182,22 +5248,22 @@ esp_err_t smartcard_seedkeeper_list_secret_headers(
                          0x01};
   err = seedkeeper_transmit_checked_compat(
       init_apdu, sizeof(init_apdu), response, sizeof(response), &response_len,
-      &sw, timeout_ms, "列表初始化", detail, sizeof(detail));
+      &sw, timeout_ms, "List init", detail, sizeof(detail));
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "列表初始化失败。");
+    snprintf(out->detail, sizeof(out->detail), "List initialization failed.");
     out->err = err;
     seedkeeper_compat_session_clear();
     return err;
   }
   if (sw == 0x9C12) {
-    snprintf(out->detail, sizeof(out->detail), "没有更多条目。");
+    snprintf(out->detail, sizeof(out->detail), "No more entries.");
     out->err = ESP_OK;
     seedkeeper_compat_session_clear();
     return ESP_OK;
   }
   if (sw != 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "列表返回 SW=%04X。", sw);
+    snprintf(out->detail, sizeof(out->detail), "List returned SW=%04X.", sw);
     out->err = ESP_OK;
     seedkeeper_compat_session_clear();
     return ESP_OK;
@@ -5219,18 +5285,18 @@ esp_err_t smartcard_seedkeeper_list_secret_headers(
     sw = 0;
     err = seedkeeper_transmit_checked_compat(
         next_apdu, sizeof(next_apdu), response, sizeof(response),
-        &response_len, &sw, timeout_ms, "列表读取", detail, sizeof(detail));
+        &response_len, &sw, timeout_ms, "List read", detail, sizeof(detail));
     out->sw = sw;
     if (err != ESP_OK)
       break;
   }
 
   if (sw != 0x9C12 && sw != 0x9000 && err == ESP_OK)
-    snprintf(out->detail, sizeof(out->detail), "列表读取完成，SW=%04X。", sw);
+    snprintf(out->detail, sizeof(out->detail), "List read complete, SW=%04X.", sw);
   else if (sw == 0x9C12)
-    snprintf(out->detail, sizeof(out->detail), "SeedKeeper 列表读取完成。");
+    snprintf(out->detail, sizeof(out->detail), "SeedKeeper list read complete.");
   else
-    snprintf(out->detail, sizeof(out->detail), "SeedKeeper 列表读取完成。");
+    snprintf(out->detail, sizeof(out->detail), "SeedKeeper list read complete.");
   out->err = err;
   seedkeeper_compat_session_clear();
   return err;
@@ -5265,10 +5331,10 @@ esp_err_t smartcard_seedkeeper_generate_masterseed(
   if (out->sw == 0x9000 && out->response_len >= 6) {
     uint16_t sid = read_be16(out->response);
     snprintf(out->detail, sizeof(out->detail),
-             "主种子已生成：SID=%u。", (unsigned)sid);
+             "Master seed generated: SID=%u.", (unsigned)sid);
   } else {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "生成主种子", out->sw);
+                                "Generate master seed", out->sw);
   }
   return ESP_OK;
 }
@@ -5301,9 +5367,9 @@ esp_err_t smartcard_seedkeeper_generate_2fa_secret(
   if (out->sw == 0x9000 && out->response_len >= 6) {
     uint16_t sid = read_be16(out->response);
     snprintf(out->detail, sizeof(out->detail),
-             "2FA 秘密已生成：SID=%u。", (unsigned)sid);
+             "2FA secret generated: SID=%u.", (unsigned)sid);
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "生成 2FA",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Generate 2FA",
                                 out->sw);
   }
   return ESP_OK;
@@ -5356,10 +5422,10 @@ esp_err_t smartcard_seedkeeper_generate_random_secret(
   if (out->sw == 0x9000 && out->response_len >= 6) {
     uint16_t sid = read_be16(out->response);
     snprintf(out->detail, sizeof(out->detail),
-             "随机秘密已生成：SID=%u。", (unsigned)sid);
+             "Random secret generated: SID=%u.", (unsigned)sid);
   } else {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                "生成随机秘密", out->sw);
+                                "Generate random secret", out->sw);
   }
   return ESP_OK;
 }
@@ -5400,12 +5466,12 @@ esp_err_t smartcard_seedkeeper_derive_master_password(
       satochip_bytes_to_hex(out->response + 2, derived_len, derived_hex,
                             sizeof(derived_hex));
       snprintf(out->detail, sizeof(out->detail),
-               "派生成功：%s。", derived_hex);
+               "Derivation succeeded: %s.", derived_hex);
     } else {
-      snprintf(out->detail, sizeof(out->detail), "主密码派生成功。");
+      snprintf(out->detail, sizeof(out->detail), "Master password derived.");
     }
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "派生主密码",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Derive master password",
                                 out->sw);
   }
   return ESP_OK;
@@ -5440,14 +5506,14 @@ esp_err_t smartcard_seedkeeper_import_secret(
                                                sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s", detail[0] ? detail
-                                                                : "PIN 验证失败。");
+                                                                : "PIN verification failed.");
     return err;
   }
 
   const uint8_t *seedkeeper_header = header + 2;
   size_t seedkeeper_header_len = header_len - 2;
   if (seedkeeper_header_len > 128) {
-    snprintf(out->detail, sizeof(out->detail), "SeedKeeper 头过长。");
+    snprintf(out->detail, sizeof(out->detail), "SeedKeeper header is too long.");
     seedkeeper_compat_session_clear();
     return ESP_ERR_INVALID_SIZE;
   }
@@ -5460,7 +5526,7 @@ esp_err_t smartcard_seedkeeper_import_secret(
     padded_secret_size += pad;
   }
   if (padded_secret_size > 0xFFFFU) {
-    snprintf(out->detail, sizeof(out->detail), "秘密过大。");
+    snprintf(out->detail, sizeof(out->detail), "Secret is too large.");
     seedkeeper_compat_session_clear();
     return ESP_ERR_INVALID_SIZE;
   }
@@ -5477,7 +5543,7 @@ esp_err_t smartcard_seedkeeper_import_secret(
   if (secure_import)
     init_lc += 2U + iv_len;
   if (init_lc > 255U) {
-    snprintf(out->detail, sizeof(out->detail), "导入初始化数据过长。");
+    snprintf(out->detail, sizeof(out->detail), "Import initialization data is too long.");
     seedkeeper_compat_session_clear();
     return ESP_ERR_INVALID_SIZE;
   }
@@ -5499,10 +5565,10 @@ esp_err_t smartcard_seedkeeper_import_secret(
   uint16_t sw = 0;
   err = seedkeeper_transmit_checked_compat(
       apdu, apdu_len, response, sizeof(response), &response_len, &sw,
-      timeout_ms, "导入初始化", detail, sizeof(detail));
+      timeout_ms, "Import init", detail, sizeof(detail));
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "导入初始化失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Import initialization failed: %s.",
              esp_err_to_name(err));
     out->err = err;
     seedkeeper_compat_session_clear();
@@ -5510,9 +5576,9 @@ esp_err_t smartcard_seedkeeper_import_secret(
   }
   if (sw != 0x9000) {
     if (sw == 0x9C33)
-      snprintf(out->detail, sizeof(out->detail), "导入失败：MAC 校验错误。");
+      snprintf(out->detail, sizeof(out->detail), "Import failed: MAC check error.");
     else
-      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "导入初始化",
+      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Import init",
                                   sw);
     out->err = ESP_OK;
     seedkeeper_compat_session_clear();
@@ -5533,17 +5599,17 @@ esp_err_t smartcard_seedkeeper_import_secret(
     memcpy(apdu + 7, secret + offset, chunk);
     err = seedkeeper_transmit_checked_compat(
         apdu, 7 + chunk, response, sizeof(response), &response_len, &sw,
-        timeout_ms, "导入分片", detail, sizeof(detail));
+        timeout_ms, "Import chunk", detail, sizeof(detail));
     out->sw = sw;
     if (err != ESP_OK) {
-      snprintf(out->detail, sizeof(out->detail), "导入分片失败：%s。",
+      snprintf(out->detail, sizeof(out->detail), "Import chunk failed: %s.",
                esp_err_to_name(err));
       out->err = err;
       seedkeeper_compat_session_clear();
       return err;
     }
     if (sw != 0x9000) {
-      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "导入分片",
+      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Import chunk",
                                   sw);
       out->err = ESP_OK;
       seedkeeper_compat_session_clear();
@@ -5569,10 +5635,10 @@ esp_err_t smartcard_seedkeeper_import_secret(
   }
   err = seedkeeper_transmit_checked_compat(
       apdu, apdu_len, response, sizeof(response), &response_len, &sw,
-      timeout_ms, "导入完成", detail, sizeof(detail));
+      timeout_ms, "Import finish", detail, sizeof(detail));
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "导入完成失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Import finish failed: %s.",
              esp_err_to_name(err));
     out->err = err;
     seedkeeper_compat_session_clear();
@@ -5585,13 +5651,13 @@ esp_err_t smartcard_seedkeeper_import_secret(
     uint16_t sid = read_be16(response);
     if (has_header_meta && header_meta.label[0]) {
       snprintf(out->detail, sizeof(out->detail),
-               "导入成功：%s SID=%u。", header_meta.label, (unsigned)sid);
+               "Import succeeded: %s SID=%u.", header_meta.label, (unsigned)sid);
     } else {
       snprintf(out->detail, sizeof(out->detail),
-               "导入成功：SID=%u。", (unsigned)sid);
+               "Import succeeded: SID=%u.", (unsigned)sid);
     }
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "导入完成",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Import finish",
                                 sw);
   }
 
@@ -5621,7 +5687,7 @@ esp_err_t smartcard_seedkeeper_export_secret(
                                    sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s", detail[0] ? detail
-                                                                : "PIN 验证失败。");
+                                                                : "PIN verification failed.");
     return err;
   }
 
@@ -5647,10 +5713,10 @@ esp_err_t smartcard_seedkeeper_export_secret(
 
   err = seedkeeper_transmit_checked_compat(
       apdu, apdu_len, response, sizeof(response), &response_len, &sw,
-      timeout_ms, "导出初始化", detail, sizeof(detail));
+      timeout_ms, "Export init", detail, sizeof(detail));
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "导出初始化失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Export initialization failed: %s.",
              esp_err_to_name(err));
     out->err = err;
     seedkeeper_compat_session_clear();
@@ -5658,15 +5724,15 @@ esp_err_t smartcard_seedkeeper_export_secret(
   }
   if (sw != 0x9000) {
     if (sw == 0x9C31)
-      snprintf(out->detail, sizeof(out->detail), "导出被策略阻止。");
+      snprintf(out->detail, sizeof(out->detail), "Export blocked by policy.");
     else if (sw == 0x9C08)
-      snprintf(out->detail, sizeof(out->detail), "秘密不存在。");
+      snprintf(out->detail, sizeof(out->detail), "Secret does not exist.");
     else if (sw == 0x9C30)
-      snprintf(out->detail, sizeof(out->detail), "卡片忙，请重试。");
+      snprintf(out->detail, sizeof(out->detail), "Card is busy. Retry.");
     else if (sw == 0x9C0F)
-      snprintf(out->detail, sizeof(out->detail), "参数无效。");
+      snprintf(out->detail, sizeof(out->detail), "Invalid parameter.");
     else
-      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "导出初始化",
+      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Export init",
                                   sw);
     out->err = ESP_OK;
     seedkeeper_compat_session_clear();
@@ -5689,17 +5755,17 @@ esp_err_t smartcard_seedkeeper_export_secret(
     sw = 0;
     err = seedkeeper_transmit_checked_compat(
         export_apdu, apdu_len, response, sizeof(response), &response_len, &sw,
-        timeout_ms, "导出分片", detail, sizeof(detail));
+        timeout_ms, "Export chunk", detail, sizeof(detail));
     out->sw = sw;
     if (err != ESP_OK) {
-      snprintf(out->detail, sizeof(out->detail), "导出分片失败：%s。",
+      snprintf(out->detail, sizeof(out->detail), "Export chunk failed: %s.",
                esp_err_to_name(err));
       out->err = err;
       seedkeeper_compat_session_clear();
       return err;
     }
     if (sw != 0x9000) {
-      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "导出分片",
+      satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Export chunk",
                                   sw);
       out->err = ESP_OK;
       seedkeeper_compat_session_clear();
@@ -5720,10 +5786,10 @@ esp_err_t smartcard_seedkeeper_export_secret(
 
   if (has_header_meta && header_meta.label[0]) {
     snprintf(out->detail, sizeof(out->detail),
-             "导出完成：%s，已读取 %u 字节。", header_meta.label,
+             "Export complete: %s, read %u bytes.", header_meta.label,
              (unsigned)total_payload);
   } else {
-    snprintf(out->detail, sizeof(out->detail), "导出完成，已读取 %u 字节。",
+    snprintf(out->detail, sizeof(out->detail), "Export complete, read %u bytes.",
              (unsigned)total_payload);
   }
 
@@ -5751,7 +5817,7 @@ esp_err_t smartcard_seedkeeper_export_secret_to_satochip(
                                    sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s", detail[0] ? detail
-                                                                : "PIN 验证失败。");
+                                                                : "PIN verification failed.");
     return err;
   }
 
@@ -5763,10 +5829,10 @@ esp_err_t smartcard_seedkeeper_export_secret_to_satochip(
   uint16_t sw = 0;
   err = seedkeeper_transmit_checked_compat(
       apdu, sizeof(apdu), response, sizeof(response), &response_len, &sw,
-      timeout_ms, "导出到 Satochip", detail, sizeof(detail));
+      timeout_ms, "Export to Satochip", detail, sizeof(detail));
   out->sw = sw;
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "导出到 Satochip 失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Export to Satochip failed: %s.",
              esp_err_to_name(err));
     out->err = err;
     seedkeeper_compat_session_clear();
@@ -5774,14 +5840,14 @@ esp_err_t smartcard_seedkeeper_export_secret_to_satochip(
   }
   if (sw != 0x9000) {
     if (sw == 0x9C31)
-      snprintf(out->detail, sizeof(out->detail), "导出被策略阻止。");
+      snprintf(out->detail, sizeof(out->detail), "Export blocked by policy.");
     else if (sw == 0x9C08)
-      snprintf(out->detail, sizeof(out->detail), "秘密不存在。");
+      snprintf(out->detail, sizeof(out->detail), "Secret does not exist.");
     else if (sw == 0x9C0F)
-      snprintf(out->detail, sizeof(out->detail), "参数无效。");
+      snprintf(out->detail, sizeof(out->detail), "Invalid parameter.");
     else
       satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                  "导出到 Satochip", sw);
+                                  "Export to Satochip", sw);
     out->err = ESP_OK;
     seedkeeper_compat_session_clear();
     return ESP_OK;
@@ -5793,9 +5859,9 @@ esp_err_t smartcard_seedkeeper_export_secret_to_satochip(
                                              &header_meta) &&
       header_meta.label[0]) {
     snprintf(out->detail, sizeof(out->detail),
-             "已导出到 Satochip：%s。", header_meta.label);
+             "Exported to Satochip: %s.", header_meta.label);
   } else {
-    snprintf(out->detail, sizeof(out->detail), "已导出到 Satochip。");
+    snprintf(out->detail, sizeof(out->detail), "Exported to Satochip.");
   }
   out->err = ESP_OK;
   seedkeeper_compat_session_clear();
@@ -5815,15 +5881,15 @@ esp_err_t smartcard_seedkeeper_reset_secret(
   esp_err_t err = seedkeeper_execute_apdu(pin, true, apdu, sizeof(apdu), out,
                                           timeout_ms, "RESET_SECRET");
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "重置秘密失败：%s。",
+    snprintf(out->detail, sizeof(out->detail), "Reset secret failed: %s.",
              esp_err_to_name(err));
     out->err = err;
     return err;
   }
   if (out->sw == 0x9000)
-    snprintf(out->detail, sizeof(out->detail), "秘密已重置。");
+    snprintf(out->detail, sizeof(out->detail), "Secret reset.");
   else
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "重置秘密",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Reset secret",
                                 out->sw);
   out->err = ESP_OK;
   return ESP_OK;
@@ -5839,7 +5905,7 @@ esp_err_t smartcard_seedkeeper_setup_pin(
   size_t new_pin_len = new_pin ? strlen(new_pin) : 0;
   if (new_pin_len < 4 || new_pin_len > 16) {
     out->err = ESP_ERR_INVALID_ARG;
-    snprintf(out->detail, sizeof(out->detail), "PIN 需 4-16 位。");
+    snprintf(out->detail, sizeof(out->detail), "PIN must be 4-16 characters.");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -5903,14 +5969,14 @@ esp_err_t smartcard_seedkeeper_setup_pin(
   }
 
   if (out->sw == 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "设置完成。");
+    snprintf(out->detail, sizeof(out->detail), "Setup complete.");
   } else if (out->sw == 0x9C03) {
     snprintf(out->detail, sizeof(out->detail),
-             "卡已初始化；改 PIN 请用改PIN。");
+             "Card is already initialized. Use Change PIN to change it.");
   } else if (out->sw == 0x9C0F || out->sw == 0x6700) {
-    snprintf(out->detail, sizeof(out->detail), "PIN 或参数无效。");
+    snprintf(out->detail, sizeof(out->detail), "PIN or parameter is invalid.");
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "设置PIN",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Set PIN",
                                 out->sw);
   }
   secure_zero(apdu, sizeof(apdu));
@@ -5947,12 +6013,12 @@ esp_err_t smartcard_seedkeeper_change_pin(
   if (err != ESP_OK)
     return err;
   if (out->sw == 0x9000) {
-    snprintf(out->detail, sizeof(out->detail), "PIN 已修改。");
+    snprintf(out->detail, sizeof(out->detail), "PIN changed.");
   } else if ((out->sw & 0xFFC0U) == 0x63C0U) {
-    snprintf(out->detail, sizeof(out->detail), "PIN 错误，剩余 %u 次。",
+    snprintf(out->detail, sizeof(out->detail), "Wrong PIN, %u attempts remaining.",
              (unsigned)(out->sw & 0x000FU));
   } else {
-    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "修改 PIN",
+    satochip_fill_simple_detail(out->detail, sizeof(out->detail), "Change PIN",
                                 out->sw);
   }
   return ESP_OK;
@@ -5965,27 +6031,27 @@ static void seedkeeper_format_reset_lock_step_detail(
     return;
   if (out->sw == 0xFF00) {
     snprintf(out->detail, sizeof(out->detail),
-             "已恢复为空白卡。拔插卡后重新设置 PIN。");
+             "Restored to a blank card. Reinsert it, then set the PIN again.");
   } else if (out->sw == 0x9C0C) {
     snprintf(out->detail, sizeof(out->detail),
-             "%s 已锁定。下一步执行：%s。", step_name ? step_name : "当前步骤",
-             next_hint ? next_hint : "继续");
+             "%s is locked. Next step: %s.", step_name ? step_name : "Current step",
+             next_hint ? next_hint : "Continue");
   } else if ((out->sw & 0xFFC0U) == 0x63C0U) {
-    snprintf(out->detail, sizeof(out->detail), "%s 错误，剩余 %u 次。",
-             step_name ? step_name : "输入",
+    snprintf(out->detail, sizeof(out->detail), "Wrong %s, %u attempts remaining.",
+             step_name ? step_name : "input",
              (unsigned)(out->sw & 0x000FU));
   } else if (out->sw == 0x9000) {
     snprintf(out->detail, sizeof(out->detail),
-             "输入正确，重置已中止。请重新进入后使用错误值。");
+             "Input was correct, so reset was aborted. Re-enter and use the wrong value.");
   } else if (out->sw == 0x9C03) {
     snprintf(out->detail, sizeof(out->detail),
-             "PIN 还没锁定，不能执行 PUK 步骤。先执行错 PIN。");
+             "PIN is not locked yet; the PUK step cannot run. Run the wrong-PIN step first.");
   } else if (out->sw == 0x9C04) {
     snprintf(out->detail, sizeof(out->detail),
-             "卡片尚未初始化，无需重置。");
+             "The card is not initialized; reset is not needed.");
   } else {
     satochip_fill_simple_detail(out->detail, sizeof(out->detail),
-                                step_name ? step_name : "重置", out->sw);
+                                step_name ? step_name : "Reset", out->sw);
   }
 }
 
@@ -5999,7 +6065,7 @@ esp_err_t smartcard_seedkeeper_reset_wrong_pin_step(
   size_t pin_len = wrong_pin ? strlen(wrong_pin) : 0;
   if (pin_len < 4 || pin_len > 16) {
     out->err = ESP_ERR_INVALID_ARG;
-    snprintf(out->detail, sizeof(out->detail), "错误 PIN 需 4-16 位。");
+    snprintf(out->detail, sizeof(out->detail), "Wrong PIN must be 4-16 characters.");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -6017,7 +6083,7 @@ esp_err_t smartcard_seedkeeper_reset_wrong_pin_step(
   if (err != ESP_OK)
     return err;
 
-  seedkeeper_format_reset_lock_step_detail(out, "PIN", "错 PUK");
+  seedkeeper_format_reset_lock_step_detail(out, "PIN", "wrong PUK");
   out->err = ESP_OK;
   return ESP_OK;
 }
@@ -6032,7 +6098,7 @@ esp_err_t smartcard_seedkeeper_reset_wrong_puk_step(
   size_t puk_len = wrong_puk ? strlen(wrong_puk) : 0;
   if (puk_len < 4 || puk_len > 16) {
     out->err = ESP_ERR_INVALID_ARG;
-    snprintf(out->detail, sizeof(out->detail), "错误 PUK 需 4-16 位。");
+    snprintf(out->detail, sizeof(out->detail), "Wrong PUK must be 4-16 characters.");
     return ESP_ERR_INVALID_ARG;
   }
 
@@ -6050,7 +6116,7 @@ esp_err_t smartcard_seedkeeper_reset_wrong_puk_step(
   if (err != ESP_OK)
     return err;
 
-  seedkeeper_format_reset_lock_step_detail(out, "PUK", "等待恢复完成");
+  seedkeeper_format_reset_lock_step_detail(out, "PUK", "wait for reset completion");
   out->err = ESP_OK;
   return ESP_OK;
 }
@@ -6066,7 +6132,7 @@ esp_err_t smartcard_seedkeeper_reset_factory_signal(
   out->err = ESP_ERR_NOT_SUPPORTED;
   out->sw = 0x9C20;
   snprintf(out->detail, sizeof(out->detail),
-           "新版 SeedKeeper 不支持拔插 B0FF 重置。请用错 PIN / 错 PUK 流程。");
+           "New SeedKeeper cards do not support B0FF reset by reinsertion. Use the wrong PIN / wrong PUK flow.");
   return ESP_ERR_NOT_SUPPORTED;
 }
 
@@ -6083,7 +6149,7 @@ esp_err_t smartcard_seedkeeper_print_logs(const char *pin,
                                    detail, sizeof(detail));
   if (err != ESP_OK) {
     snprintf(out->detail, sizeof(out->detail), "%s", detail[0] ? detail
-                                                                : "PIN 验证失败。");
+                                                                : "PIN verification failed.");
     return err;
   }
 
@@ -6094,9 +6160,9 @@ esp_err_t smartcard_seedkeeper_print_logs(const char *pin,
                          0x01};
   err = seedkeeper_transmit_checked_compat(
       init_apdu, sizeof(init_apdu), response, sizeof(response), &response_len,
-      &sw, timeout_ms, "日志读取", detail, sizeof(detail));
+      &sw, timeout_ms, "Log read", detail, sizeof(detail));
   if (err != ESP_OK) {
-    snprintf(out->detail, sizeof(out->detail), "日志读取失败。");
+    snprintf(out->detail, sizeof(out->detail), "Log read failed.");
     out->err = err;
     seedkeeper_compat_session_clear();
     return err;
@@ -6111,7 +6177,7 @@ esp_err_t smartcard_seedkeeper_print_logs(const char *pin,
 
   size_t pos = 0;
   pos += (size_t)snprintf(out->detail + pos, sizeof(out->detail) - pos,
-                          "总日志=%u 可用=%u\n", (unsigned)total_logs,
+                          "Total logs=%u available=%u\n", (unsigned)total_logs,
                           (unsigned)avail_logs);
   while (sw == 0x9000) {
     size_t copy = response_len;
@@ -6138,7 +6204,7 @@ esp_err_t smartcard_seedkeeper_print_logs(const char *pin,
     sw = 0;
     err = seedkeeper_transmit_checked_compat(
         next_apdu, sizeof(next_apdu), response, sizeof(response),
-        &response_len, &sw, timeout_ms, "日志读取", detail, sizeof(detail));
+        &response_len, &sw, timeout_ms, "Log read", detail, sizeof(detail));
     if (err != ESP_OK)
       break;
   }

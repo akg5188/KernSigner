@@ -2,7 +2,9 @@
 
 #include "storage_browser.h"
 #include "../../core/storage.h"
+#include "../../i18n/i18n.h"
 #include "../../ui/dialog.h"
+#include "../../ui/i18n_text.h"
 #include "../../ui/menu.h"
 #include "../../ui/theme.h"
 #include "wipe_flash_dialog.h"
@@ -45,6 +47,16 @@ static void cleanup_file_data(void) {
 
 static void build_menu(void);
 static void back_cb(void);
+
+static const char *item_type_label(void) {
+  return ui_i18n_text(cfg.item_type_name ? cfg.item_type_name : "");
+}
+
+static const char *location_label(void) {
+  return (cfg.location == STORAGE_FLASH)
+             ? i18n_tr_or("storage.flash_storage", "Flash")
+             : i18n_tr_or("storage.storage_card", "SD card");
+}
 
 /* ---------- Entry selection ---------- */
 
@@ -95,11 +107,11 @@ static void inline_delete_refresh_cb(void *user_data) {
 
   if (ret != ESP_OK || raw_count == 0) {
     storage_free_file_list(raw_filenames, raw_count);
-    const char *loc_name =
-        (cfg.location == STORAGE_FLASH) ? "闪存" : "存储卡";
     char msg[64];
-    snprintf(msg, sizeof(msg), "在%s中没有找到%s文件", loc_name,
-             cfg.item_type_name);
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("storage.no_files_found_format",
+                        "No %s files found in %s"),
+             item_type_label(), location_label());
     dialog_show_error(msg, back_cb, 0);
     return;
   }
@@ -118,18 +130,23 @@ static void inline_delete_confirm_cb(bool confirmed, void *user_data) {
     if (cfg.location == STORAGE_FLASH) {
       char detail[80];
       snprintf(detail, sizeof(detail),
-               "%s已删除。\n如需不可恢复删除，请使用清空闪存。",
-               cfg.item_type_name);
-      dialog_show_info("已删除", detail, inline_delete_refresh_cb, NULL,
-                       DIALOG_STYLE_OVERLAY);
+               i18n_tr_or("storage.deleted_flash_detail_format",
+                          "%s deleted.\nFor unrecoverable deletion, use wipe "
+                          "flash."),
+               item_type_label());
+      dialog_show_info(i18n_tr_or("storage.deleted", "Deleted"), detail,
+                       inline_delete_refresh_cb, NULL, DIALOG_STYLE_OVERLAY);
     } else {
       char detail[40];
-      snprintf(detail, sizeof(detail), "%s已删除", cfg.item_type_name);
-      dialog_show_info("已删除", detail, inline_delete_refresh_cb, NULL,
-                       DIALOG_STYLE_OVERLAY);
+      snprintf(detail, sizeof(detail),
+               i18n_tr_or("storage.deleted_detail_format", "%s deleted"),
+               item_type_label());
+      dialog_show_info(i18n_tr_or("storage.deleted", "Deleted"), detail,
+                       inline_delete_refresh_cb, NULL, DIALOG_STYLE_OVERLAY);
     }
   } else {
-    dialog_show_error("删除失败", NULL, 0);
+    dialog_show_error(i18n_tr_or("dialog.delete_failed", "Delete failed"),
+                      NULL, 0);
   }
 }
 
@@ -139,7 +156,8 @@ static void delete_action_cb(int idx) {
 
   pending_delete_index = idx;
   char msg[80];
-  snprintf(msg, sizeof(msg), "删除“%s”？",
+  snprintf(msg, sizeof(msg),
+           i18n_tr_or("storage.delete_file_confirm_format", "Delete \"%s\"?"),
            display_names[idx] ? display_names[idx] : stored_filenames[idx]);
   dialog_show_danger_confirm(msg, inline_delete_confirm_cb, NULL,
                              DIALOG_STYLE_OVERLAY);
@@ -152,8 +170,11 @@ static void wipe_flash_cb(void) { wipe_flash_dialog_start(back_cb); }
 /* ---------- Menu building ---------- */
 
 static void build_menu(void) {
-  const char *title =
-      (cfg.location == STORAGE_FLASH) ? "从闪存加载" : "从存储卡加载";
+  const char *title = (cfg.location == STORAGE_FLASH)
+                          ? i18n_tr_or("storage.load_from_flash",
+                                       "Load from Flash")
+                          : i18n_tr_or("storage.load_from_sd",
+                                       "Load from SD");
 
   browser_menu = ui_menu_create(browser_screen, title, back_cb);
   if (!browser_menu)
@@ -163,11 +184,14 @@ static void build_menu(void) {
     const char *label =
         display_names[i] ? display_names[i] : stored_filenames[i];
     ui_menu_add_entry_with_action(browser_menu, label, entry_selected_cb,
-                                  "删", delete_action_cb);
+                                  i18n_tr_or("action.delete_short", "Del"),
+                                  delete_action_cb);
   }
 
   if (cfg.location == STORAGE_FLASH) {
-    ui_menu_add_entry(browser_menu, "清空闪存", wipe_flash_cb);
+    ui_menu_add_entry(browser_menu,
+                      i18n_tr_or("storage.wipe_flash", "Wipe flash"),
+                      wipe_flash_cb);
     int wipe_idx = browser_menu->config.entry_count - 1;
     lv_obj_t *wipe_label = lv_obj_get_child(browser_menu->buttons[wipe_idx], 0);
     lv_obj_set_style_text_color(wipe_label, error_color(), 0);
@@ -193,11 +217,11 @@ static void deferred_list_cb(lv_timer_t *timer) {
 
   if (ret != ESP_OK || raw_count == 0) {
     storage_free_file_list(raw_filenames, raw_count);
-    const char *loc_name =
-        (cfg.location == STORAGE_FLASH) ? "闪存" : "存储卡";
     char msg[64];
-    snprintf(msg, sizeof(msg), "在%s中没有找到%s文件", loc_name,
-             cfg.item_type_name);
+    snprintf(msg, sizeof(msg),
+             i18n_tr_or("storage.no_files_found_format",
+                        "No %s files found in %s"),
+             item_type_label(), location_label());
     dialog_show_error(msg, back_cb, 0);
     return;
   }
@@ -217,7 +241,8 @@ void storage_browser_create(lv_obj_t *parent,
   browser_screen = theme_create_page_container(parent);
 
   loading_label = lv_label_create(browser_screen);
-  lv_label_set_text(loading_label, "正在准备存储...");
+  lv_label_set_text(loading_label,
+                    i18n_tr_or("storage.preparing", "Preparing storage..."));
   lv_obj_set_style_text_font(loading_label, theme_font_small(), 0);
   lv_obj_set_style_text_color(loading_label, main_color(), 0);
   lv_obj_align(loading_label, LV_ALIGN_CENTER, 0, 0);

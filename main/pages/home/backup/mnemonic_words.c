@@ -2,6 +2,7 @@
 
 #include "mnemonic_words.h"
 #include "../../../core/key.h"
+#include "../../../i18n/i18n.h"
 #include "../../../ui/dialog.h"
 #include "../../../ui/input_helpers.h"
 #include "../../../ui/theme.h"
@@ -25,11 +26,12 @@ static void append_word_line(char *buf, size_t buf_len, int *offset,
     return;
 
   int word_index = bip39_filter_get_word_index(word);
-  char index_text[5];
+  char index_text[16];
   if (word_index >= 0)
     snprintf(index_text, sizeof(index_text), "%04d", word_index);
   else
-    snprintf(index_text, sizeof(index_text), "未知");
+    snprintf(index_text, sizeof(index_text), "%s",
+             i18n_tr_or("common.unknown", "Unknown"));
 
   int remaining = (int)buf_len - *offset;
   int written = snprintf(buf + *offset, remaining, "%s%2zu. %s  %s",
@@ -50,7 +52,10 @@ void mnemonic_words_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   return_callback = return_cb;
 
   if (!key_mnemonic_is_valid()) {
-    dialog_show_error("临时助记词不能显示明文词或序号", return_cb, 0);
+    dialog_show_error(
+        i18n_tr_or("backup.no_temporary_words",
+                   "Temporary mnemonic cannot show plaintext words or indexes"),
+        return_cb, 0);
     return;
   }
 
@@ -61,13 +66,15 @@ void mnemonic_words_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   bool wordlist_ready = bip39_filter_init();
 
   mnemonic_screen = theme_create_page_container(parent);
-  theme_create_page_title(mnemonic_screen, "序号");
+  theme_create_page_title(mnemonic_screen,
+                          i18n_tr_or("backup.word_indexes", "Word indexes"));
   (void)ui_create_back_button(mnemonic_screen, back_cb);
 
   char fingerprint_text[32];
   char fingerprint_hex[9] = "--------";
   key_get_fingerprint_hex(fingerprint_hex);
-  snprintf(fingerprint_text, sizeof(fingerprint_text), "钱包指纹 %s",
+  snprintf(fingerprint_text, sizeof(fingerprint_text), "%s %s",
+           i18n_tr_or("wallet.wallet_fingerprint", "Wallet fingerprint"),
            fingerprint_hex);
 
   lv_obj_t *content = lv_obj_create(mnemonic_screen);
@@ -88,7 +95,10 @@ void mnemonic_words_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_set_style_text_align(fingerprint, LV_TEXT_ALIGN_CENTER, 0);
 
   if (!wordlist_ready) {
-    lv_obj_t *warn = theme_create_label(content, "词表未加载", false);
+    lv_obj_t *warn = theme_create_label(
+        content, i18n_tr_or("wallet.wordlist_not_loaded",
+                            "Wordlist not loaded"),
+        false);
     lv_obj_set_style_text_font(warn, theme_font_small(), 0);
     lv_obj_set_style_text_color(warn, error_color(), 0);
     lv_obj_set_style_text_align(warn, LV_TEXT_ALIGN_CENTER, 0);

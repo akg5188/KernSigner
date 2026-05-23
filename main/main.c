@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "core/session.h"
 #include "core/wallet.h"
+#include "i18n/i18n.h"
 #include "pages/pin/pin_page.h"
 #include "pages/signer_shell/signer_shell.h"
 #include "smartcard/smartcard_ccid.h"
@@ -120,7 +121,8 @@ void app_main(void) {
     ret = nvs_flash_init();
   }
   ESP_ERROR_CHECK(ret);
-  settings_init();
+  ESP_ERROR_CHECK(settings_init());
+  i18n_set_language(settings_get_language());
   (void)settings_set_permissive_signing(false);
   ESP_ERROR_CHECK(pin_init());
   session_set_expired_callback(session_expired_handler);

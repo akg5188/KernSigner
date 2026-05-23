@@ -43,10 +43,11 @@ Usage:
 
 ```bash
 # Load a single image (held as a static frame)
-just sim --qr-image simulator/data/qr_images/test_qr.png
+cd /home/ak/123/Kern
+./simulator/build/signer_simulator --qr-image simulator/data/qr_images/test_qr.png
 
 # Cycle through all images in a directory at ~30 fps
-just sim --qr-dir simulator/data/qr_images/
+./simulator/build/signer_simulator --qr-dir simulator/data/qr_images/
 ```
 
 Images are decoded via stb_image, converted from RGB888 to

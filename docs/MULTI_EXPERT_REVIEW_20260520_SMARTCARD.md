@@ -95,7 +95,7 @@ Kern 已经迁入 Satochip 智能卡 Web3 主线，但不是完整的 `satochip-
 
 - `git diff --check`：通过。
 - 三个被改 C 文件按 `build_wave_43/compile_commands.json` 执行 `-fsyntax-only`：通过。
-- `tools/kern_delivery.sh prodcheck`：失败，符合预期；失败项包括 Secure Boot、Flash Encryption、NVS 加密、生产 PIN HMAC、ETH/LWIP、USB Serial JTAG、GDB Stub、console、WDT panic 和 clean worktree。
+- `tools/signer_delivery.sh prodcheck`：失败，符合预期；失败项包括 Secure Boot、Flash Encryption、NVS 加密、生产 PIN HMAC、ETH/LWIP、USB Serial JTAG、GDB Stub、console、WDT panic 和 clean worktree。
 
 ## 交付判断
 
