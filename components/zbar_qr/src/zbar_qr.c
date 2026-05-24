@@ -6,12 +6,15 @@
 #include "zbar.h"
 
 #define ZBAR_FORMAT_Y800 0x30303859UL
+#define ZBAR_QR_NORMAL_DENSITY 1
+#define ZBAR_QR_DENSE_DENSITY 2
 
 struct zbar_qr_decoder {
   zbar_image_scanner_t *scanner;
   zbar_image_t *image;
   int image_width;
   int image_height;
+  bool dense_mode;
 };
 
 zbar_qr_decoder_t *zbar_qr_decoder_create(void) {
@@ -38,9 +41,25 @@ zbar_qr_decoder_t *zbar_qr_decoder_create(void) {
   zbar_image_scanner_set_config(decoder->scanner, ZBAR_QRCODE,
                                 ZBAR_CFG_BINARY, 1);
   zbar_image_scanner_set_config(decoder->scanner, 0, ZBAR_CFG_TEST_INVERTED, 1);
+  zbar_image_scanner_set_config(decoder->scanner, 0, ZBAR_CFG_X_DENSITY,
+                                ZBAR_QR_NORMAL_DENSITY);
+  zbar_image_scanner_set_config(decoder->scanner, 0, ZBAR_CFG_Y_DENSITY,
+                                ZBAR_QR_NORMAL_DENSITY);
   zbar_image_scanner_enable_cache(decoder->scanner, 0);
 
   return decoder;
+}
+
+void zbar_qr_decoder_set_dense_mode(zbar_qr_decoder_t *decoder, bool enabled) {
+  if (!decoder || !decoder->scanner || decoder->dense_mode == enabled)
+    return;
+
+  int density = enabled ? ZBAR_QR_DENSE_DENSITY : ZBAR_QR_NORMAL_DENSITY;
+  zbar_image_scanner_set_config(decoder->scanner, 0, ZBAR_CFG_X_DENSITY,
+                                density);
+  zbar_image_scanner_set_config(decoder->scanner, 0, ZBAR_CFG_Y_DENSITY,
+                                density);
+  decoder->dense_mode = enabled;
 }
 
 void zbar_qr_decoder_destroy(zbar_qr_decoder_t *decoder) {

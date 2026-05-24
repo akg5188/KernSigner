@@ -44,15 +44,9 @@
   ((BSP_LCD_H_RES) < (BSP_LCD_V_RES) ? (BSP_LCD_H_RES) : (BSP_LCD_V_RES))
 #define CAMERA_TARGET                                                          \
   ((CAMERA_SCREEN_DIM_MIN) < 640 ? (CAMERA_SCREEN_DIM_MIN) : 640)
-#define CAMERA_INPUT_WIDTH 1280
-#define CAMERA_INPUT_HEIGHT 960
-#define CAMERA_INPUT_CROP                                                      \
-  ((CAMERA_TARGET * 2 <= 960) ? (CAMERA_TARGET * 2) : 960)
-// Largest Q4.4 scale <= target/crop, and the exact preview size it yields.
-#define CAMERA_PPA_FRAG ((CAMERA_TARGET * 16) / CAMERA_INPUT_CROP)
-#define CAMERA_SCREEN_SIZE ((CAMERA_INPUT_CROP * CAMERA_PPA_FRAG) / 16)
-#define CAMERA_SCREEN_WIDTH CAMERA_SCREEN_SIZE
-#define CAMERA_SCREEN_HEIGHT CAMERA_SCREEN_SIZE
+#define CAMERA_SOURCE_CROP_CAP 1080
+#define CAMERA_SCREEN_WIDTH CAMERA_TARGET
+#define CAMERA_SCREEN_HEIGHT CAMERA_TARGET
 // Decode from a larger square than the on-screen preview, but keep the common
 // path light enough for animated QR sampling. 480px remains the speed-first
 // profile; occasional rescue frames use tighter crops and/or 640px when no
@@ -70,8 +64,10 @@
 #define QR_DOT_RETRY_DILATE_RADIUS_MAX 3
 #define QR_SLOW_FALLBACK_PERIOD 12
 #define QR_UR_SLOW_FALLBACK_PERIOD 5
-#define QR_RESCUE_PROFILE_PERIOD 24
+#define QR_RESCUE_PROFILE_PERIOD 16
 #define QR_INVERTED_FALLBACK_PERIOD 24
+#define QR_EARLY_RESCUE_MISS_STREAK 3
+#define QR_AGGRESSIVE_RESCUE_MISS_STREAK 6
 #define PROGRESS_BAR_HEIGHT 20
 #define PROGRESS_FRAME_PADD 2
 #define PROGRESS_BLOC_PAD 1
@@ -138,6 +134,7 @@ static uint32_t qr_decoder_width = 0;
 static uint32_t qr_decoder_height = 0;
 static uint32_t decode_profile_seq = 0;
 static volatile bool qr_payload_seen = false;
+static volatile bool qr_sequence_locked = false;
 static volatile uint32_t qr_decode_miss_streak = 0;
 
 static k_quirc_t *qr_decoder = NULL;
@@ -204,6 +201,7 @@ static void free_decode_buffer(void);
 static void free_qr_preprocess_buffer(void);
 static qr_decode_profile_t select_decode_profile(uint32_t frame_seq,
                                                  bool payload_seen,
+                                                 bool sequence_locked,
                                                  uint32_t miss_streak);
 static void rgb565_crop_to_grayscale(const uint8_t *rgb565_data,
                                      uint8_t *gray_data, uint32_t src_w,
@@ -233,7 +231,7 @@ typedef struct {
 static bool process_quirc_results(qr_scan_diag_t *diag, uint32_t radius,
                                   const k_quirc_debug_info_t *debug);
 static bool process_zbar_result(const uint8_t *gray_data, uint32_t width,
-                                uint32_t height);
+                                uint32_t height, bool dense_mode);
 static bool should_run_slow_fallback(uint32_t frame_seq);
 static bool qr_decoder_ensure_size(uint32_t width, uint32_t height);
 static bool handle_decoded_qr_payload(const uint8_t *payload,
@@ -685,6 +683,7 @@ static void free_qr_preprocess_buffer(void) {
 
 static qr_decode_profile_t select_decode_profile(uint32_t frame_seq,
                                                  bool payload_seen,
+                                                 bool sequence_locked,
                                                  uint32_t miss_streak) {
   qr_decode_profile_t profile = {
       .output_size = CAMERA_DECODE_SIZE,
@@ -693,36 +692,45 @@ static qr_decode_profile_t select_decode_profile(uint32_t frame_seq,
       .rescue_profile = false,
   };
 
-  if (payload_seen)
+  if (payload_seen && !sequence_locked)
     return profile;
 
-  if (miss_streak >= 8) {
+  if (miss_streak >= QR_AGGRESSIVE_RESCUE_MISS_STREAK) {
     profile.output_size = CAMERA_DECODE_RESCUE_SIZE;
-    profile.crop_percent = 82;
+    profile.crop_percent = 96;
+    profile.smooth_downscale = true;
+    profile.rescue_profile = true;
+    return profile;
+  }
+
+  if (miss_streak >= QR_EARLY_RESCUE_MISS_STREAK) {
+    profile.output_size = CAMERA_DECODE_RESCUE_SIZE;
+    profile.crop_percent = 98;
     profile.smooth_downscale = true;
     profile.rescue_profile = true;
     return profile;
   }
 
   switch (frame_seq % QR_RESCUE_PROFILE_PERIOD) {
-  case 5:
-    profile.crop_percent = 88;
+  case 3:
+    profile.crop_percent = 98;
+    profile.smooth_downscale = true;
+    profile.rescue_profile = true;
+    break;
+  case 7:
+    profile.output_size = CAMERA_DECODE_RESCUE_SIZE;
+    profile.crop_percent = 100;
     profile.smooth_downscale = true;
     profile.rescue_profile = true;
     break;
   case 11:
-    profile.crop_percent = 78;
+    profile.crop_percent = 94;
     profile.smooth_downscale = true;
     profile.rescue_profile = true;
     break;
-  case 17:
+  case 15:
     profile.output_size = CAMERA_DECODE_RESCUE_SIZE;
-    profile.smooth_downscale = true;
-    profile.rescue_profile = true;
-    break;
-  case 23:
-    profile.output_size = CAMERA_DECODE_RESCUE_SIZE;
-    profile.crop_percent = 82;
+    profile.crop_percent = 96;
     profile.smooth_downscale = true;
     profile.rescue_profile = true;
     break;
@@ -936,6 +944,10 @@ static bool handle_decoded_qr_payload(const uint8_t *payload, int payload_len) {
   if (part_index >= 0 || qr_parser->total == 1) {
     if (qr_parser->format > FORMAT_NONE)
       __atomic_store_n(&qr_payload_seen, true, __ATOMIC_RELEASE);
+    if (qr_parser->total > 1 && !qr_parser_is_complete(qr_parser))
+      __atomic_store_n(&qr_sequence_locked, true, __ATOMIC_RELEASE);
+    else
+      __atomic_store_n(&qr_sequence_locked, false, __ATOMIC_RELEASE);
     if (qr_parser->format == FORMAT_UR || qr_parser->total > 1)
       preview_paused_for_payload = true;
     if (qr_parser->format != FORMAT_UR)
@@ -974,10 +986,12 @@ static bool handle_decoded_qr_payload(const uint8_t *payload, int payload_len) {
 }
 
 static bool process_zbar_result(const uint8_t *gray_data, uint32_t width,
-                                uint32_t height) {
+                                uint32_t height, bool dense_mode) {
   if (!qr_zbar_decoder || !qr_decode_result || !gray_data || width == 0 ||
       height == 0)
     return false;
+
+  zbar_qr_decoder_set_dense_mode(qr_zbar_decoder, dense_mode);
 
   if (!zbar_qr_decode_grayscale(qr_zbar_decoder, gray_data, (int)width,
                                 (int)height, qr_decode_result))
@@ -1006,10 +1020,11 @@ static bool should_run_slow_fallback(uint32_t frame_seq) {
   if (!qr_zbar_decoder || !qr_parser)
     return true;
 
-  // Once an animated UR sequence has started, prefer sampling more fresh frames.
-  // ZBar handles OKX-style round/dot QR well; quirc + dilation is more useful
-  // before the format is known.
-  if (qr_parser->format == FORMAT_UR)
+  // Once an animated multipart wallet sequence has started, prefer sampling more
+  // fresh frames. ZBar handles these screen-rendered QR styles well; quirc +
+  // dilation is more useful before the format is known.
+  if (qr_parser->format == FORMAT_UR || qr_parser->format == FORMAT_RELAY ||
+      qr_parser->format == FORMAT_TP_MULTI)
     return false;
 
   if (qr_parser->format > FORMAT_NONE)
@@ -1101,21 +1116,24 @@ static void qr_decode_task(void *pvParameters) {
     static uint32_t decode_frame_seq = 0;
     uint32_t frame_seq = decode_frame_seq++;
     bool got_payload = false;
-    bool run_slow_fallback =
-        should_run_slow_fallback(frame_seq) || frame_data.rescue_profile;
+    bool prelock_rescue =
+        frame_data.rescue_profile &&
+        !__atomic_load_n(&qr_payload_seen, __ATOMIC_ACQUIRE);
+    bool run_slow_fallback = should_run_slow_fallback(frame_seq) || prelock_rescue;
     bool quirc_ready =
         run_slow_fallback &&
         qr_decoder_ensure_size(frame_data.width, frame_data.height);
     bool preprocess_ready =
         quirc_ready &&
+        prelock_rescue &&
         ensure_qr_preprocess_buffer(frame_data.width, frame_data.height);
     uint32_t retry_radius = 0;
-    if (run_slow_fallback && preprocess_ready) {
+    if (prelock_rescue && preprocess_ready) {
       retry_radius =
           (dot_retry_frame++ % QR_DOT_RETRY_DILATE_RADIUS_MAX) + 1;
     }
 
-    bool run_contrast_retry = frame_data.rescue_profile && quirc_ready;
+    bool run_contrast_retry = prelock_rescue && quirc_ready;
     int pass_count = 1 + (retry_radius ? 1 : 0) +
                      (run_contrast_retry ? 1 : 0);
     for (int pass = 0; pass < pass_count && !got_payload; pass++) {
@@ -1152,8 +1170,10 @@ static void qr_decode_task(void *pvParameters) {
         break;
       }
 
-      got_payload =
-          process_zbar_result(zbar_buf, frame_data.width, frame_data.height);
+      bool zbar_dense_mode = prelock_rescue && qr_parser &&
+                             qr_parser->format == FORMAT_NONE;
+      got_payload = process_zbar_result(zbar_buf, frame_data.width,
+                                        frame_data.height, zbar_dense_mode);
       if (got_payload || closing || destruction_in_progress || scan_completed)
         break;
 
@@ -1445,21 +1465,21 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
   }
 
   static bool resolution_mismatch_logged = false;
-  if (!resolution_mismatch_logged && (camera_buf_hes != CAMERA_INPUT_WIDTH ||
-                                      camera_buf_ves != CAMERA_INPUT_HEIGHT)) {
+  if (!resolution_mismatch_logged &&
+      !((camera_buf_hes == 1280 && camera_buf_ves == 960) ||
+        (camera_buf_hes == 1920 && camera_buf_ves == 1080))) {
     ESP_LOGW(TAG,
              "Camera resolution %" PRIu32 "x%" PRIu32
-             " differs from expected %dx%d; cropping dynamically",
-             camera_buf_hes, camera_buf_ves, CAMERA_INPUT_WIDTH,
-             CAMERA_INPUT_HEIGHT);
+             " is not a known OV5647 scan profile; cropping dynamically",
+             camera_buf_hes, camera_buf_ves);
     resolution_mismatch_logged = true;
   }
 
   uint32_t in_w = camera_buf_hes;
   uint32_t in_h = camera_buf_ves;
   uint32_t preview_crop = (in_w < in_h) ? in_w : in_h;
-  if (preview_crop > CAMERA_INPUT_CROP) {
-    preview_crop = CAMERA_INPUT_CROP;
+  if (preview_crop > CAMERA_SOURCE_CROP_CAP) {
+    preview_crop = CAMERA_SOURCE_CROP_CAP;
   }
   uint32_t crop_ox = (in_w - preview_crop) / 2;
   uint32_t crop_oy = (in_h - preview_crop) / 2;
@@ -1476,10 +1496,12 @@ static void camera_video_frame_operation(uint8_t *camera_buf,
     __atomic_store_n(&decode_frame_in_flight, true, __ATOMIC_RELEASE);
     bool payload_seen =
         __atomic_load_n(&qr_payload_seen, __ATOMIC_ACQUIRE);
+    bool sequence_locked =
+        __atomic_load_n(&qr_sequence_locked, __ATOMIC_ACQUIRE);
     uint32_t miss_streak =
         __atomic_load_n(&qr_decode_miss_streak, __ATOMIC_ACQUIRE);
     decode_profile = select_decode_profile(decode_profile_seq++, payload_seen,
-                                           miss_streak);
+                                           sequence_locked, miss_streak);
     if (decode_profile.output_size > preview_crop)
       decode_profile.output_size = preview_crop;
     uint32_t decode_crop = preview_crop;
@@ -1761,6 +1783,7 @@ void qr_scanner_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   preview_paused_for_payload = false;
   decode_profile_seq = 0;
   __atomic_store_n(&qr_payload_seen, false, __ATOMIC_RELEASE);
+  __atomic_store_n(&qr_sequence_locked, false, __ATOMIC_RELEASE);
   __atomic_store_n(&qr_decode_miss_streak, 0, __ATOMIC_RELEASE);
 
   qr_scanner_screen = lv_obj_create(lv_screen_active());
@@ -1919,6 +1942,7 @@ void qr_scanner_page_destroy(void) {
   preview_paused_for_payload = false;
   decode_profile_seq = 0;
   __atomic_store_n(&qr_payload_seen, false, __ATOMIC_RELEASE);
+  __atomic_store_n(&qr_sequence_locked, false, __ATOMIC_RELEASE);
   __atomic_store_n(&qr_decode_miss_streak, 0, __ATOMIC_RELEASE);
 }
 
