@@ -29,6 +29,7 @@ void scan_page_hide(void);
 void scan_page_destroy(void);
 
 #ifdef SIMULATOR
+void scan_simulator_show_btc_psbt_review(void);
 void scan_simulator_show_web3_tx_review(void);
 void scan_simulator_show_web3_typed_review(void);
 #endif

@@ -2,7 +2,7 @@
 
 Status: **untested development firmware**.
 
-This repository currently contains a development snapshot for Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 (`wave_43`). The included firmware has been rebuilt locally, passed simulator delivery acceptance, and the app-only image was flashed to a real board with a passing boot-log capture on 2026-05-23. It is **not audited** and must be treated as **test-funds only** until independent real-device and production-security verification is complete.
+This repository currently contains a development snapshot for Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3 (`wave_43`). The included firmware has been rebuilt locally, passed simulator delivery acceptance, and the app-only image was flashed to a real board with a passing boot-log capture on 2026-05-24. It is **not audited** and must be treated as **test-funds only** until independent real-device and production-security verification is complete.
 
 ## Pinned Local Build Inputs
 
@@ -49,8 +49,8 @@ sha256sum firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
 Expected included firmware SHA256:
 
 ```text
-733082ea5a4946fccad2ea78ae8fea4cb933f34fcf709de9921f9c4c0b4decd4  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
-896c00b2cc488fb76d8bf208705ce3b0faa9b51142285b437a57c8a69d6c5c0b  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
+bd50d526089b13d7af360e0ef4514b5e961564138452bb2c5a028f6132dac502  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin
+c31bb74caed08a17313ae0693c2b3a17e09cb3e0f9a2ae7cb7616df3622a282a  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
 ```
 
 A byte-for-byte match can depend on using the same ESP-IDF, toolchain, submodule commits, generated font assets, and sdkconfig. If the hash differs, compare:
@@ -63,13 +63,13 @@ sha256sum sdkconfig.release.wave_43 dependencies.lock main/ui/assets/signer_cn_2
 
 Latest local acceptance checks for this snapshot:
 
-- `JOBS=2 tools/signer_delivery.sh build`: PASS, app hash `733082ea5a4946fccad2ea78ae8fea4cb933f34fcf709de9921f9c4c0b4decd4`
+- `JOBS=2 tools/signer_delivery.sh build`: PASS, app hash `bd50d526089b13d7af360e0ef4514b5e961564138452bb2c5a028f6132dac502`
 - `tools/signer_delivery.sh check`: PASS, report `docs/screens/delivery_20260523_175620/ACCEPTANCE_REPORT.txt`
 - `./scripts/test.sh`: PASS
 - `(cd firmware/wave_43 && sha256sum -c SHA256SUMS.txt)`: PASS
 - OKX local sample: static photo + 1 fps video frames `12/12 decoded`
 - App-only real-device flash: PASS on `/dev/ttyACM0`, `Hash of data verified`
-- Boot-log capture: PASS, `docs/logs/boot_20260523_182345.log`
+- Boot-log capture: PASS on local hardware after app-only flashing.
 
 ## Flash The Included Firmware
 

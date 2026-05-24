@@ -241,6 +241,8 @@ static const char *shell_i18n_key_for_id(const char *id) {
       {"smartcard_card_info", "menu.info"},
       {"satochip_path_address", "sign.derive_address"},
       {"connect_wallet_satochip_address", "sign.derive_address"},
+      {"web3_address_satochip", "sign.derive_address"},
+      {"connect_keystone", NULL},
       {"smartcard_satochip_write_mnemonic", "menu.write_card"},
       {"smartcard_satochip_maint", "menu.maintenance"},
       {"smartcard_satochip_advanced_tools", "menu.advanced"},
@@ -451,9 +453,8 @@ static const signer_menu_override_t SIGNER_PI_CONNECT_MENU[] = {
     {"Rabby", "connect_rabby"},
     {"TokenPocket", "connect_tokenpocket"},
     {"imToken", "connect_imtoken"},
-    {"Derived Address", "connect_wallet_satochip_address",
-     "menu.derived_address"},
-    {"Keystone", "connect_wallet_satochip_address", ""},
+    {"Derived Address", "custom_derivation", "menu.derived_address"},
+    {"Keystone", "connect_keystone"},
 };
 
 static const signer_menu_override_t SIGNER_CONNECT_WEB3_MENU[] = {
@@ -493,6 +494,11 @@ static const signer_menu_override_t SIGNER_CONNECT_TOKENPOCKET_MENU[] = {
 static const signer_menu_override_t SIGNER_CONNECT_IMTOKEN_MENU[] = {
     {"Mnemonic", "web3_imtoken_mnemonic"},
     {"Smartcard", "web3_imtoken_satochip"},
+};
+
+static const signer_menu_override_t SIGNER_CONNECT_KEYSTONE_MENU[] = {
+    {"Mnemonic", "web3_address_mnemonic"},
+    {"Smartcard", "web3_address_satochip", "menu.smartcard"},
 };
 
 static const signer_menu_override_t SIGNER_BTC_WALLET_MENU[] = {
@@ -766,6 +772,20 @@ static const signer_feature_t SIGNER_LOCAL_SMARTCARD_FEATURES[] = {
      "Create a mnemonic from SeedKeeper random data.",
      "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
      SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
+    {"connect_keystone", "pi_connect_wallet", "Keystone", "Choose Source",
+     "Choose a source for the Keystone-compatible address QR.",
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_GROUP,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_VIEW_ONLY},
+    {"web3_address_mnemonic", "connect_keystone", "Mnemonic",
+     "Keystone Address QR",
+     "Show the EVM address QR derived from the current mnemonic.",
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_VIEW_ONLY},
+    {"web3_address_satochip", "connect_keystone", "Smartcard",
+     "Keystone Address QR",
+     "Read the EVM address from the smartcard and show its QR code.",
+     "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
+     SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_EXTERNAL_IO},
     {"load_seedkeeper_mnemonic",
      "load_mnemonic", "Smartcard", "Import from card",
      "Import a mnemonic from SeedKeeper.",
@@ -883,6 +903,9 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "web3_tokenpocket_satochip",
     "web3_imtoken_mnemonic",
     "web3_imtoken_satochip",
+    "connect_keystone",
+    "web3_address_mnemonic",
+    "web3_address_satochip",
     "btc_wallet",
     "btc_mnemonic",
     "btc_satochip",
@@ -1025,8 +1048,6 @@ static bool product_screen_is_visible(const char *id) {
          !signer_id_is_any(id, "seedkeeper_status", "seedkeeper_list") &&
          strcmp(id, "seedkeeper_logs") != 0 &&
          strcmp(id, "connect_address") != 0 &&
-         !signer_id_is_any(id, "web3_address_mnemonic",
-                         "web3_address_satochip") &&
          !signer_id_is_any(id, "addresses", "addr_receive") &&
          !signer_id_is_any(id, "addr_change", "addr_scan_check") &&
          strcmp(id, "addr_qr_view") != 0 &&
@@ -1307,6 +1328,11 @@ static void simulator_custom_derivation_import_cb(void) {
   (void)signer_shell_show_screen("load_mnemonic");
 }
 
+static void simulator_custom_derivation_smartcard_cb(void) {
+  custom_derivation_page_destroy();
+  (void)signer_shell_show_screen("connect_wallet_satochip_address");
+}
+
 static bool simulator_launch_custom_derivation(void) {
   if (!s_parent)
     s_parent = lv_screen_active();
@@ -1315,10 +1341,12 @@ static bool simulator_launch_custom_derivation(void) {
   s_current_screen_id = "custom_derivation";
   custom_derivation_page_create_with_import(
       s_parent, simulator_custom_derivation_return_cb,
-      simulator_custom_derivation_import_cb);
+      simulator_custom_derivation_import_cb,
+      simulator_custom_derivation_smartcard_cb);
   custom_derivation_page_show();
   return true;
 }
+
 #endif
 
 #ifndef SIMULATOR
@@ -1499,6 +1527,11 @@ static void shell_return_from_custom_derivation_cb(void) {
 static void shell_import_from_custom_derivation_cb(void) {
   custom_derivation_page_destroy();
   legacy_wallet_launch_load();
+}
+
+static void shell_custom_derivation_smartcard_cb(void) {
+  custom_derivation_page_destroy();
+  (void)signer_shell_show_screen("connect_wallet_satochip_address");
 }
 
 static void legacy_wallet_launch_words(void) {
@@ -1942,7 +1975,8 @@ static void legacy_wallet_launch_custom_derivation_unlocked(void) {
   lv_obj_t *root = legacy_wallet_prepare_root();
   custom_derivation_page_create_with_import(
       root, shell_return_from_custom_derivation_cb,
-      shell_import_from_custom_derivation_cb);
+      shell_import_from_custom_derivation_cb,
+      shell_custom_derivation_smartcard_cb);
   custom_derivation_page_show();
 }
 
@@ -3038,7 +3072,8 @@ static bool is_connect_wallet_source_menu(const char *id) {
                 strcmp(id, "connect_metamask") == 0 ||
                 strcmp(id, "connect_rabby") == 0 ||
                 strcmp(id, "connect_tokenpocket") == 0 ||
-                strcmp(id, "connect_imtoken") == 0);
+                strcmp(id, "connect_imtoken") == 0 ||
+                strcmp(id, "connect_keystone") == 0);
 }
 
 static bool is_connect_wallet_group_menu(const char *id) {
@@ -3146,6 +3181,10 @@ static void web3_qr_event_cb(lv_event_t *event) {
 
 static evm_web3_profile_t web3_profile_for_feature(const char *id) {
   if (!id)
+    return EVM_WEB3_PROFILE_ADDRESS;
+  if (strcmp(id, "web3_address") == 0 ||
+      strcmp(id, "web3_address_mnemonic") == 0 ||
+      strcmp(id, "web3_address_satochip") == 0)
     return EVM_WEB3_PROFILE_ADDRESS;
   if (strcmp(id, "web3_okx") == 0 ||
       strcmp(id, "web3_okx_mnemonic") == 0 ||
@@ -8900,6 +8939,11 @@ static bool create_special_detail_cards(lv_obj_t *parent,
     return true;
   }
 
+  if (strcmp(feature->id, "web3_address_satochip") == 0) {
+    create_satochip_tool_block(parent, feature, SATOCHIP_TOOL_PATH_ADDRESS);
+    return true;
+  }
+
   if (strcmp(feature->id, "satochip_btc_zpub") == 0 ||
       strcmp(feature->id, "btc_satochip_zpub") == 0) {
     create_satochip_tool_block(parent, feature, SATOCHIP_TOOL_BTC_ZPUB);
@@ -9443,6 +9487,9 @@ static size_t signer_override_menu_count(const char *id) {
   if (strcmp(id, "connect_imtoken") == 0)
     return sizeof(SIGNER_CONNECT_IMTOKEN_MENU) /
            sizeof(SIGNER_CONNECT_IMTOKEN_MENU[0]);
+  if (strcmp(id, "connect_keystone") == 0)
+    return sizeof(SIGNER_CONNECT_KEYSTONE_MENU) /
+           sizeof(SIGNER_CONNECT_KEYSTONE_MENU[0]);
   if (strcmp(id, "btc_wallet") == 0)
     return sizeof(SIGNER_BTC_WALLET_MENU) / sizeof(SIGNER_BTC_WALLET_MENU[0]);
   if (strcmp(id, "btc_mnemonic") == 0)
@@ -9619,6 +9666,12 @@ static void create_signer_child_menu(lv_obj_t *list,
       create_signer_override_menu(list, SIGNER_CONNECT_IMTOKEN_MENU,
                                 sizeof(SIGNER_CONNECT_IMTOKEN_MENU) /
                                     sizeof(SIGNER_CONNECT_IMTOKEN_MENU[0])))
+    return;
+  if (strcmp(feature->id, "connect_keystone") == 0 &&
+      create_signer_override_menu(
+          list, SIGNER_CONNECT_KEYSTONE_MENU,
+          sizeof(SIGNER_CONNECT_KEYSTONE_MENU) /
+              sizeof(SIGNER_CONNECT_KEYSTONE_MENU[0])))
     return;
   if (strcmp(feature->id, "btc_wallet") == 0 &&
       create_signer_override_menu(

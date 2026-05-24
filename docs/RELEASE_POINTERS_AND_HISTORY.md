@@ -1,6 +1,6 @@
 # 发布包指针与历史版本说明
 
-日期：2026-05-23
+日期：2026-05-24
 
 本文件用于防止刷错旧包。代码、文档、截图和 `_release/LATEST_RELEASE.txt` 不一定同时更新，必须分开确认。
 
@@ -20,14 +20,14 @@
 - `kernsigner-wave43-0.0.7-rc1-untested-app.bin`
 - `SHA256SUMS.txt`
 
-2026-05-23 当前预置固件哈希：
+2026-05-24 当前预置固件哈希：
 
-- app-only: `733082ea5a4946fccad2ea78ae8fea4cb933f34fcf709de9921f9c4c0b4decd4`
-- full image: `896c00b2cc488fb76d8bf208705ce3b0faa9b51142285b437a57c8a69d6c5c0b`
+- app-only: `bd50d526089b13d7af360e0ef4514b5e961564138452bb2c5a028f6132dac502`
+- full image: `c31bb74caed08a17313ae0693c2b3a17e09cb3e0f9a2ae7cb7616df3622a282a`
 
 这组固件是开发测试快照，不是商业生产版。刷机前先看 `firmware/wave_43/README.zh-CN.md` 和 `docs/UNTESTED_FIRMWARE_NOTICE.md`。
 
-2026-05-23 本地复核：
+2026-05-24 本地复核：
 
 - 构建：`JOBS=2 tools/signer_delivery.sh build` 通过。
 - 模拟器验收：`docs/screens/delivery_20260523_175620/ACCEPTANCE_REPORT.txt`，`FINAL: PASS`。
@@ -35,7 +35,7 @@
 - 固件校验：`firmware/wave_43/SHA256SUMS.txt` 全部通过。
 - OKX 桌面样本：静态图 + 1 fps 视频抽帧 `12/12 decoded`。
 - 真机刷写：`/dev/ttyACM0` app-only 刷写通过，esptool 显示 `Hash of data verified`。
-- 启动日志：`docs/logs/boot_20260523_182345.log` 通过，屏幕、GT911 触摸、LVGL task 和背光初始化正常。
+- 启动日志：本地 app-only 刷写后通过，屏幕、GT911 触摸、LVGL task 和背光初始化正常。
 
 ## 2026-05-20 状态
 

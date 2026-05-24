@@ -4027,6 +4027,29 @@ static lv_obj_t *btc_prepare_page(void) {
   return scan_screen;
 }
 
+static lv_obj_t *create_scan_review_scroll_container(void) {
+  if (!scan_screen)
+    return NULL;
+
+  lv_obj_t *container = lv_obj_create(scan_screen);
+  lv_obj_set_width(container, LV_PCT(100));
+  lv_obj_set_height(container, 0);
+  lv_obj_set_flex_grow(container, 1);
+  lv_obj_set_flex_flow(container, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(container, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_top(container, 10, 0);
+  lv_obj_set_style_pad_left(container, 10, 0);
+  lv_obj_set_style_pad_right(container, 10, 0);
+  lv_obj_set_style_pad_bottom(container, 10 + theme_get_min_touch_size(), 0);
+  lv_obj_set_style_pad_gap(container, 10, 0);
+  theme_apply_screen(container);
+  lv_obj_add_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scroll_dir(container, LV_DIR_VER);
+  lv_obj_set_scrollbar_mode(container, LV_SCROLLBAR_MODE_AUTO);
+  return container;
+}
+
 static void btc_source_back_cb(lv_event_t *e) {
   (void)e;
   pending_btc_source = BTC_SIGN_SOURCE_NONE;
@@ -4123,6 +4146,12 @@ static void show_scanned_sign_payload(void) {
     show_multisig_options_menu();
     return;
   }
+
+  lv_obj_t *root = btc_prepare_page();
+  (void)web3_create_fixed_title(root,
+                                scan_tr("scan.confirm_signature",
+                                        "Confirm signature"));
+  (void)ui_create_back_button(root, back_button_cb);
 
   if (!create_psbt_info_display())
     dialog_show_error(scan_tr("sign.psbt_invalid", "Invalid transaction data"),
@@ -4810,18 +4839,20 @@ static bool create_psbt_info_display(void) {
     output_colors[diagram_idx] = error_color();
   }
 
-  psbt_info_container = lv_obj_create(scan_screen);
-  lv_obj_set_size(psbt_info_container, LV_PCT(100), LV_PCT(100));
-  lv_obj_set_flex_flow(psbt_info_container, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(psbt_info_container, LV_FLEX_ALIGN_START,
-                        LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(psbt_info_container, 10, 0);
-  lv_obj_set_style_pad_gap(psbt_info_container, 10, 0);
-  theme_apply_screen(psbt_info_container);
-  lv_obj_add_flag(psbt_info_container, LV_OBJ_FLAG_SCROLLABLE);
+  psbt_info_container = create_scan_review_scroll_container();
+  if (!psbt_info_container) {
+    free(input_amounts);
+    free(output_amounts);
+    free(output_colors);
+    free(classified_outputs);
+    wally_tx_free(global_tx);
+    return false;
+  }
 
   lv_obj_update_layout(psbt_info_container);
-  int32_t diagram_width = lv_obj_get_width(scan_screen) - 20;
+  int32_t diagram_width = lv_obj_get_content_width(psbt_info_container);
+  if (diagram_width <= 0)
+    diagram_width = lv_obj_get_width(scan_screen) - 20;
   tx_diagram = sankey_diagram_create(psbt_info_container, diagram_width, 160);
   if (tx_diagram) {
     sankey_diagram_set_inputs(tx_diagram, input_amounts, num_inputs);
@@ -4957,7 +4988,9 @@ static bool create_psbt_info_display(void) {
       if (!has_spends) {
         lv_obj_t *title =
             theme_create_label(psbt_info_container,
-                               scan_tr("scan.spend", "Spend:"), false);
+                               scan_tr("sign.external_output",
+                                       "External output"),
+                               false);
         theme_apply_label(title, true);
         lv_obj_set_style_text_color(title, highlight_color(), 0);
         lv_obj_set_style_margin_top(title, 15, 0);
@@ -5530,15 +5563,11 @@ static void create_message_sign_display(void) {
     return;
   }
 
-  psbt_info_container = lv_obj_create(scan_screen);
-  lv_obj_set_size(psbt_info_container, LV_PCT(100), LV_PCT(100));
-  lv_obj_set_flex_flow(psbt_info_container, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(psbt_info_container, LV_FLEX_ALIGN_START,
-                        LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(psbt_info_container, 10, 0);
-  lv_obj_set_style_pad_gap(psbt_info_container, 10, 0);
-  theme_apply_screen(psbt_info_container);
-  lv_obj_add_flag(psbt_info_container, LV_OBJ_FLAG_SCROLLABLE);
+  psbt_info_container = create_scan_review_scroll_container();
+  if (!psbt_info_container) {
+    wally_free_string(address);
+    return;
+  }
 
   theme_create_page_title(psbt_info_container,
                           scan_tr("sign.message_signing",

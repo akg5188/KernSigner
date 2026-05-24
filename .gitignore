@@ -30,6 +30,7 @@ simulator/build*/
 simulator/sim_data/
 
 # Tests
+tools/*/build/
 components/bbqr/test/test_bbqr
 components/bbqr/test/test_base32
 components/bbqr/test/test_miniz
@@ -52,6 +53,7 @@ main/core/test/libwally.a
 
 # IDE / tools
 .vscode/
+*.code-workspace
 .cache/
 .cm/logs/
 

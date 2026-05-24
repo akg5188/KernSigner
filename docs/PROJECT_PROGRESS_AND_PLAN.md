@@ -8,7 +8,7 @@
 
 当前项目已经完成“Krux 风格中文硬件底包 + 低风险工具 + 旧 Kern 钱包核心接入 + 智能卡测试主线 + 自动交付验收”的测试资金候选闭环。最新固件版本是 `0.0.7-rc1`，目标板是 Waveshare ESP32-P4 WiFi6 Touch LCD 4.3。仓库已包含 `firmware/wave_43/` 下的 untested full/app-only 固件；`_release/LATEST_RELEASE.txt` 只指向上一次脚本生成的交付包，不一定等同于当前源码或预置固件。
 
-2026-05-23 最新预置固件哈希：app-only `733082ea5a4946fccad2ea78ae8fea4cb933f34fcf709de9921f9c4c0b4decd4`，full image `896c00b2cc488fb76d8bf208705ce3b0faa9b51142285b437a57c8a69d6c5c0b`。这版已经本地构建、通过模拟器验收、通过 OKX 图片/视频桌面解码样本，并在 `/dev/ttyACM0` 上完成 app-only 真机刷写和启动日志检查。
+2026-05-24 最新预置固件哈希：app-only `bd50d526089b13d7af360e0ef4514b5e961564138452bb2c5a028f6132dac502`，full image `c31bb74caed08a17313ae0693c2b3a17e09cb3e0f9a2ae7cb7616df3622a282a`。这版已经本地构建、通过模拟器验收、通过 OKX 图片/视频桌面解码样本，并在 `/dev/ttyACM0` 上完成 app-only 真机刷写和启动日志检查。
 
 当前版本可以用于验收：
 

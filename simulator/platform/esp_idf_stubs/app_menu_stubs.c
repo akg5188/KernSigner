@@ -449,6 +449,111 @@ static void sim_web3_add_button_row(lv_obj_t *root) {
   lv_obj_set_width(cancel, LV_PCT(44));
 }
 
+static lv_obj_t *sim_btc_review_root(void) {
+  lv_obj_t *root = lv_screen_active();
+  lv_obj_clean(root);
+  theme_apply_screen(root);
+  lv_obj_set_flex_flow(root, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(root, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                        LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_all(root, theme_get_default_padding(), 0);
+  lv_obj_set_style_pad_gap(root, theme_get_default_padding(), 0);
+
+  lv_obj_t *card = lv_obj_create(root);
+  lv_obj_set_width(card, LV_PCT(100));
+  lv_obj_set_height(card, 0);
+  lv_obj_set_flex_grow(card, 1);
+  lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START,
+                        LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_scroll_dir(card, LV_DIR_VER);
+  lv_obj_set_scrollbar_mode(card, LV_SCROLLBAR_MODE_AUTO);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+  theme_apply_screen(card);
+  lv_obj_set_style_pad_top(card, 10, 0);
+  lv_obj_set_style_pad_left(card, 10, 0);
+  lv_obj_set_style_pad_right(card, 10, 0);
+  lv_obj_set_style_pad_bottom(card, 10 + theme_get_min_touch_size(), 0);
+  lv_obj_set_style_pad_gap(card, 10, 0);
+  return card;
+}
+
+static void sim_btc_add_label(lv_obj_t *parent, const char *text,
+                              lv_color_t color, bool strong) {
+  lv_obj_t *label = theme_create_label(parent, text, strong);
+  lv_obj_set_width(label, LV_PCT(100));
+  lv_obj_set_height(label, LV_SIZE_CONTENT);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+  lv_obj_set_style_text_color(label, color, 0);
+}
+
+static void sim_btc_add_separator(lv_obj_t *parent) {
+  lv_obj_t *line = lv_obj_create(parent);
+  lv_obj_set_size(line, LV_PCT(100), 2);
+  lv_obj_set_style_bg_color(line, main_color(), 0);
+  lv_obj_set_style_bg_opa(line, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(line, 0, 0);
+}
+
+static void sim_btc_add_button_row(lv_obj_t *parent) {
+  lv_obj_t *row = lv_obj_create(parent);
+  lv_obj_set_width(row, LV_PCT(100));
+  lv_obj_set_height(row, theme_get_min_touch_size() + theme_get_small_padding());
+  lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+  lv_obj_set_flex_align(row, LV_FLEX_ALIGN_SPACE_BETWEEN,
+                        LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_border_width(row, 0, 0);
+  lv_obj_set_style_pad_all(row, 0, 0);
+  lv_obj_set_style_pad_gap(row, 10, 0);
+
+  lv_obj_t *back = theme_create_button(row, "返回", false);
+  lv_obj_set_width(back, LV_PCT(45));
+  lv_obj_t *sign = theme_create_button(row, "签名", true);
+  lv_obj_set_width(sign, LV_PCT(45));
+}
+
+void scan_simulator_show_btc_psbt_review(void) {
+  lv_obj_t *card = sim_btc_review_root();
+  sim_btc_add_label(card, "PSBT 审核", main_color(), true);
+  sim_btc_add_label(card, "输入 (1): 2.00 000 000 BTC", main_color(), false);
+  sim_btc_add_separator(card);
+
+  sim_btc_add_label(card, "外部输出", highlight_color(), true);
+  sim_btc_add_label(card, "输出 0: 0.50 000 000 BTC", main_color(), false);
+  sim_btc_add_label(card,
+                    "bc1qzqsrqszsvpcgpy9qkrqdpc83qygjzv6q8d7w5k",
+                    highlight_color(), false);
+  sim_btc_add_label(card, "输出 1: 0.40 000 000 BTC", main_color(), false);
+  sim_btc_add_label(card,
+                    "bc1qxq6rxve5xmnrd7gt3xys5vsk2xp8x9q0vm6m8t",
+                    highlight_color(), false);
+  sim_btc_add_label(card, "输出 2: 0.30 000 000 BTC", main_color(), false);
+  sim_btc_add_label(card,
+                    "bc1q5cyxnuxmeuwuvkwfem96llyxf5zx4dcnqfr4s6",
+                    highlight_color(), false);
+  sim_btc_add_label(card, "输出 3: 0.25 000 000 BTC", main_color(), false);
+  sim_btc_add_label(card,
+                    "bc1q9zpgru5z0t6w7h4fxx67x0yxj2d3gz57g9xq0m",
+                    highlight_color(), false);
+  sim_btc_add_label(card, "输出 4: 0.20 000 000 BTC", main_color(), false);
+  sim_btc_add_label(card,
+                    "bc1q0x6zyg4q4z9v0h6xq9cvk7vq9a0z5tc3hl4hpk",
+                    highlight_color(), false);
+  sim_btc_add_label(card, "输出 5: 0.15 000 000 BTC", main_color(), false);
+  sim_btc_add_label(card,
+                    "bc1q7m3l32egzr6za2j73gtm63h4crn5tczrqgd0s5",
+                    highlight_color(), false);
+  sim_btc_add_label(card, "输出 6: 0.10 000 000 BTC", main_color(), false);
+  sim_btc_add_label(card,
+                    "bc1q2n0w4gt64f8ph407u3u3v9d42v8fq4f9qdu4rx",
+                    highlight_color(), false);
+
+  sim_btc_add_separator(card);
+  sim_btc_add_label(card, "手续费: 0.10 000 000 BTC", error_color(), false);
+  sim_btc_add_button_row(card);
+}
+
 void scan_simulator_show_web3_tx_review(void) {
   lv_obj_t *card = sim_web3_review_root();
   sim_web3_add_field(card, "钱包", "OKX", false);

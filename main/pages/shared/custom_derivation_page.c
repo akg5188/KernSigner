@@ -57,6 +57,7 @@ static ui_text_input_t path_input = {0};
 static ui_text_input_t smartcard_pin_input = {0};
 static void (*return_callback)(void) = NULL;
 static void (*mnemonic_import_callback)(void) = NULL;
+static void (*smartcard_choice_callback)(void) = NULL;
 static custom_derivation_source_option_t source_options[MNEMONIC_SLOT_CAPACITY + 1];
 static size_t source_option_count = 0;
 static size_t source_selected_index = 0;
@@ -929,17 +930,24 @@ static void mnemonic_choice_cb(lv_event_t *e) {
 
 static void smartcard_choice_cb(lv_event_t *e) {
   (void)e;
+  if (smartcard_choice_callback) {
+    custom_derivation_page_hide();
+    smartcard_choice_callback();
+    return;
+  }
   show_detail_stage(CUSTOM_DERIV_ENTRY_SMARTCARD);
 }
 
 void custom_derivation_page_create_with_import(lv_obj_t *parent,
                                                void (*return_cb)(void),
-                                               void (*mnemonic_import_cb)(void)) {
+                                               void (*mnemonic_import_cb)(void),
+                                               void (*smartcard_cb)(void)) {
   if (!parent)
     return;
 
   return_callback = return_cb;
   mnemonic_import_callback = mnemonic_import_cb;
+  smartcard_choice_callback = smartcard_cb;
   page_screen = theme_create_page_container(parent);
   lv_obj_set_style_bg_color(page_screen, bg_color(), 0);
   lv_obj_add_flag(page_screen, LV_OBJ_FLAG_SCROLLABLE);
@@ -1100,7 +1108,7 @@ void custom_derivation_page_create_with_import(lv_obj_t *parent,
 }
 
 void custom_derivation_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
-  custom_derivation_page_create_with_import(parent, return_cb, NULL);
+  custom_derivation_page_create_with_import(parent, return_cb, NULL, NULL);
 }
 
 void custom_derivation_page_show(void) {

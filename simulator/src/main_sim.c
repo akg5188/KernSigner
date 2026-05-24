@@ -405,8 +405,8 @@ static int run_button_interaction_checks(FILE *interaction_file) {
         {"pi_connect_wallet", "MetaMask", "connect_metamask", NULL},
         {"pi_connect_wallet", "Rabby", "connect_rabby", NULL},
         {"pi_connect_wallet", "TokenPocket", "connect_tokenpocket", NULL},
-        {"pi_connect_wallet", "派生地址", "connect_wallet_satochip_address", NULL},
-        {"pi_connect_wallet", "Keystone", "connect_wallet_satochip_address", NULL},
+        {"pi_connect_wallet", "派生地址", "custom_derivation", NULL},
+        {"pi_connect_wallet", "Keystone", "connect_keystone", NULL},
         {"pi_connect_wallet", "BTC", "btc_wallet", NULL},
         {"connect_okx", "助记词", "web3_okx_mnemonic", NULL},
         {"connect_okx", "智能卡", "web3_okx_satochip", NULL},
@@ -418,6 +418,8 @@ static int run_button_interaction_checks(FILE *interaction_file) {
         {"connect_rabby", "智能卡", "web3_rabby_satochip", NULL},
         {"connect_tokenpocket", "助记词", "web3_tokenpocket_mnemonic", NULL},
         {"connect_tokenpocket", "智能卡", "web3_tokenpocket_satochip", NULL},
+        {"connect_keystone", "助记词", "web3_address_mnemonic", NULL},
+        {"connect_keystone", "智能卡", "web3_address_satochip", NULL},
         {"btc_wallet", "助记词", "btc_mnemonic", NULL},
         {"btc_wallet", "智能卡", "btc_satochip_zpub", NULL},
         {"new_mnemonic", "扑克牌", "new_cards_entropy", NULL},
@@ -1062,6 +1064,65 @@ static int capture_web3_review_screens(const char *dir) {
     return failures == 0 ? 0 : 1;
 }
 
+static int capture_btc_review_screens(const char *dir) {
+    if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
+        perror(dir);
+        return 1;
+    }
+
+    char top_path[512];
+    char bottom_path[512];
+    char scroll_path[512];
+    snprintf(top_path, sizeof(top_path), "%s/btc_psbt_review_top.bmp", dir);
+    snprintf(bottom_path, sizeof(bottom_path), "%s/btc_psbt_review_bottom.bmp",
+             dir);
+    snprintf(scroll_path, sizeof(scroll_path), "%s/btc_psbt_review_scroll.tsv",
+             dir);
+
+    scan_simulator_show_btc_psbt_review();
+    run_lvgl_frames(8);
+    lv_obj_update_layout(lv_screen_active());
+
+    int failures = 0;
+    if (write_screen_bmp(top_path) != 0) {
+        failures++;
+    } else {
+        printf("screenshot: %s\n", top_path);
+    }
+
+    lv_obj_t *scroll_obj = find_scrollable_object_recursive(lv_screen_active());
+    int32_t bottom_before = scroll_obj ? lv_obj_get_scroll_bottom(scroll_obj) : 0;
+    int32_t bottom_after = bottom_before;
+    const char *scroll_status = "not_scrollable";
+    if (scroll_obj && bottom_before > 0) {
+        int32_t target_y = lv_obj_get_scroll_y(scroll_obj) + bottom_before;
+        lv_obj_scroll_to_y(scroll_obj, target_y, LV_ANIM_OFF);
+        run_lvgl_frames(3);
+        bottom_after = lv_obj_get_scroll_bottom(scroll_obj);
+        scroll_status = bottom_after < bottom_before ? "ok" : "failed";
+        if (write_screen_bmp(bottom_path) != 0) {
+            failures++;
+            scroll_status = "failed";
+        } else {
+            printf("screenshot: %s\n", bottom_path);
+        }
+        if (strcmp(scroll_status, "ok") != 0)
+            failures++;
+    } else {
+        failures++;
+    }
+
+    FILE *scroll_file = fopen(scroll_path, "w");
+    if (scroll_file) {
+        fprintf(scroll_file, "scrollable\tbottom_before\tbottom_after\tstatus\n");
+        fprintf(scroll_file, "%s\t%d\t%d\t%s\n", scroll_obj ? "yes" : "no",
+                (int)bottom_before, (int)bottom_after, scroll_status);
+        fclose(scroll_file);
+    }
+
+    return failures == 0 ? 0 : 1;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Main                                                                        */
 /* -------------------------------------------------------------------------- */
@@ -1075,7 +1136,9 @@ static void print_usage(const char *prog) {
     printf("  -d, --data-dir <path>   Data directory (default: simulator/sim_data/)\n");
     printf("  -W, --width <N>         Display width in pixels (default: %d)\n", SIM_LCD_H_RES);
     printf("  -H, --height <N>        Display height in pixels (default: %d)\n", SIM_LCD_V_RES);
+    printf("      --language <code>   UI language code for this run (for example zh_Hans_CN)\n");
     printf("  -S, --screenshot-dir <path>  Capture every KernSigner shell screen to BMP\n");
+    printf("  -B, --btc-review-dir <path>  Capture BTC PSBT review fixture BMPs\n");
     printf("  -C, --custom-derivation-dir <path>  Capture derivation source/detail BMPs\n");
     printf("  -M, --mnemonic-slots-dir <path> Capture mnemonic slot picker BMP\n");
     printf("  -L, --loaded-menu-dir <path> Capture loaded mnemonic menu BMP\n");
@@ -1113,7 +1176,9 @@ int main(int argc, char *argv[]) {
         { "data-dir", required_argument, NULL, 'd' },
         { "width",    required_argument, NULL, 'W' },
         { "height",   required_argument, NULL, 'H' },
+        { "language", required_argument, NULL, 1000 },
         { "screenshot-dir", required_argument, NULL, 'S' },
+        { "btc-review-dir", required_argument, NULL, 'B' },
         { "custom-derivation-dir", required_argument, NULL, 'C' },
         { "mnemonic-slots-dir", required_argument, NULL, 'M' },
         { "loaded-menu-dir", required_argument, NULL, 'L' },
@@ -1127,13 +1192,15 @@ int main(int argc, char *argv[]) {
     int sim_width = SIM_LCD_H_RES;
     int sim_height = SIM_LCD_V_RES;
     const char *screenshot_dir = NULL;
+    const char *btc_review_dir = NULL;
     const char *custom_derivation_dir = NULL;
     const char *mnemonic_slots_dir = NULL;
     const char *loaded_menu_dir = NULL;
     const char *word_count_dir = NULL;
     const char *web3_review_dir = NULL;
+    const char *language_code = NULL;
     int opt;
-    while ((opt = getopt_long(argc, argv, "q:Q:d:W:H:S:C:M:L:N:R:w::vh", long_opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "q:Q:d:W:H:S:B:C:M:L:N:R:w::vh", long_opts, NULL)) != -1) {
         switch (opt) {
             case 'q':
                 sim_video_set_qr_image(optarg);
@@ -1154,8 +1221,14 @@ int main(int argc, char *argv[]) {
             case 'H':
                 sim_height = atoi(optarg);
                 break;
+            case 1000:
+                language_code = optarg;
+                break;
             case 'S':
                 screenshot_dir = optarg;
+                break;
+            case 'B':
+                btc_review_dir = optarg;
                 break;
             case 'C':
                 custom_derivation_dir = optarg;
@@ -1185,10 +1258,12 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr,
                     "Usage: %s [--qr-image PATH] [--qr-dir DIR] [--data-dir DIR]"
                     " [--width N] [--height N] [--screenshot-dir DIR]"
+                    " [--btc-review-dir DIR]"
                     " [--custom-derivation-dir DIR] [--mnemonic-slots-dir DIR]"
                     " [--loaded-menu-dir DIR]"
                     " [--word-count-dir DIR]"
                     " [--web3-review-dir DIR]"
+                    " [--language CODE]"
                     " [--verbose]\n",
                     argv[0]);
                 return 1;
@@ -1238,6 +1313,10 @@ int main(int argc, char *argv[]) {
 
     /* Initialize persistent settings */
     settings_init();
+    i18n_language_t language = settings_get_language();
+    if (language_code)
+        language = i18n_language_from_code(language_code);
+    i18n_set_language(language);
 
     /* Initialize PMIC (simulated battery on wave_35; no-op on wave_4b) */
     bsp_pmic_init();
@@ -1245,6 +1324,8 @@ int main(int argc, char *argv[]) {
     /* KernSigner is the desktop BSP shim; startup mirrors hardware and enters the
      * KernSigner migration shell directly instead of the old wallet/login flow. */
     signer_shell_create(scr);
+    if (btc_review_dir)
+        return capture_btc_review_screens(btc_review_dir);
     if (custom_derivation_dir)
         return capture_custom_derivation_screens(custom_derivation_dir);
     if (mnemonic_slots_dir)
