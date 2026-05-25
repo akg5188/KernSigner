@@ -27,6 +27,22 @@
 
 <img src="case_preview.png" width="620" alt="AI-designed unverified ESP32-P4 4.3 case preview">
 
+## 实拍
+
+已打印装配实拍：
+
+### 正面
+
+<img src="photo_2026-05-25_21-25-39.jpg" width="420" alt="Printed Waveshare ESP32-P4 case front view">
+
+### 背面
+
+<img src="photo_2026-05-25_21-25-32.jpg" width="420" alt="Printed Waveshare ESP32-P4 case back view">
+
+### 侧面
+
+<img src="photo_2026-05-25_21-25-09.jpg" width="420" alt="Printed Waveshare ESP32-P4 case side view">
+
 ## 打印前请确认
 
 - 这版已经实打装配验证，可作为当前可用版本。
