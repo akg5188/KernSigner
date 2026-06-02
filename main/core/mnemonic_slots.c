@@ -41,30 +41,7 @@ static size_t count_words(const char *mnemonic) {
 static bool fingerprint_from_mnemonic(const char *mnemonic, char out[9]) {
   if (!mnemonic || !out)
     return false;
-
-  unsigned char seed[BIP39_SEED_LEN_512];
-  struct ext_key *master_key = NULL;
-  if (bip39_mnemonic_to_seed512(mnemonic, NULL, seed, sizeof(seed)) !=
-          WALLY_OK ||
-      bip32_key_from_seed_alloc(seed, sizeof(seed), BIP32_VER_MAIN_PRIVATE, 0,
-                                &master_key) != WALLY_OK) {
-    secure_memzero(seed, sizeof(seed));
-    return false;
-  }
-  secure_memzero(seed, sizeof(seed));
-
-  unsigned char fingerprint[BIP32_KEY_FINGERPRINT_LEN];
-  if (bip32_key_get_fingerprint(master_key, fingerprint,
-                                sizeof(fingerprint)) != WALLY_OK) {
-    bip32_key_free(master_key);
-    return false;
-  }
-  bip32_key_free(master_key);
-
-  for (int i = 0; i < BIP32_KEY_FINGERPRINT_LEN; i++)
-    snprintf(out + (i * 2), 3, "%02x", fingerprint[i]);
-  out[8] = '\0';
-  return true;
+  return key_compute_mnemonic_fingerprint_hex(out, mnemonic);
 }
 
 static void clear_slot(size_t index) {

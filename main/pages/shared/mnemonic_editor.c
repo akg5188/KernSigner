@@ -124,36 +124,9 @@ static bool get_mnemonic_fingerprint_hex(char *hex_out) {
             sizeof(mnemonic) - strlen(mnemonic) - 1);
   }
 
-  unsigned char seed[BIP39_SEED_LEN_512];
-  if (bip39_mnemonic_to_seed512(mnemonic, NULL, seed, sizeof(seed)) !=
-      WALLY_OK) {
-    secure_memzero(mnemonic, sizeof(mnemonic));
-    secure_memzero(seed, sizeof(seed));
-    return false;
-  }
+  bool ok = key_compute_mnemonic_fingerprint_hex(hex_out, mnemonic);
   secure_memzero(mnemonic, sizeof(mnemonic));
-
-  struct ext_key *master_key = NULL;
-  if (bip32_key_from_seed_alloc(seed, sizeof(seed), BIP32_VER_MAIN_PRIVATE, 0,
-                                &master_key) != WALLY_OK) {
-    secure_memzero(seed, sizeof(seed));
-    return false;
-  }
-  secure_memzero(seed, sizeof(seed));
-
-  unsigned char fingerprint[BIP32_KEY_FINGERPRINT_LEN];
-  if (bip32_key_get_fingerprint(master_key, fingerprint,
-                                BIP32_KEY_FINGERPRINT_LEN) != WALLY_OK) {
-    bip32_key_free(master_key);
-    return false;
-  }
-  bip32_key_free(master_key);
-
-  for (int i = 0; i < BIP32_KEY_FINGERPRINT_LEN; i++)
-    snprintf(hex_out + (i * 2), 3, "%02x", fingerprint[i]);
-  hex_out[BIP32_KEY_FINGERPRINT_LEN * 2] = '\0';
-
-  return true;
+  return ok;
 }
 
 static bool recalculate_last_word(void) {
@@ -227,8 +200,8 @@ static void update_fingerprint_display(void) {
     if (get_mnemonic_fingerprint_hex(fp_hex)) {
       char buf[32];
       snprintf(buf, sizeof(buf),
-               i18n_tr_or("wallet.wallet_fingerprint_format",
-                          "Wallet fingerprint %s"),
+               i18n_tr_or("wallet.mnemonic_fingerprint_format",
+                          "Mnemonic fingerprint %s"),
                fp_hex);
       lv_label_set_text(fingerprint_label, buf);
       lv_obj_clear_flag(fingerprint_label, LV_OBJ_FLAG_HIDDEN);

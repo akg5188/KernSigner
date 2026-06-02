@@ -53,14 +53,14 @@ static void style_slot_button(int index, const mnemonic_slot_info_t *info,
   if (current) {
     snprintf(text, sizeof(text),
              i18n_tr_or("wallet.current_slot_format",
-                        "Current mnemonic %u\nWallet fingerprint %s\n%u "
+                        "Current mnemonic %u\nMnemonic fingerprint %s\n%u "
                         "words"),
              (unsigned)(slot_index + 1), info->fingerprint,
              (unsigned)info->word_count);
   } else {
     snprintf(text, sizeof(text),
              i18n_tr_or("wallet.slot_format",
-                        "Mnemonic %u\nWallet fingerprint %s\n%u words"),
+                        "Mnemonic %u\nMnemonic fingerprint %s\n%u words"),
              (unsigned)(slot_index + 1), info->fingerprint,
              (unsigned)info->word_count);
   }
@@ -116,7 +116,7 @@ void mnemonic_slots_page_create(lv_obj_t *parent, void (*return_cb)(void),
   style_slots_menu_layout();
 
   char current_fp[9] = {0};
-  bool has_current = key_get_fingerprint_hex(current_fp);
+  bool has_current = key_get_mnemonic_fingerprint_hex(current_fp);
 
   for (size_t i = 0; i < MNEMONIC_SLOT_CAPACITY; i++) {
     mnemonic_slot_info_t info;

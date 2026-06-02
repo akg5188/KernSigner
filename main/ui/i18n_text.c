@@ -144,7 +144,8 @@ const char *ui_i18n_text(const char *text) {
       {"24 个单词", "wallet.24_words", "24 words"},
       {"词", "wallet.seed_words", "Words"},
       {"原始熵", "wallet.raw_entropy", "Raw entropy"},
-      {"钱包指纹", "wallet.wallet_fingerprint", "Wallet fingerprint"},
+      {"助记词指纹", "wallet.mnemonic_fingerprint", "Mnemonic fingerprint"},
+      {"助记词指纹", "wallet.wallet_fingerprint", "Mnemonic fingerprint"},
 
       {"Camera Entropy", "input.camera", "Camera Entropy"},
       {"Tap to capture", "common.start", "Tap to capture"},

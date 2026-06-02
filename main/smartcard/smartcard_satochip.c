@@ -23,6 +23,7 @@
 #include "wally_core.h"
 #include "wally_crypto.h"
 #include "wally_script.h"
+#include "smartcard_transport.h"
 
 #ifndef ESP_ERR_INVALID_RESPONSE
 #define ESP_ERR_INVALID_RESPONSE ESP_ERR_INVALID_STATE
@@ -81,7 +82,7 @@ static const uint8_t k_seedkeeper_get_status_apdu[] = {
 #define SATOCHIP_INS_SEEDKEEPER_LOGS 0xA9
 #define SATOCHIP_INS_RESET_SECRET 0xA5
 #define SATOCHIP_MAX_PATH_COMPONENTS 10
-#define SATOCHIP_DEFAULT_TIMEOUT_MS 12000
+#define SATOCHIP_DEFAULT_TIMEOUT_MS 30000
 #define SATOCHIP_SC_MAC_LEN 20
 #define KECCAK_ROUNDS 24
 
@@ -820,7 +821,7 @@ static esp_err_t satochip_transmit_checked(const uint8_t *apdu, size_t apdu_len,
                                            uint32_t timeout_ms) {
   uint8_t ins = apdu_len > 1 ? apdu[1] : 0;
   size_t response_len = 0;
-  esp_err_t err = smartcard_ccid_transmit_apdu(
+  esp_err_t err = smartcard_transport_transmit_apdu(
       apdu, apdu_len, response, response_cap, &response_len, sw,
       timeout_ms ? timeout_ms : SATOCHIP_DEFAULT_TIMEOUT_MS);
   if (err != ESP_OK) {
@@ -1147,7 +1148,7 @@ static esp_err_t smartcard_select_applet(const uint8_t *select_apdu,
   uint8_t response[SMARTCARD_CCID_RESPONSE_MAX_LEN];
   size_t response_len = 0;
   uint16_t sw = 0;
-  esp_err_t err = smartcard_ccid_transmit_apdu(
+  esp_err_t err = smartcard_transport_transmit_apdu(
       select_apdu, select_apdu_len, response, sizeof(response), &response_len,
       &sw, timeout_ms ? timeout_ms : SATOCHIP_DEFAULT_TIMEOUT_MS);
   if (select_sw)
@@ -1861,15 +1862,8 @@ satochip_parse_extended_key_response(const uint8_t *payload, size_t payload_len,
 
 static esp_err_t ensure_reader_ready(uint32_t timeout_ms,
                                      char *detail, size_t detail_len) {
-  smartcard_ccid_report_t ccid_report;
-  smartcard_ccid_snapshot(&ccid_report);
-  if (ccid_report.reader_present && ccid_report.card_present &&
-      smartcard_ccid_report_is_success(&ccid_report)) {
-    return ESP_OK;
-  }
-
   esp_err_t probe_err =
-      smartcard_ccid_probe(timeout_ms ? timeout_ms : SATOCHIP_DEFAULT_TIMEOUT_MS);
+      smartcard_transport_probe(timeout_ms ? timeout_ms : SATOCHIP_DEFAULT_TIMEOUT_MS);
   if (probe_err != ESP_OK && detail && detail_len > 0) {
     snprintf(detail, detail_len, "Reader or card is not ready: %s.",
              esp_err_to_name(probe_err));
@@ -2899,27 +2893,23 @@ esp_err_t smartcard_satochip_read_status(smartcard_satochip_status_t *out,
   out->transport_error = ESP_ERR_INVALID_STATE;
   snprintf(out->detail, sizeof(out->detail), "Connecting to Satochip.");
 
-  smartcard_ccid_report_t ccid_report;
-  smartcard_ccid_snapshot(&ccid_report);
-  if (!ccid_report.reader_present || !ccid_report.card_present ||
-      !smartcard_ccid_report_is_success(&ccid_report)) {
-    esp_err_t probe_err = smartcard_ccid_probe(timeout_ms ? timeout_ms : 12000);
-    if (probe_err != ESP_OK) {
-      out->transport_error = probe_err;
-      snprintf(out->detail, sizeof(out->detail),
-               "Reader or card is not ready: %s.", esp_err_to_name(probe_err));
-      return probe_err;
-    }
+  esp_err_t probe_err = smartcard_transport_probe(timeout_ms ? timeout_ms : 30000);
+  if (probe_err != ESP_OK) {
+    out->transport_error = probe_err;
+    snprintf(out->detail, sizeof(out->detail),
+             "Reader or card is not ready: %s.", esp_err_to_name(probe_err));
+    return probe_err;
   }
 
   uint8_t response[SMARTCARD_CCID_RESPONSE_MAX_LEN];
   size_t response_len = 0;
   uint16_t sw = 0;
   esp_err_t err =
-      smartcard_ccid_transmit_apdu(k_select_satochip_apdu,
-                                   sizeof(k_select_satochip_apdu), response,
-                                   sizeof(response), &response_len, &sw,
-                                   timeout_ms ? timeout_ms : 12000);
+      smartcard_transport_transmit_apdu(k_select_satochip_apdu,
+                                        sizeof(k_select_satochip_apdu),
+                                        response, sizeof(response),
+                                        &response_len, &sw,
+                                        timeout_ms ? timeout_ms : 30000);
   out->transport_error = err;
   out->select_sw = sw;
   if (err != ESP_OK) {
@@ -2937,10 +2927,10 @@ esp_err_t smartcard_satochip_read_status(smartcard_satochip_status_t *out,
   memset(response, 0, sizeof(response));
   response_len = 0;
   sw = 0;
-  err = smartcard_ccid_transmit_apdu(k_get_status_apdu,
-                                     sizeof(k_get_status_apdu), response,
-                                     sizeof(response), &response_len, &sw,
-                                     timeout_ms ? timeout_ms : 12000);
+  err = smartcard_transport_transmit_apdu(k_get_status_apdu,
+                                          sizeof(k_get_status_apdu), response,
+                                          sizeof(response), &response_len, &sw,
+                                          timeout_ms ? timeout_ms : 30000);
   out->transport_error = err;
   out->status_sw = sw;
   if (err != ESP_OK) {
@@ -2990,17 +2980,12 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
   out->err = ESP_ERR_INVALID_STATE;
   snprintf(out->detail, sizeof(out->detail), "Reading card label.");
 
-  smartcard_ccid_report_t ccid_report;
-  smartcard_ccid_snapshot(&ccid_report);
-  if (!ccid_report.reader_present || !ccid_report.card_present ||
-      !smartcard_ccid_report_is_success(&ccid_report)) {
-    esp_err_t probe_err = smartcard_ccid_probe(timeout_ms ? timeout_ms : 12000);
-    if (probe_err != ESP_OK) {
-      out->err = probe_err;
-      snprintf(out->detail, sizeof(out->detail),
-               "Reader or card is not ready: %s.", esp_err_to_name(probe_err));
-      return probe_err;
-    }
+  esp_err_t probe_err = smartcard_transport_probe(timeout_ms ? timeout_ms : 30000);
+  if (probe_err != ESP_OK) {
+    out->err = probe_err;
+    snprintf(out->detail, sizeof(out->detail),
+             "Reader or card is not ready: %s.", esp_err_to_name(probe_err));
+    return probe_err;
   }
 
   uint16_t sw = 0;
@@ -3049,20 +3034,28 @@ esp_err_t smartcard_satochip_get_label(smartcard_satochip_label_t *out,
   memset(&sc, 0, sizeof(sc));
   err = satochip_transmit_checked(k_get_label_apdu, sizeof(k_get_label_apdu),
                                   response, sizeof(response), &response_len,
-                                  &label_sw, timeout_ms ? timeout_ms : 12000);
+                                  &label_sw, timeout_ms ? timeout_ms : 30000);
   if (err == ESP_OK && satochip_sw_needs_secure_channel(label_sw)) {
     err = satochip_secure_channel_begin(
         &sc, NULL, NULL, response, sizeof(response), &response_len, &label_sw,
-        timeout_ms ? timeout_ms : 12000);
+        timeout_ms ? timeout_ms : 30000);
     if (err == ESP_OK) {
       err = satochip_transmit_card(&sc, k_get_label_apdu,
                                    sizeof(k_get_label_apdu), response,
                                    sizeof(response), &response_len, &label_sw,
-                                   timeout_ms ? timeout_ms : 12000);
+                                   timeout_ms ? timeout_ms : 30000);
     }
   }
   secure_zero(&sc, sizeof(sc));
   out->label_sw = label_sw;
+
+  if (err == ESP_OK && label_sw == 0x9C06) {
+    out->err = ESP_OK;
+    snprintf(out->detail, sizeof(out->detail),
+             "Card requires Smartcard PIN before reading the label.");
+    return ESP_OK;
+  }
+
   if (err != ESP_OK) {
     out->err = err;
     snprintf(out->detail, sizeof(out->detail), "Label read failed: %s.",

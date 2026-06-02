@@ -84,6 +84,20 @@ fi
 
 log "checking sdkconfig: $SDKCONFIG"
 
+if [[ -s "$ROOT_DIR/sdkconfig.defaults.high_value" ]]; then
+  log "PASS: high-value sdkconfig overlay present"
+else
+  log "FAIL: sdkconfig.defaults.high_value is missing"
+  failures=1
+fi
+
+if [[ -s "$ROOT_DIR/docs/HIGH_VALUE_SECURITY_TARGET.zh-CN.md" ]]; then
+  log "PASS: high-value security target doc present"
+else
+  log "FAIL: docs/HIGH_VALUE_SECURITY_TARGET.zh-CN.md is missing"
+  failures=1
+fi
+
 require_set CONFIG_SECURE_BOOT
 require_set CONFIG_FLASH_ENCRYPTION_ENABLED
 require_set CONFIG_NVS_ENCRYPTION

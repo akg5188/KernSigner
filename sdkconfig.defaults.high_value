@@ -1,0 +1,44 @@
+# KernSigner high-value custody target overlay.
+#
+# This file is a target, not proof of production readiness. Build with it only
+# after testing the eFuse workflow on a sacrificial board:
+#
+# idf.py -B build_high_value_wave_43 \
+#   -D SDKCONFIG=build_high_value_wave_43/sdkconfig \
+#   -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43;sdkconfig.defaults.high_value' \
+#   build
+
+CONFIG_KSIG_PRODUCTION_REQUIRE_PIN_HMAC=y
+
+# Firmware integrity and flash-at-rest protection.
+CONFIG_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_V2_PREFERRED=y
+CONFIG_SECURE_BOOT_V2_ECC_SUPPORTED=y
+CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES=y
+CONFIG_FLASH_ENCRYPTION_ENABLED=y
+CONFIG_NVS_ENCRYPTION=y
+
+# No radios/network stack in the high-value target.
+# CONFIG_BT_ENABLED is not set
+# CONFIG_ESP_HOST_WIFI_ENABLED is not set
+# CONFIG_ESP_WIFI_ENABLED is not set
+# CONFIG_ETH_ENABLED is not set
+# CONFIG_LWIP_ENABLE is not set
+
+# No production console/debugger paths.
+# CONFIG_USJ_ENABLE_USB_SERIAL_JTAG is not set
+# CONFIG_ESP_GDBSTUB_ENABLED is not set
+# CONFIG_ESP_SYSTEM_PANIC_GDBSTUB is not set
+CONFIG_ESP_SYSTEM_PANIC_SILENT_REBOOT=y
+CONFIG_ESP_CONSOLE_NONE=y
+# CONFIG_ESP_CONSOLE_UART_DEFAULT is not set
+# CONFIG_ESP_CONSOLE_UART_CUSTOM is not set
+# CONFIG_ESP_CONSOLE_UART is not set
+# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set
+# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED is not set
+# CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG is not set
+
+# Fail closed on task stalls.
+CONFIG_ESP_TASK_WDT_EN=y
+CONFIG_ESP_TASK_WDT_INIT=y
+CONFIG_ESP_TASK_WDT_PANIC=y

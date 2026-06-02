@@ -433,20 +433,21 @@ void kef_encrypt_page_create(lv_obj_t *parent, void (*return_cb)(void),
                         "Use %s as the backup name?"),
              suggested_id);
   } else {
-    /* Fall back to wallet fingerprint */
+    /* Mnemonic backups use the mnemonic-only fingerprint as their stable ID. */
     char fp_hex[9] = {0};
-    if (!key_get_fingerprint_hex(fp_hex)) {
+    if (!key_get_mnemonic_fingerprint_hex(fp_hex) ||
+        strcmp(fp_hex, "--------") == 0) {
       SECURE_FREE_BUFFER(data_copy, data_copy_len);
       data_copy_len = 0;
       dialog_show_error(i18n_tr_or("wallet.read_fingerprint_failed",
-                                   "Read wallet fingerprint failed"),
+                                   "Read mnemonic fingerprint failed"),
                         return_cb, 0);
       return;
     }
     snprintf(kef_id, sizeof(kef_id), "%s", fp_hex);
     snprintf(msg, sizeof(msg),
              i18n_tr_or("backup.use_fingerprint_as_name_confirm_format",
-                        "Use wallet fingerprint %s as the backup name?"),
+                        "Use mnemonic fingerprint %s as the backup name?"),
              fp_hex);
   }
 

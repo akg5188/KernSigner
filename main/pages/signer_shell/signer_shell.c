@@ -6,12 +6,15 @@
 #include "signer_port/signer_storage_browser.h"
 #include "core/crypto_utils.h"
 #include "core/evm.h"
+#include "core/key.h"
 #include "core/pin.h"
 #include "core/settings.h"
 #include "i18n/i18n.h"
+#include "qr/scanner.h"
 #include "qr/viewer.h"
 #include "smartcard/smartcard_ccid.h"
 #include "smartcard/smartcard_satochip.h"
+#include "smartcard/smartcard_transport.h"
 #include "ui/dialog.h"
 #include "ui/i18n_text.h"
 #include "ui/input_helpers.h"
@@ -19,7 +22,6 @@
 #include "utils/secure_mem.h"
 
 #ifndef SIMULATOR
-#include "core/key.h"
 #include "core/mnemonic_slots.h"
 #include "core/wallet.h"
 #include "pages/home/addresses.h"
@@ -63,6 +65,7 @@
 #endif
 
 #include <bsp/display.h>
+#include <ctype.h>
 #include <esp_app_desc.h>
 #include <esp_err.h>
 #include <esp_heap_caps.h>
@@ -274,7 +277,7 @@ static const char *shell_i18n_key_for_id(const char *id) {
       {"smartcard_seedkeeper_write_mnemonic", "menu.write_card"},
       {"smartcard_seedkeeper_view_mnemonic", "menu.view"},
       {"smartcard_seedkeeper_load_mnemonic", "action.import"},
-      {"smartcard_seedkeeper_save_password", "action.save"},
+      {"smartcard_seedkeeper_save_secret", "action.save"},
       {"smartcard_seedkeeper_load_descriptor", "descriptor.load_descriptor"},
       {"smartcard_seedkeeper_save_descriptor", "descriptor.save_descriptor"},
       {"smartcard_seedkeeper_clone", "menu.clone"},
@@ -338,6 +341,8 @@ static const char *shell_alias_target_for_id(const char *id) {
     return "connect_imtoken";
   if (strcmp(id, "connect_address") == 0 || strcmp(id, "web3_address") == 0)
     return "custom_derivation";
+  if (strcmp(id, "smartcard_seedkeeper_save_password") == 0)
+    return "smartcard_seedkeeper_save_secret";
   return NULL;
 }
 
@@ -639,7 +644,7 @@ static const signer_menu_override_t SIGNER_SMARTCARD_SEEDKEEPER_MENU[] = {
     {"Write", "smartcard_seedkeeper_write_mnemonic"},
     {"View", "smartcard_seedkeeper_view_mnemonic"},
     {"Import", "smartcard_seedkeeper_load_mnemonic"},
-    {"Save Password", "smartcard_seedkeeper_save_password"},
+    {"Save", "smartcard_seedkeeper_save_secret"},
     {"Load Descriptor", "smartcard_seedkeeper_load_descriptor"},
     {"Save Descriptor", "smartcard_seedkeeper_save_descriptor"},
     {"Clone", "smartcard_seedkeeper_clone"},
@@ -737,9 +742,9 @@ static const signer_feature_t SIGNER_LOCAL_SMARTCARD_FEATURES[] = {
      "Load the card mnemonic into device memory.",
      "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
      SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
-    {"smartcard_seedkeeper_save_password",
-     "smartcard_satochip_seedkeeper_tools", "Save Password", "Password item",
-     "Save a password to SeedKeeper.",
+    {"smartcard_seedkeeper_save_secret",
+     "smartcard_satochip_seedkeeper_tools", "Save", "Text / password",
+     "Save text or password data to SeedKeeper.",
      "main/pages/signer_shell/signer_shell.c", SIGNER_FEATURE_ACTION,
      SIGNER_FEATURE_UI_READY, SIGNER_FEATURE_RISK_SECRET_MATERIAL},
     {"smartcard_seedkeeper_load_descriptor",
@@ -952,7 +957,7 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "smartcard_seedkeeper_write_mnemonic",
     "smartcard_seedkeeper_view_mnemonic",
     "smartcard_seedkeeper_load_mnemonic",
-    "smartcard_seedkeeper_save_password",
+    "smartcard_seedkeeper_save_secret",
     "smartcard_seedkeeper_load_descriptor",
     "smartcard_seedkeeper_save_descriptor",
     "smartcard_seedkeeper_clone",
@@ -1310,6 +1315,8 @@ static lv_obj_t *satochip_maint_attach_extra_field(lv_obj_t *parent,
                                                    size_t max_len,
                                                    lv_obj_t **slot);
 static void create_signer_header(lv_obj_t *root, const signer_feature_t *feature);
+static lv_obj_t *create_signer_list(lv_obj_t *root, bool center_items,
+                                    bool grid_mode);
 static void create_signer_child_menu(lv_obj_t *list,
                                    const signer_feature_t *feature);
 static const signer_feature_t *shell_feature_find(const char *id);
@@ -3623,27 +3630,27 @@ static void card_info_task(void *arg) {
   s_card_info_task_err = ESP_OK;
   s_card_info_result[0] = '\0';
 
-  char ccid_text[1024];
+  char reader_text[1536];
   char label_text[512];
   smartcard_satochip_label_t label;
   memset(&label, 0, sizeof(label));
 
-  esp_err_t probe_err = smartcard_ccid_probe(12000);
-  smartcard_ccid_format_report(ccid_text, sizeof(ccid_text));
+  esp_err_t probe_err = smartcard_transport_probe(30000);
+  smartcard_transport_format_report(reader_text, sizeof(reader_text));
 
   if (probe_err == ESP_OK) {
-    esp_err_t label_err = smartcard_satochip_get_label(&label, 12000);
+    esp_err_t label_err = smartcard_satochip_get_label(&label, 30000);
     smartcard_satochip_format_label(&label, label_text, sizeof(label_text));
 
     if (label_err != ESP_OK)
       probe_err = label_err;
 
     snprintf(s_card_info_result, sizeof(s_card_info_result),
-             "Reader\n%s\n\nCard Label\n%s", ccid_text, label_text);
+             "Reader\n%s\n\nCard Label\n%s", reader_text, label_text);
   } else {
     snprintf(s_card_info_result, sizeof(s_card_info_result),
              "Reader Overview\n%s\n\nFurther reads skipped: reader or card is not ready.",
-             ccid_text);
+             reader_text);
   }
 
   s_card_info_task_err = probe_err;
@@ -4065,11 +4072,20 @@ static void satochip_tool_finish_ui(void) {
   if (feature)
     create_signer_header(root, feature);
 
+  lv_obj_t *content = create_signer_list(root, false, false);
+  lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_OFF);
+
   lv_obj_t *panel =
-      create_panel(root,
+      create_panel(content,
                    s_satochip_tool_task_err == ESP_OK ? yes_color()
                                                       : error_color(),
                    max_i(14, theme_get_small_padding()));
+  lv_obj_set_flex_grow(panel, 1);
+  lv_obj_add_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scroll_dir(panel, LV_DIR_VER);
+  lv_obj_set_scrollbar_mode(panel, LV_SCROLLBAR_MODE_AUTO);
+  lv_obj_set_style_pad_right(panel, theme_get_small_padding() + 4, 0);
   create_text(panel,
               s_satochip_tool_title[0] ? s_satochip_tool_title : "Satochip",
               true,
@@ -4586,22 +4602,18 @@ static void refresh_smartcard_label(lv_obj_t *label) {
   if (!label)
     return;
 
-  char text[768];
-  smartcard_ccid_format_report(text, sizeof(text));
+  char text[1536];
+  smartcard_transport_format_report(text, sizeof(text));
   lv_label_set_text(label, text);
 
-  smartcard_ccid_report_t report;
-  smartcard_ccid_snapshot(&report);
   lv_color_t color = main_color();
-  if (report.state == SMARTCARD_CCID_STATE_PASS ||
-      report.state == SMARTCARD_CCID_STATE_APPLET_OK ||
-      report.state == SMARTCARD_CCID_STATE_ATR_OK) {
+  smartcard_transport_t active = smartcard_transport_active();
+  if (active == SMARTCARD_TRANSPORT_USB_CCID ||
+      active == SMARTCARD_TRANSPORT_NFC_PN532) {
     color = yes_color();
-  } else if (report.state == SMARTCARD_CCID_STATE_FAIL ||
-             report.state == SMARTCARD_CCID_STATE_TIMEOUT) {
+  }
+  if (s_smartcard_probe_task_err != ESP_OK) {
     color = error_color();
-  } else if (report.state == SMARTCARD_CCID_STATE_UNSUPPORTED) {
-    color = secondary_color();
   }
   lv_obj_set_style_text_color(label, color, 0);
 }
@@ -4609,7 +4621,7 @@ static void refresh_smartcard_label(lv_obj_t *label) {
 static void smartcard_probe_task(void *arg) {
   (void)arg;
   const bool delete_with_caps = s_smartcard_probe_task_with_caps;
-  s_smartcard_probe_task_err = smartcard_ccid_probe(12000);
+  s_smartcard_probe_task_err = smartcard_transport_probe(30000);
   __atomic_store_n(&s_smartcard_probe_task_done, true, __ATOMIC_RELEASE);
   if (delete_with_caps) {
     vTaskDeleteWithCaps(NULL);
@@ -4647,7 +4659,7 @@ static void smartcard_probe_start(lv_obj_t *label) {
     lv_label_set_text(label, i18n_tr_or("dialog.processing", "Checking"));
     lv_obj_set_style_text_color(label, highlight_color(), 0);
   }
-  (void)smartcard_ccid_probe(12000);
+  s_smartcard_probe_task_err = smartcard_transport_probe(30000);
   refresh_smartcard_label(label);
   return;
 #endif
@@ -4737,7 +4749,7 @@ static void satochip_status_task(void *arg) {
     goto status_done;
   }
 
-  s_satochip_status_task_err = smartcard_satochip_read_status(status, 12000);
+  s_satochip_status_task_err = smartcard_satochip_read_status(status, 30000);
   s_satochip_status_app_selected = status->app_selected;
   smartcard_satochip_format_status(status, s_satochip_status_text,
                                    sizeof(s_satochip_status_text));
@@ -4781,7 +4793,7 @@ static void satochip_status_start(lv_obj_t *label) {
 #ifdef SIMULATOR
   smartcard_satochip_status_t status;
   memset(&status, 0, sizeof(status));
-  esp_err_t err = smartcard_satochip_read_status(&status, 12000);
+  esp_err_t err = smartcard_satochip_read_status(&status, 30000);
   smartcard_satochip_format_status(&status, s_satochip_status_text,
                                    sizeof(s_satochip_status_text));
   s_satochip_status_task_err = err;
@@ -4902,7 +4914,7 @@ typedef enum {
   SATOCHIP_MAINT_SEEDKEEPER_WRITE_MNEMONIC,
   SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC,
   SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC,
-  SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD,
+  SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET,
   SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR,
   SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR,
   SATOCHIP_MAINT_SEEDKEEPER_CLONE,
@@ -4937,6 +4949,10 @@ static char s_satochip_maint_pin[80];
 static char s_satochip_maint_text_a[1024];
 static char s_satochip_maint_text_b[4096];
 static char s_satochip_maint_text_c[4096];
+static char s_satochip_seedkeeper_scanned_secret[4096];
+static char s_satochip_seedkeeper_export_secret_qr[4096];
+static char s_satochip_seedkeeper_export_secret_qr_title[96];
+static bool s_satochip_seedkeeper_export_secret_qr_pending;
 static smartcard_seedkeeper_header_list_t s_satochip_seedkeeper_last_list;
 static bool s_satochip_seedkeeper_last_list_valid;
 static satochip_maint_mode_t s_satochip_seedkeeper_last_list_mode =
@@ -4953,6 +4969,7 @@ typedef enum {
   SATOCHIP_SEEDKEEPER_ITEM_OP_LOAD,
   SATOCHIP_SEEDKEEPER_ITEM_OP_DELETE,
   SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE,
+  SATOCHIP_SEEDKEEPER_ITEM_OP_EXPORT,
 } satochip_seedkeeper_item_op_t;
 
 static satochip_seedkeeper_lookup_stage_t s_satochip_seedkeeper_lookup_stage =
@@ -4963,6 +4980,7 @@ static uint16_t s_satochip_seedkeeper_selected_sid;
 static smartcard_seedkeeper_header_t s_satochip_seedkeeper_selected_header;
 static bool s_satochip_seedkeeper_selected_header_valid;
 static char s_satochip_seedkeeper_cached_pin[80];
+static bool s_satochip_seedkeeper_ephemeral_create;
 static void satochip_seedkeeper_lookup_state_reset(void);
 static void satochip_seedkeeper_render_lookup_content(lv_obj_t *panel);
 static void satochip_seedkeeper_lookup_select_item(uint16_t sid);
@@ -4975,6 +4993,9 @@ static void satochip_maint_start(void);
 static void satochip_maint_start_event_cb(lv_event_t *event);
 static void satochip_seedkeeper_reset_pin_step_event_cb(lv_event_t *event);
 static void satochip_seedkeeper_reset_puk_step_event_cb(lv_event_t *event);
+static void seedkeeper_secret_qr_state_reset(void);
+static void seedkeeper_secret_qr_show_if_pending(void);
+static void seedkeeper_secret_scan_event_cb(lv_event_t *event);
 static void satochip_maint_attach_primary_input(lv_obj_t *parent,
                                                 const char *placeholder,
                                                 bool password,
@@ -5005,6 +5026,7 @@ static bool smartcard_task_busy(void) {
 #define SEEDKEEPER_TYPE_MASTER_PASSWORD 0x91
 #define SEEDKEEPER_TYPE_2FA_SECRET 0xB0
 #define SEEDKEEPER_TYPE_DATA 0xC0
+#define SEEDKEEPER_SUBTYPE_GENERIC_TEXT 0x02
 #define SEEDKEEPER_ORIGIN_PLAIN_IMPORT 0x01
 #define SEEDKEEPER_ORIGIN_GENERATED_ON_CARD 0x03
 #define SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED 0x01
@@ -5102,6 +5124,71 @@ static void satochip_maint_result_clear(void) {
   s_satochip_maint_task_err = ESP_ERR_INVALID_STATE;
 }
 
+static void seedkeeper_secret_qr_state_reset(void) {
+  s_satochip_seedkeeper_export_secret_qr_pending = false;
+  s_satochip_seedkeeper_export_secret_qr[0] = '\0';
+  s_satochip_seedkeeper_export_secret_qr_title[0] = '\0';
+}
+
+#ifndef SIMULATOR
+static void seedkeeper_secret_qr_return_cb(void) {
+  qr_viewer_page_destroy();
+  seedkeeper_secret_qr_state_reset();
+  (void)signer_shell_show_screen(s_current_screen_id);
+}
+
+static void seedkeeper_secret_qr_show_if_pending(void) {
+  if (!s_satochip_seedkeeper_export_secret_qr_pending ||
+      !s_satochip_seedkeeper_export_secret_qr[0])
+    return;
+  const char *title = s_satochip_seedkeeper_export_secret_qr_title[0]
+                          ? s_satochip_seedkeeper_export_secret_qr_title
+                          : "SeedKeeper Secret";
+  if (!qr_viewer_page_create(lv_screen_active(),
+                             s_satochip_seedkeeper_export_secret_qr, title,
+                             seedkeeper_secret_qr_return_cb)) {
+    dialog_show_error("Secret QR display failed", NULL, 2000);
+    seedkeeper_secret_qr_state_reset();
+    return;
+  }
+  qr_viewer_page_show();
+}
+
+static void seedkeeper_secret_return_from_qr_cb(void) {
+  size_t content_len = 0;
+  char *scanned = qr_scanner_get_completed_content_with_len(&content_len);
+  qr_scanner_page_destroy();
+  s_satochip_seedkeeper_scanned_secret[0] = '\0';
+  if (scanned && content_len > 0) {
+    size_t copy_len = content_len;
+    if (copy_len >= sizeof(s_satochip_seedkeeper_scanned_secret))
+      copy_len = sizeof(s_satochip_seedkeeper_scanned_secret) - 1;
+    memcpy(s_satochip_seedkeeper_scanned_secret, scanned, copy_len);
+    s_satochip_seedkeeper_scanned_secret[copy_len] = '\0';
+  }
+  free(scanned);
+  (void)signer_shell_show_screen("smartcard_seedkeeper_save_secret");
+}
+#else
+static void seedkeeper_secret_qr_show_if_pending(void) {
+  seedkeeper_secret_qr_state_reset();
+}
+#endif
+
+static void seedkeeper_secret_scan_event_cb(lv_event_t *event) {
+  (void)event;
+#ifdef SIMULATOR
+  snprintf(s_satochip_seedkeeper_scanned_secret,
+           sizeof(s_satochip_seedkeeper_scanned_secret),
+           "simulator scanned secret");
+  (void)signer_shell_show_screen("smartcard_seedkeeper_save_secret");
+#else
+  lv_obj_t *root = legacy_wallet_prepare_root();
+  qr_scanner_page_create(root, seedkeeper_secret_return_from_qr_cb);
+  qr_scanner_page_show();
+#endif
+}
+
 static void satochip_maint_log_stack_watermark(const char *stage) {
   ESP_LOGI(TAG, "satochip maint %s stack watermark=%u words",
            stage ? stage : "?", (unsigned)uxTaskGetStackHighWaterMark(NULL));
@@ -5150,6 +5237,11 @@ static bool seedkeeper_header_is_loadable_mnemonic(
            header->subtype == 0x01));
 }
 
+static bool seedkeeper_header_is_generic_secret(
+    const smartcard_seedkeeper_header_t *header) {
+  return header && header->type == SEEDKEEPER_TYPE_DATA;
+}
+
 static bool seedkeeper_header_is_password(
     const smartcard_seedkeeper_header_t *header) {
   return header && header->type == SEEDKEEPER_TYPE_PASSWORD;
@@ -5158,6 +5250,7 @@ static bool seedkeeper_header_is_password(
 static bool seedkeeper_header_is_viewable(
     const smartcard_seedkeeper_header_t *header) {
   return seedkeeper_header_is_loadable_mnemonic(header) ||
+         seedkeeper_header_is_generic_secret(header) ||
          seedkeeper_header_is_password(header);
 }
 
@@ -5165,6 +5258,8 @@ static const char *seedkeeper_header_kind_label(
   const smartcard_seedkeeper_header_t *header) {
   if (seedkeeper_header_is_password(header))
     return "Password";
+  if (seedkeeper_header_is_generic_secret(header))
+    return "Secret";
   if (seedkeeper_header_is_loadable_mnemonic(header))
     return "Mnemonic";
   return "Item";
@@ -5172,42 +5267,20 @@ static const char *seedkeeper_header_kind_label(
 
 static bool seedkeeper_fingerprint_from_mnemonic(
     const char *mnemonic, const char *passphrase, uint8_t out[4]) {
-#ifdef SIMULATOR
-  (void)mnemonic;
-  (void)passphrase;
-  (void)out;
-  return false;
-#else
-  if (!mnemonic || !mnemonic[0] || !out)
+  if (!out)
     return false;
-
-  unsigned char seed[BIP39_SEED_LEN_512];
+  (void)passphrase;
   unsigned char fingerprint[BIP32_KEY_FINGERPRINT_LEN];
-  struct ext_key *master_key = NULL;
-  bool ok = false;
-  memset(seed, 0, sizeof(seed));
   memset(fingerprint, 0, sizeof(fingerprint));
 
-  if (bip39_mnemonic_to_seed512(mnemonic, passphrase ? passphrase : "", seed,
-                                sizeof(seed)) != WALLY_OK)
-    goto cleanup;
-  if (bip32_key_from_seed_alloc(seed, sizeof(seed), BIP32_VER_MAIN_PRIVATE, 0,
-                                &master_key) != WALLY_OK)
-    goto cleanup;
-  if (bip32_key_get_fingerprint(master_key, fingerprint,
-                                BIP32_KEY_FINGERPRINT_LEN) != WALLY_OK)
-    goto cleanup;
+  if (!key_compute_mnemonic_fingerprint(fingerprint, mnemonic)) {
+    secure_memzero(fingerprint, sizeof(fingerprint));
+    return false;
+  }
 
   memcpy(out, fingerprint, 4);
-  ok = true;
-
-cleanup:
-  if (master_key)
-    bip32_key_free(master_key);
-  secure_memzero(seed, sizeof(seed));
   secure_memzero(fingerprint, sizeof(fingerprint));
-  return ok;
-#endif
+  return true;
 }
 
 static bool seedkeeper_wallet_fingerprint_hex_from_mnemonic(
@@ -5215,29 +5288,46 @@ static bool seedkeeper_wallet_fingerprint_hex_from_mnemonic(
   if (!out)
     return false;
   out[0] = '\0';
-  uint8_t fp[4];
-  if (!seedkeeper_fingerprint_from_mnemonic(mnemonic, passphrase, fp)) {
-    secure_memzero(fp, sizeof(fp));
+  (void)passphrase;
+  return key_compute_mnemonic_fingerprint_hex(out, mnemonic);
+}
+
+static bool seedkeeper_label_is_fingerprint(const char *label) {
+  if (!label || strlen(label) != 8)
     return false;
+  for (size_t i = 0; i < 8; i++) {
+    if (!isxdigit((unsigned char)label[i]))
+      return false;
   }
-  snprintf(out, 9, "%02x%02x%02x%02x", fp[0], fp[1], fp[2], fp[3]);
-  secure_memzero(fp, sizeof(fp));
   return true;
 }
 
-static void seedkeeper_label_with_wallet_fp(const char *label, const char *fp,
-                                            char out[SEEDKEEPER_LABEL_MAX_BYTES + 1]) {
+static void seedkeeper_format_fingerprint_hex(const uint8_t fingerprint[4],
+                                              char out[9]) {
   if (!out)
     return;
-  const char *safe_label = (label && label[0]) ? label : "KernSigner Mnemonic";
-  if (!fp || !fp[0] || strstr(safe_label, fp)) {
-    snprintf(out, SEEDKEEPER_LABEL_MAX_BYTES + 1, "%s", safe_label);
+  out[0] = '\0';
+  if (!fingerprint)
+    return;
+  snprintf(out, 9, "%02x%02x%02x%02x", fingerprint[0], fingerprint[1],
+           fingerprint[2], fingerprint[3]);
+}
+
+static void seedkeeper_header_mnemonic_fingerprint_hex(
+    const smartcard_seedkeeper_header_t *header, char out[9]) {
+  if (!out)
+    return;
+  out[0] = '\0';
+  if (!header)
+    return;
+  if (seedkeeper_label_is_fingerprint(header->label)) {
+    memcpy(out, header->label, 8);
+    out[8] = '\0';
+    for (size_t i = 0; out[i]; i++)
+      out[i] = (char)tolower((unsigned char)out[i]);
     return;
   }
-  int written = snprintf(out, SEEDKEEPER_LABEL_MAX_BYTES + 1, "%s %s",
-                         safe_label, fp);
-  if (written < 0)
-    out[0] = '\0';
+  seedkeeper_format_fingerprint_hex(header->fingerprint, out);
 }
 
 static void satochip_seedkeeper_store_last_list(
@@ -5369,18 +5459,25 @@ static void satochip_seedkeeper_render_list_entries(lv_obj_t *panel) {
         !seedkeeper_header_is_viewable(header))
       continue;
 
-    char fingerprint[16];
-    satochip_hex_bytes_upper(header->fingerprint, sizeof(header->fingerprint),
-                             fingerprint, sizeof(fingerprint));
-    char label[96];
-    if (seedkeeper_header_is_password(header)) {
+	    char fingerprint[9];
+	    seedkeeper_header_mnemonic_fingerprint_hex(header, fingerprint);
+	    char label[96];
+	    if (seedkeeper_header_is_loadable_mnemonic(header)) {
+	      snprintf(label, sizeof(label), "%s",
+	               fingerprint[0] ? fingerprint : "--------");
+    } else if (seedkeeper_header_is_generic_secret(header)) {
+      if (header->label[0])
+        snprintf(label, sizeof(label), "%s", header->label);
+      else
+        snprintf(label, sizeof(label), "Secret %u", (unsigned)header->id);
+    } else if (seedkeeper_header_is_password(header)) {
       snprintf(label, sizeof(label), "Password %s",
                header->label[0] ? header->label : fingerprint);
     } else {
       if (header->label[0])
-        snprintf(label, sizeof(label), "Mnemonic %s", header->label);
+        snprintf(label, sizeof(label), "%s", header->label);
       else
-        snprintf(label, sizeof(label), "Mnemonic ID%u", (unsigned)header->id);
+        snprintf(label, sizeof(label), "Item %u", (unsigned)header->id);
     }
     create_action_button(panel, label, satochip_seedkeeper_select_item_cb,
                          (void *)(uintptr_t)header->id, false);
@@ -5427,8 +5524,17 @@ static void satochip_seedkeeper_render_lookup_content(lv_obj_t *panel) {
   char title[48];
   snprintf(title, sizeof(title), "%s", seedkeeper_header_kind_label(header));
   create_text(panel, title, true, highlight_color());
-  if (header && header->label[0])
-    create_text(panel, header->label, false, secondary_color());
+  if (header) {
+	    if (seedkeeper_header_is_loadable_mnemonic(header)) {
+	      char fingerprint[9];
+	      seedkeeper_header_mnemonic_fingerprint_hex(header, fingerprint);
+	      create_text(panel,
+	                  fingerprint[0] ? fingerprint : "(empty)", false,
+	                  secondary_color());
+    } else if (header->label[0]) {
+      create_text(panel, header->label, false, secondary_color());
+    }
+  }
   if (s_satochip_maint_result[0])
     create_text(panel, s_satochip_maint_result, false,
                 s_satochip_maint_task_err == ESP_OK ? main_color()
@@ -5454,14 +5560,27 @@ static void satochip_seedkeeper_render_lookup_content(lv_obj_t *panel) {
     return;
   }
 
-  if (seedkeeper_header_is_password(header)) {
-    create_action_button(panel, "View Password",
+	  if (seedkeeper_header_is_password(header)) {
+	    create_action_button(panel, "View Password",
+	                         satochip_seedkeeper_lookup_item_action_cb,
+	                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_VIEW,
+	                         true);
+	    create_action_button(panel, "Export QR",
+	                         satochip_seedkeeper_lookup_item_action_cb,
+	                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_EXPORT,
+	                         false);
+	    create_action_button(panel, "Edit",
+	                         satochip_seedkeeper_lookup_item_action_cb,
+	                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE,
+	                         false);
+  } else if (seedkeeper_header_is_generic_secret(header)) {
+    create_action_button(panel, "View Secret",
                          satochip_seedkeeper_lookup_item_action_cb,
                          (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_VIEW,
                          true);
-    create_action_button(panel, "Edit",
+    create_action_button(panel, "Export QR",
                          satochip_seedkeeper_lookup_item_action_cb,
-                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_UPDATE,
+                         (void *)(uintptr_t)SATOCHIP_SEEDKEEPER_ITEM_OP_EXPORT,
                          false);
   } else {
     create_action_button(panel, "View Mnemonic",
@@ -5722,7 +5841,7 @@ static void satochip_format_seedkeeper_write_mnemonic_result(
   if (res->sw == 0x9000 && res->response_len >= 6) {
     uint16_t sid = ((uint16_t)res->response[0] << 8) | res->response[1];
     satochip_appendf(dst, dst_len, &pos, "SID: %u\n", (unsigned)sid);
-    satochip_appendf(dst, dst_len, &pos, "Wallet fingerprint: %s\n",
+    satochip_appendf(dst, dst_len, &pos, "Fingerprint: %s\n",
                      wallet_fp && wallet_fp[0] ? wallet_fp : "--");
     return;
   }
@@ -5738,17 +5857,19 @@ static void satochip_format_seedkeeper_write_mnemonic_result(
   }
 }
 
-static bool seedkeeper_build_plain_header(uint8_t type, uint8_t subtype,
-                                          uint8_t export_rights,
-                                          const char *label,
-                                          const uint8_t fingerprint[4],
-                                          uint8_t *out, size_t out_len,
-                                          size_t *written_out) {
+static bool seedkeeper_build_plain_header_impl(uint8_t type, uint8_t subtype,
+                                               uint8_t export_rights,
+                                               const char *label,
+                                               bool allow_empty_label,
+                                               const uint8_t fingerprint[4],
+                                               uint8_t *out, size_t out_len,
+                                               size_t *written_out) {
   if (!out || out_len < 15 || !written_out)
     return false;
 
-  const char *safe_label = (label && label[0]) ? label : "KernSigner";
-  size_t label_len = strnlen(safe_label, SEEDKEEPER_LABEL_MAX_BYTES + 1);
+  const char *safe_label =
+      (label && label[0]) ? label : (allow_empty_label ? "" : "KernSigner");
+  size_t label_len = strlen(safe_label);
   if (label_len > SEEDKEEPER_LABEL_MAX_BYTES)
     label_len = SEEDKEEPER_LABEL_MAX_BYTES;
   if (15U + label_len > out_len)
@@ -5777,6 +5898,26 @@ static bool seedkeeper_build_plain_header(uint8_t type, uint8_t subtype,
   return true;
 }
 
+static bool seedkeeper_build_plain_header(uint8_t type, uint8_t subtype,
+                                          uint8_t export_rights,
+                                          const char *label,
+                                          const uint8_t fingerprint[4],
+                                          uint8_t *out, size_t out_len,
+                                          size_t *written_out) {
+  return seedkeeper_build_plain_header_impl(type, subtype, export_rights,
+                                            label, false, fingerprint, out,
+                                            out_len, written_out);
+}
+
+static bool seedkeeper_build_plain_header_allow_empty(
+    uint8_t type, uint8_t subtype, uint8_t export_rights, const char *label,
+    const uint8_t fingerprint[4], uint8_t *out, size_t out_len,
+    size_t *written_out) {
+  return seedkeeper_build_plain_header_impl(type, subtype, export_rights,
+                                            label, true, fingerprint, out,
+                                            out_len, written_out);
+}
+
 static bool seedkeeper_build_mnemonic_secret(const char *mnemonic,
                                              const char *passphrase,
                                              uint8_t *out, size_t out_len,
@@ -5802,6 +5943,56 @@ static bool seedkeeper_build_mnemonic_secret(const char *mnemonic,
   pos += passphrase_len;
   *written_out = pos;
   return true;
+}
+
+static bool seedkeeper_build_mnemonic_header_from_text(
+    const char *mnemonic, const char *passphrase, uint8_t *header,
+    size_t header_len, size_t *written_out, char *wallet_fp_out,
+    size_t wallet_fp_out_len) {
+  if (!mnemonic || !mnemonic[0] || !header || !written_out)
+    return false;
+
+  uint8_t secret[2 + SEEDKEEPER_MNEMONIC_MAX_BYTES * 2];
+  uint8_t secret_hash[CRYPTO_SHA256_SIZE];
+  uint8_t header_fingerprint[4];
+  bool ok = false;
+  memset(secret, 0, sizeof(secret));
+  memset(secret_hash, 0, sizeof(secret_hash));
+  memset(header_fingerprint, 0, sizeof(header_fingerprint));
+  if (wallet_fp_out && wallet_fp_out_len > 0)
+    wallet_fp_out[0] = '\0';
+
+  size_t secret_len = 0;
+  ok = seedkeeper_build_mnemonic_secret(mnemonic, passphrase, secret,
+                                        sizeof(secret), &secret_len) &&
+       crypto_sha256(secret, secret_len, secret_hash) == CRYPTO_OK;
+  if (!ok)
+    goto done;
+
+  if (!seedkeeper_fingerprint_from_mnemonic(mnemonic, passphrase,
+                                            header_fingerprint)) {
+    memcpy(header_fingerprint, secret_hash, sizeof(header_fingerprint));
+  }
+
+  char label_text[SEEDKEEPER_LABEL_MAX_BYTES + 1] = "";
+  if (wallet_fp_out && wallet_fp_out_len > 0 &&
+      seedkeeper_wallet_fingerprint_hex_from_mnemonic(
+          mnemonic, passphrase, wallet_fp_out)) {
+    snprintf(label_text, sizeof(label_text), "%s", wallet_fp_out);
+  }
+
+  ok = seedkeeper_build_plain_header(
+      SEEDKEEPER_TYPE_BIP39_MNEMONIC, 0x00,
+      SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, label_text, header_fingerprint, header,
+      header_len, written_out);
+  if (!ok)
+    goto done;
+
+done:
+  secure_memzero(secret, sizeof(secret));
+  secure_memzero(secret_hash, sizeof(secret_hash));
+  secure_memzero(header_fingerprint, sizeof(header_fingerprint));
+  return ok;
 }
 
 static bool seedkeeper_collect_plain_secret(
@@ -5901,6 +6092,39 @@ static bool seedkeeper_import_text_secret(
                                      label, secret_hash, header,
                                      sizeof(header), &header_len)) {
     snprintf(result, result_len, "%s content is too long or empty.", title ? title : "");
+    secure_memzero(header, sizeof(header));
+    secure_memzero(secret, sizeof(secret));
+    secure_memzero(secret_hash, sizeof(secret_hash));
+    return false;
+  }
+
+  s_satochip_maint_task_err = smartcard_seedkeeper_import_secret(
+      pin, header, header_len, secret, secret_len, 0, NULL, 0, NULL, 0, false,
+      apdu, 30000);
+  satochip_format_apdu_result(result, result_len, title, apdu);
+  secure_memzero(header, sizeof(header));
+  secure_memzero(secret, sizeof(secret));
+  secure_memzero(secret_hash, sizeof(secret_hash));
+  return true;
+}
+
+static bool seedkeeper_import_text_secret_allow_empty_label(
+    const char *pin, uint8_t type, uint8_t subtype, const char *text,
+    bool two_byte_len, const char *title, smartcard_satochip_apdu_result_t *apdu,
+    char *result, size_t result_len) {
+  uint8_t header[15 + SEEDKEEPER_LABEL_MAX_BYTES];
+  uint8_t secret[4096];
+  uint8_t secret_hash[CRYPTO_SHA256_SIZE];
+  size_t header_len = 0;
+  size_t secret_len = 0;
+  if (!seedkeeper_build_text_secret(text, two_byte_len, secret,
+                                    sizeof(secret), &secret_len) ||
+      crypto_sha256(secret, secret_len, secret_hash) != CRYPTO_OK ||
+      !seedkeeper_build_plain_header_allow_empty(
+          type, subtype, SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, "",
+          secret_hash, header, sizeof(header), &header_len)) {
+    snprintf(result, result_len, "%s content is too long or empty.",
+             title ? title : "");
     secure_memzero(header, sizeof(header));
     secure_memzero(secret, sizeof(secret));
     secure_memzero(secret_hash, sizeof(secret_hash));
@@ -6046,23 +6270,24 @@ static bool seedkeeper_extract_bip39_mnemonic(
   const uint8_t *payload = secret;
   size_t payload_len = secret_len;
   size_t pos = 0;
+  bool ok = false;
   if (header.type == SEEDKEEPER_TYPE_BIP39_MNEMONIC) {
     if (payload_len < 2)
-      return false;
+      goto done;
 
     size_t mnemonic_len = payload[pos++];
     if (mnemonic_len == 0 || mnemonic_len >= mnemonic_out_len ||
         pos + mnemonic_len > payload_len)
-      return false;
+      goto done;
     memcpy(mnemonic_out, payload + pos, mnemonic_len);
     mnemonic_out[mnemonic_len] = '\0';
     pos += mnemonic_len;
 
     if (pos >= payload_len)
-      return false;
+      goto done;
     size_t passphrase_len = payload[pos++];
     if (pos + passphrase_len > payload_len)
-      return false;
+      goto done;
     if (passphrase_out && passphrase_out_len > 0) {
       size_t copy = passphrase_len;
       if (copy >= passphrase_out_len)
@@ -6073,47 +6298,48 @@ static bool seedkeeper_extract_bip39_mnemonic(
   } else if (header.type == SEEDKEEPER_TYPE_MASTERSEED &&
              header.subtype == 0x01) {
     if (payload_len < 4)
-      return false;
+      goto done;
 
     size_t masterseed_len = payload[pos++];
     if (masterseed_len == 0 || pos + masterseed_len > payload_len)
-      return false;
+      goto done;
     pos += masterseed_len;
 
     if (pos >= payload_len)
-      return false;
+      goto done;
     const char *wordlist_name = seedkeeper_wordlist_name_from_byte(payload[pos++]);
     if (!wordlist_name)
-      return false;
+      goto done;
 
     if (pos >= payload_len)
-      return false;
+      goto done;
     size_t entropy_len = payload[pos++];
     if (entropy_len < 16 || entropy_len > 32 || (entropy_len % 4) != 0 ||
         pos + entropy_len > payload_len)
-      return false;
+      goto done;
 
     struct words *wordlist = NULL;
     if (bip39_get_wordlist(wordlist_name, &wordlist) != WALLY_OK || !wordlist)
-      return false;
+      goto done;
 
     char *mnemonic = NULL;
     if (bip39_mnemonic_from_bytes(wordlist, payload + pos, entropy_len,
-                                  &mnemonic) != WALLY_OK || !mnemonic)
-      return false;
+                                  &mnemonic) != WALLY_OK ||
+        !mnemonic)
+      goto done;
 
     char *mnemonic_copy = dup_wally_string_local(mnemonic);
     if (!mnemonic_copy)
-      return false;
+      goto done;
     snprintf(mnemonic_out, mnemonic_out_len, "%s", mnemonic_copy);
     SECURE_FREE_STRING(mnemonic_copy);
     pos += entropy_len;
 
     if (pos >= payload_len)
-      return false;
+      goto done;
     size_t passphrase_len = payload[pos++];
     if (pos + passphrase_len > payload_len)
-      return false;
+      goto done;
     if (passphrase_out && passphrase_out_len > 0) {
       size_t copy = passphrase_len;
       if (copy >= passphrase_out_len)
@@ -6122,13 +6348,21 @@ static bool seedkeeper_extract_bip39_mnemonic(
       passphrase_out[copy] = '\0';
     }
   } else {
-    return false;
+    goto done;
   }
 
   if (header_out)
     *header_out = header;
+  ok = true;
+
+done:
   secure_memzero(secret, sizeof(secret));
-  return true;
+  if (!ok) {
+    mnemonic_out[0] = '\0';
+    if (passphrase_out && passphrase_out_len > 0)
+      passphrase_out[0] = '\0';
+  }
+  return ok;
 }
 
 static bool seedkeeper_extract_random_secret_bytes(
@@ -6145,8 +6379,7 @@ static bool seedkeeper_extract_random_secret_bytes(
     return false;
 
   bool ok = false;
-  if (header.type == SEEDKEEPER_TYPE_SECRET_KEY &&
-      header.origin == SEEDKEEPER_ORIGIN_GENERATED_ON_CARD) {
+  if (header.type == SEEDKEEPER_TYPE_SECRET_KEY) {
     if (secret_len == expected_len) {
       memcpy(entropy_out, secret, expected_len);
       ok = true;
@@ -6223,9 +6456,8 @@ static void satochip_format_seedkeeper_mnemonic_result(
   char wallet_fp[9] = "";
   (void)seedkeeper_wallet_fingerprint_hex_from_mnemonic(mnemonic, passphrase,
                                                         wallet_fp);
-  satochip_appendf(dst, dst_len, &pos, "SID: %u\nLabel: %s\nWallet fingerprint: %s\n\n%s",
+  satochip_appendf(dst, dst_len, &pos, "SID: %u\nFingerprint: %s\n\n%s",
                    (unsigned)header.id,
-                   header.label[0] ? header.label : "(no label)",
                    wallet_fp[0] ? wallet_fp : "--", mnemonic);
   if (passphrase[0])
     satochip_appendf(dst, dst_len, &pos, "\n\nPassphrase: %s", passphrase);
@@ -6234,13 +6466,6 @@ static void satochip_format_seedkeeper_mnemonic_result(
                      loaded_ok ? "success, slot " : "failed",
                      loaded_ok ? "" : ".",
                      loaded_ok ? (unsigned)(slot_index + 1U) : 0U);
-#ifndef SIMULATOR
-  if (load_result && loaded_ok) {
-    char loaded_fp[9] = "";
-    if (key_get_fingerprint_hex(loaded_fp))
-      satochip_appendf(dst, dst_len, &pos, "\nWallet fingerprint: %s", loaded_fp);
-  }
-#endif
 }
 
 static void satochip_format_seedkeeper_password_result(
@@ -6274,11 +6499,49 @@ static void satochip_format_seedkeeper_password_result(
   secure_memzero(&header, sizeof(header));
 }
 
+static void satochip_format_seedkeeper_secret_result(
+    char *dst, size_t dst_len, const char *title,
+    const smartcard_satochip_apdu_result_t *apdu) {
+  if (!dst || dst_len == 0)
+    return;
+
+  char secret[4096];
+  smartcard_seedkeeper_header_t header;
+  bool parsed = seedkeeper_extract_text_secret(apdu, secret, sizeof(secret),
+                                               &header);
+  char fingerprint[9] = "";
+  if (parsed)
+    seedkeeper_format_fingerprint_hex(header.fingerprint, fingerprint);
+
+  size_t pos = 0;
+  dst[0] = '\0';
+  satochip_appendf(dst, dst_len, &pos, "%s\n",
+                   title ? title : "View Secret");
+  if (apdu)
+    satochip_appendf(dst, dst_len, &pos, "SW: %04X\n", apdu->sw);
+  if (apdu && apdu->detail[0])
+    satochip_appendf(dst, dst_len, &pos, "%s\n", apdu->detail);
+  if (!parsed) {
+    satochip_appendf(dst, dst_len, &pos,
+                     "Could not parse a text secret. Check the SID and export permission.");
+    return;
+  }
+
+  satochip_appendf(dst, dst_len, &pos, "SID: %u\n",
+                   (unsigned)header.id);
+  if (header.label[0]) {
+    satochip_appendf(dst, dst_len, &pos, "Label: %s\n", header.label);
+  }
+  satochip_appendf(dst, dst_len, &pos, "Fingerprint: %s\n\n%s",
+                   fingerprint[0] ? fingerprint : "--", secret);
+  secure_memzero(secret, sizeof(secret));
+  secure_memzero(&header, sizeof(header));
+}
+
 static void satochip_format_seedkeeper_create_result(
     char *dst, size_t dst_len, const char *title, uint16_t sid,
     const uint8_t fingerprint[4], const char *mnemonic, bool loaded_ok,
     size_t slot_index) {
-  (void)fingerprint;
   if (!dst || dst_len == 0)
     return;
 
@@ -6294,13 +6557,14 @@ static void satochip_format_seedkeeper_create_result(
                    loaded_ok ? "success, slot " : "failed",
                    loaded_ok ? "" : ".",
                    loaded_ok ? (unsigned)(slot_index + 1U) : 0U);
-#ifndef SIMULATOR
-  if (loaded_ok) {
-    char loaded_fp[9] = "";
-    if (key_get_fingerprint_hex(loaded_fp))
-      satochip_appendf(dst, dst_len, &pos, "\nWallet fingerprint: %s", loaded_fp);
-  }
-#endif
+  char wallet_fp[9] = "";
+  if (mnemonic && mnemonic[0])
+    (void)seedkeeper_wallet_fingerprint_hex_from_mnemonic(mnemonic, "",
+                                                          wallet_fp);
+  if (!wallet_fp[0] && fingerprint)
+    seedkeeper_format_fingerprint_hex(fingerprint, wallet_fp);
+  satochip_appendf(dst, dst_len, &pos, "\nFingerprint: %s",
+                   wallet_fp[0] ? wallet_fp : "--");
 }
 
 static void satochip_format_certificate_export(
@@ -6376,12 +6640,24 @@ static void satochip_format_seedkeeper_header_list_result(
 
   for (size_t i = 0; i < list->count; i++) {
     const smartcard_seedkeeper_header_t *header = &list->headers[i];
+    char fingerprint[9];
+    if (seedkeeper_header_is_loadable_mnemonic(header))
+      seedkeeper_header_mnemonic_fingerprint_hex(header, fingerprint);
+    else
+      seedkeeper_format_fingerprint_hex(header->fingerprint, fingerprint);
     satochip_appendf(dst, dst_len, &pos,
                      "\n#%u ID=%u\n"
-                     "Label: %s\n"
+                     "%s: %s\n"
                      "Type: %u/%u Origin: %u Rights: %u Count: %u\n",
                      (unsigned)(i + 1U), (unsigned)header->id,
-                     header->label[0] ? header->label : "(no label)",
+                     seedkeeper_header_is_loadable_mnemonic(header) ||
+                             seedkeeper_header_is_generic_secret(header)
+                         ? "Fingerprint"
+                         : "Label",
+                     seedkeeper_header_is_loadable_mnemonic(header) ||
+                             seedkeeper_header_is_generic_secret(header)
+                         ? (fingerprint[0] ? fingerprint : "--------")
+                         : (header->label[0] ? header->label : "(no label)"),
                      (unsigned)header->type, (unsigned)header->subtype,
                      (unsigned)header->origin,
                      (unsigned)header->export_rights,
@@ -6394,8 +6670,8 @@ static void satochip_format_seedkeeper_header_list_result(
 static const char *
 satochip_seedkeeper_stub_title(satochip_maint_mode_t mode) {
   switch (mode) {
-  case SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD:
-    return "Save Password";
+  case SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET:
+    return "Save Secret";
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR:
     return "Load Descriptor";
   case SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR:
@@ -6436,7 +6712,7 @@ static bool satochip_maint_mode_requires_pin(satochip_maint_mode_t mode) {
          mode == SATOCHIP_MAINT_SEEDKEEPER_WRITE_MNEMONIC ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC ||
-         mode == SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD ||
+         mode == SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR ||
          mode == SATOCHIP_MAINT_SEEDKEEPER_CLONE ||
@@ -6479,7 +6755,7 @@ static bool satochip_screen_uses_onscreen_keyboard(const char *id) {
           strcmp(id, "smartcard_seedkeeper_write_mnemonic") == 0 ||
           strcmp(id, "smartcard_seedkeeper_view_mnemonic") == 0 ||
           strcmp(id, "smartcard_seedkeeper_load_mnemonic") == 0 ||
-          strcmp(id, "smartcard_seedkeeper_save_password") == 0 ||
+          strcmp(id, "smartcard_seedkeeper_save_secret") == 0 ||
           strcmp(id, "smartcard_seedkeeper_load_descriptor") == 0 ||
           strcmp(id, "smartcard_seedkeeper_save_descriptor") == 0 ||
           strcmp(id, "smartcard_seedkeeper_clone") == 0 ||
@@ -6923,7 +7199,7 @@ static void satochip_maint_task(void *arg) {
       break;
     }
     s_satochip_maint_task_err = smartcard_seedkeeper_read_status(
-        s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, status, 12000);
+        s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, status, 30000);
     smartcard_seedkeeper_format_status(status, s_satochip_maint_result,
                                        sizeof(s_satochip_maint_result));
     secure_memzero(status, sizeof(*status));
@@ -6941,10 +7217,10 @@ static void satochip_maint_task(void *arg) {
                "Out of memory. Could not read list.");
       break;
     }
-    s_satochip_maint_task_err = smartcard_seedkeeper_list_secret_headers(
-        s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, list, 12000);
-    satochip_format_seedkeeper_header_list_result(
-        list, s_satochip_maint_result, sizeof(s_satochip_maint_result));
+	      s_satochip_maint_task_err = smartcard_seedkeeper_list_secret_headers(
+	          s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, list, 30000);
+	      satochip_format_seedkeeper_header_list_result(
+	          list, s_satochip_maint_result, sizeof(s_satochip_maint_result));
     satochip_seedkeeper_store_last_list(list, SATOCHIP_MAINT_SEEDKEEPER_LIST);
     secure_memzero(list, sizeof(*list));
     free(list);
@@ -6952,7 +7228,7 @@ static void satochip_maint_task(void *arg) {
   }
   case SATOCHIP_MAINT_SEEDKEEPER_LOGS:
     s_satochip_maint_task_err = smartcard_seedkeeper_print_logs(
-        s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, apdu, 12000);
+        s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, apdu, 30000);
     satochip_format_apdu_result(s_satochip_maint_result,
                                 sizeof(s_satochip_maint_result),
                                 "SeedKeeper Logs", apdu);
@@ -6985,8 +7261,8 @@ static void satochip_maint_task(void *arg) {
       break;
     }
 
-    const char *label =
-        s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "BIP39-RNG-KernSigner";
+    const char *label = "Mnemonic entropy";
+    s_satochip_maint_text_b[0] = '\0';
     s_satochip_maint_task_err = smartcard_seedkeeper_generate_random_secret(
         s_satochip_maint_pin, SEEDKEEPER_TYPE_SECRET_KEY, 0x00,
         (uint8_t)entropy_len, SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, label,
@@ -7055,25 +7331,118 @@ static void satochip_maint_task(void *arg) {
     }
 #endif
 
+    uint8_t mnemonic_header[15 + SEEDKEEPER_LABEL_MAX_BYTES];
+    uint8_t mnemonic_secret[2 + SEEDKEEPER_MNEMONIC_MAX_BYTES * 2];
+    size_t mnemonic_header_len = 0;
+    size_t mnemonic_secret_len = 0;
+    uint16_t mnemonic_sid = 0;
+    bool stored_on_card = false;
     size_t slot_index = 0;
-    bool loaded_ok =
-        seedkeeper_load_mnemonic_into_session(mnemonic, "", &slot_index);
-    satochip_format_seedkeeper_create_result(
-        s_satochip_maint_result, sizeof(s_satochip_maint_result),
-        "Smartcard Create", header.id ? header.id : sid, header.fingerprint[0] ||
-                                              header.fingerprint[1] ||
-                                              header.fingerprint[2] ||
-                                              header.fingerprint[3]
-                                          ? header.fingerprint
-                                          : fp,
-        mnemonic, loaded_ok, slot_index);
-    s_satochip_maint_task_err = loaded_ok ? ESP_OK : ESP_ERR_INVALID_STATE;
+    bool loaded_ok = false;
+    bool card_copy_removed = false;
+    char wallet_fp[9] = "";
+    char temp_fp[9] = "";
+    seedkeeper_format_fingerprint_hex(fp, temp_fp);
+
+    if (!seedkeeper_build_mnemonic_header_from_text(
+            mnemonic, "", mnemonic_header, sizeof(mnemonic_header),
+            &mnemonic_header_len, wallet_fp, sizeof(wallet_fp)) ||
+        !seedkeeper_build_mnemonic_secret(mnemonic, "", mnemonic_secret,
+                                          sizeof(mnemonic_secret),
+                                          &mnemonic_secret_len)) {
+      s_satochip_maint_task_err = ESP_ERR_INVALID_RESPONSE;
+      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+               "Mnemonic packaging failed.");
+      SECURE_FREE_STRING(mnemonic);
+#ifndef SIMULATOR
+      secure_memzero(entropy_hex, sizeof(entropy_hex));
+#endif
+      secure_memzero(entropy, sizeof(entropy));
+      secure_memzero(fp, sizeof(fp));
+      secure_memzero(mnemonic_header, sizeof(mnemonic_header));
+      secure_memzero(mnemonic_secret, sizeof(mnemonic_secret));
+      secure_memzero(wallet_fp, sizeof(wallet_fp));
+      secure_memzero(temp_fp, sizeof(temp_fp));
+      s_satochip_seedkeeper_ephemeral_create = false;
+      break;
+    }
+
+    memset(apdu, 0, sizeof(*apdu));
+    s_satochip_maint_task_err = smartcard_seedkeeper_import_secret(
+        s_satochip_maint_pin, mnemonic_header, mnemonic_header_len,
+        mnemonic_secret, mnemonic_secret_len, 0, NULL, 0, NULL, 0, false,
+        apdu, 30000);
+    if (s_satochip_maint_task_err == ESP_OK && apdu->sw == 0x9000 &&
+        apdu->response_len >= 2) {
+      mnemonic_sid = ((uint16_t)apdu->response[0] << 8) | apdu->response[1];
+      stored_on_card = true;
+    }
+
+    loaded_ok = seedkeeper_load_mnemonic_into_session(mnemonic, "", &slot_index);
+
+    memset(apdu, 0, sizeof(*apdu));
+    {
+      esp_err_t cleanup_err = smartcard_seedkeeper_reset_secret(
+          s_satochip_maint_pin, sid, apdu, 30000);
+      card_copy_removed = (cleanup_err == ESP_OK && apdu->sw == 0x9000);
+    }
+
+    size_t pos = 0;
+    s_satochip_maint_result[0] = '\0';
+    satochip_appendf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+                     &pos, "Smartcard Create\n");
+    satochip_appendf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+                     &pos, "Mnemonic:\n%s\n\n", mnemonic);
+    satochip_appendf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+                     &pos, "Fingerprint: %s\n",
+                     wallet_fp[0] ? wallet_fp : temp_fp);
+    satochip_appendf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+                     &pos, "Device load: %s",
+                     loaded_ok ? "success" : "failed");
+    if (loaded_ok) {
+      satochip_appendf(s_satochip_maint_result,
+                       sizeof(s_satochip_maint_result), &pos, ", slot %u\n",
+                       (unsigned)(slot_index + 1U));
+    } else {
+      satochip_appendf(s_satochip_maint_result,
+                       sizeof(s_satochip_maint_result), &pos, "\n");
+    }
+    satochip_appendf(
+        s_satochip_maint_result, sizeof(s_satochip_maint_result), &pos,
+        "SeedKeeper save: %s",
+        stored_on_card ? "success" : "failed");
+    if (stored_on_card) {
+      satochip_appendf(s_satochip_maint_result,
+                       sizeof(s_satochip_maint_result), &pos, ", SID %u\n",
+                       (unsigned)mnemonic_sid);
+    } else {
+      satochip_appendf(s_satochip_maint_result,
+                       sizeof(s_satochip_maint_result), &pos, "\n");
+    }
+    satochip_appendf(s_satochip_maint_result,
+                     sizeof(s_satochip_maint_result), &pos,
+                     "Temporary entropy item: %s",
+                     card_copy_removed ? "removed" : "delete failed");
+    if (!card_copy_removed) {
+      satochip_appendf(s_satochip_maint_result,
+                       sizeof(s_satochip_maint_result), &pos, ", SID %u",
+                       (unsigned)sid);
+    }
+
+    s_satochip_maint_task_err =
+        (loaded_ok && stored_on_card && card_copy_removed) ? ESP_OK
+                                                           : ESP_ERR_INVALID_STATE;
     SECURE_FREE_STRING(mnemonic);
 #ifndef SIMULATOR
     secure_memzero(entropy_hex, sizeof(entropy_hex));
 #endif
     secure_memzero(entropy, sizeof(entropy));
     secure_memzero(fp, sizeof(fp));
+    secure_memzero(mnemonic_header, sizeof(mnemonic_header));
+    secure_memzero(mnemonic_secret, sizeof(mnemonic_secret));
+    secure_memzero(wallet_fp, sizeof(wallet_fp));
+    secure_memzero(temp_fp, sizeof(temp_fp));
+    s_satochip_seedkeeper_ephemeral_create = false;
     break;
   }
   case SATOCHIP_MAINT_SEEDKEEPER_WRITE_MNEMONIC: {
@@ -7091,25 +7460,22 @@ static void satochip_maint_task(void *arg) {
     }
     const char *mnemonic = mnemonic_owned;
 #endif
-	    uint8_t header[15 + SEEDKEEPER_LABEL_MAX_BYTES];
-	    uint8_t secret[2 + SEEDKEEPER_MNEMONIC_MAX_BYTES * 2];
-	    uint8_t secret_hash[CRYPTO_SHA256_SIZE];
-	    uint8_t header_fingerprint[4];
-	    char wallet_fp[9] = "";
-	    char label_with_fp[SEEDKEEPER_LABEL_MAX_BYTES + 1];
-	    size_t header_len = 0;
-	    size_t secret_len = 0;
-	    const char *label = s_satochip_maint_text_a[0] ? s_satochip_maint_text_a
-	                                                    : "KernSigner Mnemonic";
+    uint8_t header[15 + SEEDKEEPER_LABEL_MAX_BYTES];
+    uint8_t secret[2 + SEEDKEEPER_MNEMONIC_MAX_BYTES * 2];
+    uint8_t secret_hash[CRYPTO_SHA256_SIZE];
+    uint8_t header_fingerprint[4];
+    char wallet_fp[9] = "";
+    size_t header_len = 0;
+    size_t secret_len = 0;
     const char *passphrase =
-        s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "";
+        s_satochip_maint_text_a[0] ? s_satochip_maint_text_a : "";
     memset(header_fingerprint, 0, sizeof(header_fingerprint));
     if (!seedkeeper_build_mnemonic_secret(mnemonic, passphrase, secret,
                                           sizeof(secret), &secret_len) ||
         crypto_sha256(secret, secret_len, secret_hash) != CRYPTO_OK) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "Mnemonic or label is too long.");
+               "Mnemonic or passphrase is too long.");
 #ifndef SIMULATOR
       SECURE_FREE_STRING(mnemonic_owned);
 #endif
@@ -7118,20 +7484,33 @@ static void satochip_maint_task(void *arg) {
       secure_memzero(secret_hash, sizeof(secret_hash));
       secure_memzero(header_fingerprint, sizeof(header_fingerprint));
       break;
-	    }
-	    if (!seedkeeper_fingerprint_from_mnemonic(mnemonic, passphrase,
-	                                              header_fingerprint))
-	      memcpy(header_fingerprint, secret_hash, sizeof(header_fingerprint));
-	    (void)seedkeeper_wallet_fingerprint_hex_from_mnemonic(mnemonic, passphrase,
-	                                                          wallet_fp);
-	    seedkeeper_label_with_wallet_fp(label, wallet_fp, label_with_fp);
+    }
+    if (!seedkeeper_fingerprint_from_mnemonic(mnemonic, passphrase,
+                                              header_fingerprint))
+      memcpy(header_fingerprint, secret_hash, sizeof(header_fingerprint));
+    if (!seedkeeper_wallet_fingerprint_hex_from_mnemonic(mnemonic, passphrase,
+                                                         wallet_fp) ||
+        !wallet_fp[0]) {
+      s_satochip_maint_task_err = ESP_ERR_INVALID_RESPONSE;
+      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
+               "Mnemonic fingerprint failed.");
+#ifndef SIMULATOR
+      SECURE_FREE_STRING(mnemonic_owned);
+#endif
+      secure_memzero(header, sizeof(header));
+      secure_memzero(secret, sizeof(secret));
+      secure_memzero(secret_hash, sizeof(secret_hash));
+      secure_memzero(header_fingerprint, sizeof(header_fingerprint));
+      secure_memzero(wallet_fp, sizeof(wallet_fp));
+      break;
+    }
 	    if (!seedkeeper_build_plain_header(
 	            SEEDKEEPER_TYPE_BIP39_MNEMONIC, 0x00,
-	            SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, label_with_fp,
+	            SEEDKEEPER_EXPORT_PLAINTEXT_ALLOWED, wallet_fp,
 	            header_fingerprint, header, sizeof(header), &header_len)) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "Mnemonic or label is too long.");
+               "Mnemonic fingerprint is too long.");
 #ifndef SIMULATOR
       SECURE_FREE_STRING(mnemonic_owned);
 #endif
@@ -7151,11 +7530,10 @@ static void satochip_maint_task(void *arg) {
     SECURE_FREE_STRING(mnemonic_owned);
 #endif
     secure_memzero(header, sizeof(header));
-	    secure_memzero(secret, sizeof(secret));
-	    secure_memzero(secret_hash, sizeof(secret_hash));
-	    secure_memzero(header_fingerprint, sizeof(header_fingerprint));
+    secure_memzero(secret, sizeof(secret));
+    secure_memzero(secret_hash, sizeof(secret_hash));
+    secure_memzero(header_fingerprint, sizeof(header_fingerprint));
 	    secure_memzero(wallet_fp, sizeof(wallet_fp));
-	    secure_memzero(label_with_fp, sizeof(label_with_fp));
 	    break;
   }
   case SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC:
@@ -7294,27 +7672,65 @@ static void satochip_maint_task(void *arg) {
         secure_memzero(passphrase, sizeof(passphrase));
       }
     }
-    if (seedkeeper_header_is_password(selected_header) && !load_to_device) {
+    bool password_item = seedkeeper_header_is_password(selected_header);
+    bool secret_item = seedkeeper_header_is_generic_secret(selected_header);
+    if (password_item && !load_to_device) {
       satochip_format_seedkeeper_password_result(
-          s_satochip_maint_result, sizeof(s_satochip_maint_result), "View Password",
+          s_satochip_maint_result, sizeof(s_satochip_maint_result),
+          s_satochip_seedkeeper_item_op == SATOCHIP_SEEDKEEPER_ITEM_OP_EXPORT
+              ? "Export Password QR"
+              : "View Password",
+          apdu);
+    } else if (secret_item && !load_to_device) {
+      satochip_format_seedkeeper_secret_result(
+          s_satochip_maint_result, sizeof(s_satochip_maint_result),
+          s_satochip_seedkeeper_item_op == SATOCHIP_SEEDKEEPER_ITEM_OP_EXPORT
+              ? "Export Secret QR"
+              : "View Secret",
           apdu);
     } else {
       satochip_format_seedkeeper_mnemonic_result(
           s_satochip_maint_result, sizeof(s_satochip_maint_result),
-          load_to_device ? "Import to Device" : "View Mnemonic", apdu, load_to_device,
-          loaded_ok, slot_index);
+          load_to_device ? "Import to Device" : "View Mnemonic", apdu,
+          load_to_device, loaded_ok, slot_index);
+    }
+
+    if ((password_item || secret_item) && !load_to_device &&
+        s_satochip_seedkeeper_item_op == SATOCHIP_SEEDKEEPER_ITEM_OP_EXPORT &&
+        s_satochip_maint_task_err == ESP_OK && apdu->sw == 0x9000) {
+      char secret[4096];
+      smartcard_seedkeeper_header_t header;
+      if (seedkeeper_extract_text_secret(apdu, secret, sizeof(secret), &header)) {
+        snprintf(s_satochip_seedkeeper_export_secret_qr,
+                 sizeof(s_satochip_seedkeeper_export_secret_qr), "%s", secret);
+        snprintf(s_satochip_seedkeeper_export_secret_qr_title,
+                 sizeof(s_satochip_seedkeeper_export_secret_qr_title), "%s",
+                 header.label[0] ? header.label : "SeedKeeper Secret");
+        s_satochip_seedkeeper_export_secret_qr_pending =
+            (s_satochip_seedkeeper_export_secret_qr[0] != '\0');
+        secure_memzero(secret, sizeof(secret));
+        secure_memzero(&header, sizeof(header));
+      }
     }
     break;
   }
-  case SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD: {
-    const char *label =
-        s_satochip_maint_text_b[0] ? s_satochip_maint_text_b : "Password";
-    const char *password = s_satochip_maint_text_c;
+  case SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET: {
+    const char *label = s_satochip_maint_text_b;
+    const char *secret = s_satochip_maint_text_c;
+    const char *title =
+        label[0] ? label : "Save Secret";
     s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
-    (void)seedkeeper_import_text_secret(
-        s_satochip_maint_pin, SEEDKEEPER_TYPE_PASSWORD, 0x00, label, password,
-        false, "Save Password", apdu, s_satochip_maint_result,
-        sizeof(s_satochip_maint_result));
+    if (label[0]) {
+      (void)seedkeeper_import_text_secret(
+          s_satochip_maint_pin, SEEDKEEPER_TYPE_DATA,
+          SEEDKEEPER_SUBTYPE_GENERIC_TEXT, label, secret, true, title, apdu,
+          s_satochip_maint_result, sizeof(s_satochip_maint_result));
+    } else {
+      (void)seedkeeper_import_text_secret_allow_empty_label(
+          s_satochip_maint_pin, SEEDKEEPER_TYPE_DATA,
+          SEEDKEEPER_SUBTYPE_GENERIC_TEXT, secret, true, title, apdu,
+          s_satochip_maint_result, sizeof(s_satochip_maint_result));
+    }
     break;
   }
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR: {
@@ -7549,6 +7965,10 @@ static void satochip_maint_finish_ui(void) {
   s_satochip_maint_task_with_caps = false;
   if (seedkeeper_reset_step_done)
     s_satochip_maint_mode = SATOCHIP_MAINT_SEEDKEEPER_RESET;
+  if (s_satochip_seedkeeper_export_secret_qr_pending) {
+    seedkeeper_secret_qr_show_if_pending();
+    return;
+  }
   (void)signer_shell_show_screen(s_current_screen_id);
 }
 
@@ -7731,9 +8151,6 @@ static void satochip_maint_start(void) {
     satochip_maint_copy_text(s_satochip_maint_text_a,
                              sizeof(s_satochip_maint_text_a),
                              s_satochip_maint_extra_a);
-    satochip_maint_copy_text(s_satochip_maint_text_b,
-                             sizeof(s_satochip_maint_text_b),
-                             s_satochip_maint_extra_b);
     break;
   case SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC:
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC:
@@ -7769,9 +8186,9 @@ static void satochip_maint_start(void) {
                              sizeof(s_satochip_maint_pin),
                              s_satochip_maint_input.textarea);
     break;
-  case SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD:
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR:
   case SATOCHIP_MAINT_SEEDKEEPER_SAVE_DESCRIPTOR:
+  case SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET:
   case SATOCHIP_MAINT_SEEDKEEPER_CLONE:
   case SATOCHIP_MAINT_SEEDKEEPER_GENERATE_MASTERSEED:
   case SATOCHIP_MAINT_SEEDKEEPER_GENERATE_2FA_SECRET:
@@ -8220,6 +8637,9 @@ static void create_satochip_reset_factory_block(lv_obj_t *parent,
 
 static void create_satochip_seedkeeper_create_mnemonic_block(
     lv_obj_t *parent, const signer_feature_t *feature) {
+  s_satochip_seedkeeper_ephemeral_create =
+      feature && feature->id &&
+      strcmp(feature->id, "new_seedkeeper_create_mnemonic") == 0;
   satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_CREATE_MNEMONIC);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
@@ -8229,9 +8649,6 @@ static void create_satochip_seedkeeper_create_mnemonic_block(
   satochip_maint_attach_extra_field(panel, "Word Count", "12/15/18/21/24", "12",
                                     false, false, 8,
                                     &s_satochip_maint_extra_a);
-  satochip_maint_attach_extra_field(panel, "Label", "BIP39-RNG-KernSigner",
-                                    "BIP39-RNG-KernSigner", false, false, 80,
-                                    &s_satochip_maint_extra_b);
   satochip_maint_create_result_panel(parent, "Create Result");
 }
 
@@ -8243,11 +8660,8 @@ static void create_satochip_seedkeeper_write_mnemonic_block(
   create_text(panel, feature ? shell_feature_title(feature) : "Write to Card",
               true, main_color());
   satochip_maint_attach_primary_input(panel, "Card PIN", true, false, 64, "");
-  satochip_maint_attach_extra_field(panel, "Label", "KernSigner Mnemonic", "KernSigner Mnemonic",
-                                    false, false, 80,
-                                    &s_satochip_maint_extra_a);
-  satochip_maint_attach_extra_field(panel, "Passphrase", "Optional", "", true, false,
-                                    128, &s_satochip_maint_extra_b);
+  satochip_maint_attach_extra_field(panel, "Passphrase", "Optional", "", true,
+                                    false, 128, &s_satochip_maint_extra_a);
   satochip_maint_create_result_panel(parent, "Result");
 }
 
@@ -8284,18 +8698,24 @@ static void create_satochip_seedkeeper_load_mnemonic_block(
   satochip_seedkeeper_render_lookup_content(panel);
 }
 
-static void create_satochip_seedkeeper_save_password_block(
+static void create_satochip_seedkeeper_save_secret_block(
     lv_obj_t *parent, const signer_feature_t *feature) {
-  satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_SAVE_PASSWORD);
+  satochip_maint_prepare(SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET);
   lv_obj_t *panel =
       create_panel(parent, highlight_color(), max_i(14, theme_get_small_padding()));
-  create_text(panel, feature ? shell_feature_title(feature) : "Save Password", true,
+  create_text(panel, feature ? shell_feature_title(feature) : "Save Secret", true,
               main_color());
   satochip_maint_attach_primary_input(panel, "Card PIN", true, false, 64, "");
-  satochip_maint_attach_extra_field(panel, "Label", "Login / app name", "", false,
+  satochip_maint_attach_extra_field(panel, "Label", "Optional", "", false,
                                     false, 80, &s_satochip_maint_extra_a);
-  satochip_maint_attach_extra_field(panel, "Password", "Text to save", "", true,
-                                    false, 512, &s_satochip_maint_extra_b);
+  satochip_maint_attach_extra_field(
+      panel, "Secret", "Text to save",
+      s_satochip_seedkeeper_scanned_secret[0]
+          ? s_satochip_seedkeeper_scanned_secret
+          : "",
+      false, true, 4096, &s_satochip_maint_extra_b);
+  create_action_button(panel, "Scan QR", seedkeeper_secret_scan_event_cb, NULL,
+                       false);
   satochip_maint_create_result_panel(parent, "Result");
 }
 
@@ -8846,8 +9266,8 @@ static bool create_special_detail_cards(lv_obj_t *parent,
     return true;
   }
 
-  if (strcmp(feature->id, "smartcard_seedkeeper_save_password") == 0) {
-    create_satochip_seedkeeper_save_password_block(parent, feature);
+  if (strcmp(feature->id, "smartcard_seedkeeper_save_secret") == 0) {
+    create_satochip_seedkeeper_save_secret_block(parent, feature);
     return true;
   }
 

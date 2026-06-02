@@ -72,9 +72,9 @@ void mnemonic_words_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
 
   char fingerprint_text[32];
   char fingerprint_hex[9] = "--------";
-  key_get_fingerprint_hex(fingerprint_hex);
+  key_get_mnemonic_fingerprint_hex(fingerprint_hex);
   snprintf(fingerprint_text, sizeof(fingerprint_text), "%s %s",
-           i18n_tr_or("wallet.wallet_fingerprint", "Wallet fingerprint"),
+           i18n_tr_or("wallet.mnemonic_fingerprint", "Mnemonic fingerprint"),
            fingerprint_hex);
 
   lv_obj_t *content = lv_obj_create(mnemonic_screen);

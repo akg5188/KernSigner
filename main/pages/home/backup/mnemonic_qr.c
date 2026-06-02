@@ -673,10 +673,10 @@ void mnemonic_qr_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   lv_obj_add_event_cb(qr_container, qr_area_tap_cb, LV_EVENT_CLICKED, NULL);
 
   char fingerprint_hex[9] = "--------";
-  key_get_fingerprint_hex(fingerprint_hex);
+  key_get_mnemonic_fingerprint_hex(fingerprint_hex);
   char fp_text[32];
   snprintf(fp_text, sizeof(fp_text), "%s %s",
-           i18n_tr_or("wallet.wallet_fingerprint", "Wallet fingerprint"),
+           i18n_tr_or("wallet.mnemonic_fingerprint", "Mnemonic fingerprint"),
            fingerprint_hex);
   fingerprint_label = theme_create_label(content_area, fp_text, false);
   lv_obj_set_style_text_font(fingerprint_label, theme_font_small(), 0);

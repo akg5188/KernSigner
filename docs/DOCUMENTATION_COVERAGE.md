@@ -42,6 +42,7 @@
 | `main/pages/home/backup/`, `main/pages/load_mnemonic/` | [BACKUP_AND_RECOVERY_GUIDE.zh-CN.md](BACKUP_AND_RECOVERY_GUIDE.zh-CN.md) |
 | `main/pages/pin/`, `main/core/pin.*` | [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) |
 | `main/smartcard/`, Satochip 或 SeedKeeper 页面 | [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md), [TROUBLESHOOTING_SMARTCARD_POWER_OTG.md](TROUBLESHOOTING_SMARTCARD_POWER_OTG.md), [SECURITY_PIN_GUIDE.zh-CN.md](SECURITY_PIN_GUIDE.zh-CN.md) |
+| PN5180 NFC 模块接线和首次上板 | [pn5180_bringup/README.zh-CN.md](../pn5180_bringup/README.zh-CN.md) | [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md) |
 | 构建脚本、`sdkconfig*`、固件文件、发布脚本 | [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md), [FLASH_PRECHECK.md](FLASH_PRECHECK.md), [REPRODUCIBLE_BUILD.md](REPRODUCIBLE_BUILD.md), [firmware/wave_43/README.zh-CN.md](../firmware/wave_43/README.zh-CN.md) |
 | 生产安全配置 | [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md), [secure-boot.md](secure-boot.md), [security-plan.md](security-plan.md) |
 | 截图、交付证据、验收记录 | [screens/README.md](screens/README.md), [REAL_DEVICE_ACCEPTANCE_CHECKLIST.md](REAL_DEVICE_ACCEPTANCE_CHECKLIST.md), [RELEASE_POINTERS_AND_HISTORY.md](RELEASE_POINTERS_AND_HISTORY.md) |

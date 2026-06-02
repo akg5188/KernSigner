@@ -28,4 +28,46 @@ menu "KernSigner Configuration"
             real-funds builds must enable this option so PIN setup/verification
             fails unless eFuse KEY5 is provisioned for the HMAC peripheral.
 
+    config KSIG_PN532_I2C_HZ
+        int "PN532 NFC I2C clock Hz"
+        default 100000
+        range 50000 400000
+        help
+            I2C clock used for the optional PN532 NFC smartcard reader module.
+            The cheap red PN532 V3 boards are most reliable at 100 kHz.
+
+    config KSIG_PN532_DEDICATED_I2C
+        bool "Use a dedicated I2C bus for PN532 NFC"
+        default y if KSIG_BOARD_WAVE_43
+        default n
+        help
+            Put the PN532 module on its own I2C bus instead of sharing the
+            board touch/camera I2C bus. This is recommended on the Waveshare
+            4.3 inch board because the shared GT911 touch bus made NFC card
+            traffic unreliable in testing.
+
+    config KSIG_PN532_I2C_PORT
+        int "PN532 dedicated I2C port"
+        default -1
+        depends on KSIG_PN532_DEDICATED_I2C
+        help
+            I2C port for the PN532 dedicated bus. Use -1 to let ESP-IDF pick
+            an available hardware controller.
+
+    config KSIG_PN532_SDA_GPIO
+        int "PN532 dedicated SDA GPIO"
+        default 28 if KSIG_BOARD_WAVE_43
+        default -1
+        depends on KSIG_PN532_DEDICATED_I2C
+        help
+            SDA GPIO for the PN532 dedicated I2C bus.
+
+    config KSIG_PN532_SCL_GPIO
+        int "PN532 dedicated SCL GPIO"
+        default 31 if KSIG_BOARD_WAVE_43
+        default -1
+        depends on KSIG_PN532_DEDICATED_I2C
+        help
+            SCL GPIO for the PN532 dedicated I2C bus.
+
 endmenu

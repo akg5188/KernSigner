@@ -21839,7 +21839,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_ZH_HANS_CN] = "钢板打孔位置",
     },
     {
-        [I18N_LANG_EN] = "Use wallet fingerprint %s as the backup name?",
+        [I18N_LANG_EN] = "Use mnemonic fingerprint %s as the backup name?",
         [I18N_LANG_CA] = "Utilitzeu l'empremta digital de la cartera %s com a nom de còpia de seguretat?",
         [I18N_LANG_CS] = "Použít otisk peněženky %s jako název zálohy?",
         [I18N_LANG_DE] = "Wallet-Fingerabdruck %s als Backup-Namen verwenden?",
@@ -21859,7 +21859,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_TH] = "ใช้ลายนิ้วมือกระเป๋าสตางค์ %s เป็นชื่อสำรองหรือไม่",
         [I18N_LANG_TR] = "Yedek ad olarak cüzdan parmak izi %s kullanılsın mı?",
         [I18N_LANG_VI] = "Sử dụng dấu vân tay ví %s làm tên dự phòng?",
-        [I18N_LANG_ZH_HANS_CN] = "是否使用钱包指纹 %s 作为备份名称？",
+        [I18N_LANG_ZH_HANS_CN] = "是否使用助记词指纹 %s 作为备份名称？",
     },
     {
         [I18N_LANG_EN] = "Use %s as the backup name?",
@@ -25174,7 +25174,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_ZH_HANS_CN] = "Checksum 单词 %d/%d",
     },
     {
-        [I18N_LANG_EN] = "Current mnemonic %u\nWallet fingerprint %s\n%u words",
+        [I18N_LANG_EN] = "Current mnemonic %u\nMnemonic fingerprint %s\n%u words",
         [I18N_LANG_CA] = "mnemotècnia actual %u\nempremta digital de cartera %s\n%u paraules",
         [I18N_LANG_CS] = "Aktuální mnemotechnická pomůcka %u\nOtisk peněženky %s\n%u slov",
         [I18N_LANG_DE] = "Aktuelle Mnemonik %u\nWallet-Fingerabdruck %s\n%u Wörter",
@@ -25194,7 +25194,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_TH] = "ตัวช่วยจำปัจจุบัน %u\nลายนิ้วมือกระเป๋าสตางค์ %s\n%u คำ",
         [I18N_LANG_TR] = "Güncel anımsatıcı %u\nCüzdan parmak izi %s\n%u kelimeler",
         [I18N_LANG_VI] = "Ghi nhớ hiện tại %u\nVân tay ví %s\n%u từ",
-        [I18N_LANG_ZH_HANS_CN] = "当前助记词 %u\n钱包指纹 %s\n%u 个单词",
+        [I18N_LANG_ZH_HANS_CN] = "当前助记词 %u\n助记词指纹 %s\n%u 个单词",
     },
     {
         [I18N_LANG_EN] = "Discard input?",
@@ -25749,7 +25749,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_ZH_HANS_CN] = "Select: %s",
     },
     {
-        [I18N_LANG_EN] = "Mnemonic %u\nWallet fingerprint %s\n%u words",
+        [I18N_LANG_EN] = "Mnemonic %u\nMnemonic fingerprint %s\n%u words",
         [I18N_LANG_CA] = "mnemotècnica %u\nempremta digital de cartera %s\n%u paraules",
         [I18N_LANG_CS] = "Mnemotechnická pomůcka %u\nOtisk peněženky %s\n%u slov",
         [I18N_LANG_DE] = "Mnemonik %u\nWallet-Fingerabdruck %s\n%u Wörter",
@@ -25769,7 +25769,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_TH] = "ช่วยในการจำ %u\nลายนิ้วมือกระเป๋าสตางค์ %s\n%u คำ",
         [I18N_LANG_TR] = "Anımsatıcı %u\nCüzdan parmak izi %s\n%u kelimeler",
         [I18N_LANG_VI] = "Ghi nhớ %u\nVân tay ví %s\n%u từ",
-        [I18N_LANG_ZH_HANS_CN] = "助记词 %u\n钱包指纹 %s\n%u 个单词",
+        [I18N_LANG_ZH_HANS_CN] = "助记词 %u\n助记词指纹 %s\n%u 个单词",
     },
     {
         [I18N_LANG_EN] = "Stateless mode does not save mnemonics to local flash",
@@ -25887,7 +25887,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_ZH_HANS_CN] = "它只能用于助记词转换和恢复，不能用于签名或备份。",
     },
     {
-        [I18N_LANG_EN] = "Wallet fingerprint %s",
+        [I18N_LANG_EN] = "Mnemonic fingerprint %s",
         [I18N_LANG_CA] = "empremta digital de cartera %s",
         [I18N_LANG_CS] = "Otisk peněženky %s",
         [I18N_LANG_DE] = "Wallet-Fingerabdruck %s",
@@ -25907,7 +25907,7 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_TH] = "ลายนิ้วมือกระเป๋าสตางค์ %s",
         [I18N_LANG_TR] = "Cüzdan parmak izi %s",
         [I18N_LANG_VI] = "Vân tay ví %s",
-        [I18N_LANG_ZH_HANS_CN] = "钱包指纹 %s",
+        [I18N_LANG_ZH_HANS_CN] = "助记词指纹 %s",
     },
     {
         [I18N_LANG_EN] = "Word",

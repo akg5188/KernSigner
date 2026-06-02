@@ -17,6 +17,10 @@ bool key_load_from_mnemonic_unchecked(const char *mnemonic);
 void key_unload(void);
 bool key_get_fingerprint(unsigned char *fingerprint_out);
 bool key_get_fingerprint_hex(char *hex_out);
+bool key_compute_mnemonic_fingerprint(unsigned char *fingerprint_out,
+                                      const char *mnemonic);
+bool key_compute_mnemonic_fingerprint_hex(char *hex_out, const char *mnemonic);
+bool key_get_mnemonic_fingerprint_hex(char *hex_out);
 bool key_get_xpub(const char *path, char **xpub_out);
 bool key_get_xpub_versioned(const char *path, uint32_t version,
                             char **xpub_out);

@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <wally_bip39.h>
 #include <wally_core.h>
 
@@ -41,6 +42,39 @@ static void sim_style_black_orange_box(lv_obj_t *obj, int radius) {
 
 bool key_has_signing_key(void) { return true; }
 bool key_get_fingerprint_hex(char *hex_out) {
+  fill_string(hex_out, 9, "12345678");
+  return true;
+}
+bool key_compute_mnemonic_fingerprint(unsigned char *fingerprint_out,
+                                      const char *mnemonic) {
+  if (!fingerprint_out || !mnemonic || !mnemonic[0])
+    return false;
+
+  uint32_t hash = 2166136261u;
+  for (const unsigned char *p = (const unsigned char *)mnemonic; *p; p++) {
+    hash ^= *p;
+    hash *= 16777619u;
+  }
+  fingerprint_out[0] = (unsigned char)((hash >> 24) & 0xff);
+  fingerprint_out[1] = (unsigned char)((hash >> 16) & 0xff);
+  fingerprint_out[2] = (unsigned char)((hash >> 8) & 0xff);
+  fingerprint_out[3] = (unsigned char)(hash & 0xff);
+  return true;
+}
+bool key_compute_mnemonic_fingerprint_hex(char *hex_out,
+                                          const char *mnemonic) {
+  if (!hex_out)
+    return false;
+
+  unsigned char fp[BIP32_KEY_FINGERPRINT_LEN] = {0};
+  if (!key_compute_mnemonic_fingerprint(fp, mnemonic)) {
+    fill_string(hex_out, 9, "--------");
+    return false;
+  }
+  snprintf(hex_out, 9, "%02x%02x%02x%02x", fp[0], fp[1], fp[2], fp[3]);
+  return true;
+}
+bool key_get_mnemonic_fingerprint_hex(char *hex_out) {
   fill_string(hex_out, 9, "12345678");
   return true;
 }
@@ -878,13 +912,18 @@ esp_err_t smartcard_seedkeeper_list_secret_headers(
   (void)pin; (void)timeout_ms;
   if (out) {
     memset(out, 0, sizeof(*out));
-    out->count = 1;
+    out->count = 2;
     out->headers[0].id = 1;
     out->headers[0].type = 0x30;
     out->headers[0].export_rights = 0x01;
     memcpy(out->headers[0].fingerprint, "\x12\x34\x56\x78", 4);
-    snprintf(out->headers[0].label, sizeof(out->headers[0].label),
-             "KernSigner 模拟助记词");
+    out->headers[1].id = 2;
+    out->headers[1].type = 0xC0;
+    out->headers[1].subtype = 0x02;
+    out->headers[1].export_rights = 0x01;
+    memcpy(out->headers[1].fingerprint, "\xAB\xCD\xEF\x01", 4);
+    snprintf(out->headers[1].label, sizeof(out->headers[1].label),
+             "模拟密码组");
     out->sw = 0x9000;
     fill_string(out->detail, sizeof(out->detail), "模拟器 SeedKeeper 列表");
   }
@@ -928,26 +967,67 @@ esp_err_t smartcard_seedkeeper_import_secret(
     memset(out, 0, sizeof(*out));
     out->sw = 0x9000;
     out->response_len = 6;
-    out->response[1] = 1;
-    out->response[2] = 0x12;
-    out->response[3] = 0x34;
-    out->response[4] = 0x56;
-    out->response[5] = 0x78;
+    uint16_t sid = (header_len >= 3 && header[2] == 0xC0) ? 2 : 1;
+    out->response[0] = (uint8_t)(sid >> 8);
+    out->response[1] = (uint8_t)sid;
+    if (header_len >= 12) {
+      memcpy(out->response + 2, header + 8, 4);
+    } else {
+      memcpy(out->response + 2, "\x12\x34\x56\x78", 4);
+    }
     fill_string(out->detail, sizeof(out->detail),
-                "导入成功：KernSigner 模拟助记词 SID=1 指纹=12345678。");
+                "导入成功：模拟器 SeedKeeper 条目。");
   }
   return ESP_OK;
 }
 esp_err_t smartcard_seedkeeper_export_secret(
     const char *pin, uint16_t sid, uint16_t sid_pubkey, bool secure_export,
     smartcard_satochip_apdu_result_t *out, uint32_t timeout_ms) {
-  (void)pin; (void)sid; (void)sid_pubkey; (void)secure_export; (void)timeout_ms;
+  (void)pin; (void)sid_pubkey; (void)secure_export; (void)timeout_ms;
   if (out) {
+    if (sid == 2) {
+      static const char secret[] =
+          "user:alice\npass:correct horse battery staple";
+      const char label[] = "模拟密码组";
+      size_t label_len = strlen(label);
+      size_t text_len = strlen(secret);
+      memset(out, 0, sizeof(*out));
+      out->sw = 0x9000;
+      size_t pos = 0;
+      out->response[pos++] = 0x00;
+      out->response[pos++] = 0x02;
+      out->response[pos++] = 0xC0;
+      out->response[pos++] = 0x01;
+      out->response[pos++] = 0x01;
+      out->response[pos++] = 0x00;
+      out->response[pos++] = 0x00;
+      out->response[pos++] = 0x00;
+      out->response[pos++] = 0xAB;
+      out->response[pos++] = 0xCD;
+      out->response[pos++] = 0xEF;
+      out->response[pos++] = 0x01;
+      out->response[pos++] = 0x02;
+      out->response[pos++] = 0x00;
+      out->response[pos++] = (uint8_t)label_len;
+      memcpy(out->response + pos, label, label_len);
+      pos += label_len;
+      size_t secret_len = text_len + 2;
+      out->response[pos++] = (uint8_t)(secret_len >> 8);
+      out->response[pos++] = (uint8_t)secret_len;
+      out->response[pos++] = (uint8_t)(text_len >> 8);
+      out->response[pos++] = (uint8_t)text_len;
+      memcpy(out->response + pos, secret, text_len);
+      pos += text_len;
+      out->response_len = pos;
+      fill_string(out->detail, sizeof(out->detail),
+                  "导出完成：模拟器普通 Secret。");
+      return ESP_OK;
+    }
     static const char mnemonic[] =
         "abandon abandon abandon abandon abandon abandon abandon abandon "
         "abandon abandon abandon about";
-    const char label[] = "KernSigner 模拟助记词";
-    size_t label_len = strlen(label);
+    const char label[] = "";
+    size_t label_len = 0;
     size_t mnemonic_len = strlen(mnemonic);
     memset(out, 0, sizeof(*out));
     out->sw = 0x9000;

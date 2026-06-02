@@ -88,6 +88,8 @@ set(APP_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/signer_port/signer_services.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/signer_port/signer_storage_browser.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/smartcard/smartcard_ccid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/smartcard/smartcard_pn532.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/smartcard/smartcard_transport.c
 )
 
 # --- UI components ---

@@ -7,7 +7,7 @@
 #include "i18n/i18n.h"
 #include "pages/pin/pin_page.h"
 #include "pages/signer_shell/signer_shell.h"
-#include "smartcard/smartcard_ccid.h"
+#include "smartcard/smartcard_transport.h"
 #include "ui/theme.h"
 #include <bsp/display.h>
 #include <bsp/esp-bsp.h>
@@ -100,10 +100,10 @@ static void smartcard_boot_probe_task(void *arg) {
 
   vTaskDelay(pdMS_TO_TICKS(4500));
   ESP_LOGI(TAG, "SMARTCARD_BOOT_PROBE: begin");
-  esp_err_t ret = smartcard_ccid_probe(20000);
+  esp_err_t ret = smartcard_transport_probe(20000);
 
   char report[768];
-  smartcard_ccid_format_report(report, sizeof(report));
+  smartcard_transport_format_report(report, sizeof(report));
   ESP_LOGI(TAG, "SMARTCARD_BOOT_PROBE: result=%s", esp_err_to_name(ret));
   ESP_LOGI(TAG, "SMARTCARD_BOOT_PROBE_REPORT_BEGIN\n%s\nSMARTCARD_BOOT_PROBE_REPORT_END",
            report);

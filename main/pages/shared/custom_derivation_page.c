@@ -414,7 +414,7 @@ static void build_source_options(char *options_buf, size_t options_len,
     *default_index_out = 0;
 
   char current_fp[9] = {0};
-  bool has_current = key_get_fingerprint_hex(current_fp);
+  bool has_current = key_get_mnemonic_fingerprint_hex(current_fp);
 
   if (has_current && source_option_count < (sizeof(source_options) /
                                             sizeof(source_options[0]))) {

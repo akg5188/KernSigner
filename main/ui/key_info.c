@@ -20,7 +20,7 @@ lv_obj_t *ui_icon_text_row_create(lv_obj_t *parent, const char *icon,
 
 lv_obj_t *ui_fingerprint_create(lv_obj_t *parent, lv_color_t color) {
   char fingerprint_hex[9];
-  if (!key_get_fingerprint_hex(fingerprint_hex))
+  if (!key_get_mnemonic_fingerprint_hex(fingerprint_hex))
     return NULL;
   return ui_icon_text_row_create(parent,
                                  i18n_tr_or("sign.fingerprint", "Fingerprint"),

@@ -80,10 +80,10 @@ void mnemonic_entropy_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
   (void)ui_create_back_button(entropy_screen, back_cb);
 
   char fingerprint_hex[9] = "--------";
-  key_get_fingerprint_hex(fingerprint_hex);
+  key_get_mnemonic_fingerprint_hex(fingerprint_hex);
   char fingerprint_text[32];
   snprintf(fingerprint_text, sizeof(fingerprint_text), "%s %s",
-           i18n_tr_or("wallet.wallet_fingerprint", "Wallet fingerprint"),
+           i18n_tr_or("wallet.mnemonic_fingerprint", "Mnemonic fingerprint"),
            fingerprint_hex);
 
   lv_obj_t *card = lv_obj_create(entropy_screen);

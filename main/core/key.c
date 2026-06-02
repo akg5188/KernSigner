@@ -69,6 +69,43 @@ static bool mnemonic_words_are_bip39(const char *mnemonic) {
   return valid_mnemonic_word_count(count);
 }
 
+static bool compute_fingerprint_from_mnemonic_with_passphrase(
+    const char *mnemonic, const char *passphrase,
+    unsigned char fingerprint_out[BIP32_KEY_FINGERPRINT_LEN]) {
+  if (!mnemonic || !fingerprint_out)
+    return false;
+
+  const char *safe_passphrase = passphrase ? passphrase : "";
+  unsigned char seed[BIP39_SEED_LEN_512];
+  unsigned char local_fingerprint[BIP32_KEY_FINGERPRINT_LEN];
+  struct ext_key *local_master_key = NULL;
+  bool ok = false;
+  memset(seed, 0, sizeof(seed));
+  memset(local_fingerprint, 0, sizeof(local_fingerprint));
+
+  if (bip39_mnemonic_validate(NULL, mnemonic) != WALLY_OK)
+    goto cleanup;
+  if (bip39_mnemonic_to_seed512(mnemonic, safe_passphrase, seed,
+                                sizeof(seed)) != WALLY_OK)
+    goto cleanup;
+  if (bip32_key_from_seed_alloc(seed, sizeof(seed), BIP32_VER_MAIN_PRIVATE, 0,
+                                &local_master_key) != WALLY_OK)
+    goto cleanup;
+  if (bip32_key_get_fingerprint(local_master_key, local_fingerprint,
+                                BIP32_KEY_FINGERPRINT_LEN) != WALLY_OK)
+    goto cleanup;
+
+  memcpy(fingerprint_out, local_fingerprint, BIP32_KEY_FINGERPRINT_LEN);
+  ok = true;
+
+cleanup:
+  if (local_master_key)
+    bip32_key_free(local_master_key);
+  secure_memzero(seed, sizeof(seed));
+  secure_memzero(local_fingerprint, sizeof(local_fingerprint));
+  return ok;
+}
+
 bool key_init(void) {
   key_loaded = false;
   master_key = NULL;
@@ -231,6 +268,38 @@ bool key_get_fingerprint_hex(char *hex_out) {
   }
   hex_out[BIP32_KEY_FINGERPRINT_LEN * 2] = '\0';
   return true;
+}
+
+bool key_compute_mnemonic_fingerprint(unsigned char *fingerprint_out,
+                                      const char *mnemonic) {
+  return compute_fingerprint_from_mnemonic_with_passphrase(mnemonic, "",
+                                                           fingerprint_out);
+}
+
+bool key_compute_mnemonic_fingerprint_hex(char *hex_out, const char *mnemonic) {
+  if (!hex_out)
+    return false;
+  unsigned char local_fingerprint[BIP32_KEY_FINGERPRINT_LEN];
+  if (!key_compute_mnemonic_fingerprint(local_fingerprint, mnemonic)) {
+    secure_memzero(local_fingerprint, sizeof(local_fingerprint));
+    return false;
+  }
+  for (int i = 0; i < BIP32_KEY_FINGERPRINT_LEN; i++) {
+    snprintf(hex_out + (i * 2), 3, "%02x", local_fingerprint[i]);
+  }
+  hex_out[BIP32_KEY_FINGERPRINT_LEN * 2] = '\0';
+  secure_memzero(local_fingerprint, sizeof(local_fingerprint));
+  return true;
+}
+
+bool key_get_mnemonic_fingerprint_hex(char *hex_out) {
+  if (!hex_out)
+    return false;
+  if (!key_loaded || !stored_mnemonic) {
+    snprintf(hex_out, BIP32_KEY_FINGERPRINT_LEN * 2 + 1, "--------");
+    return true;
+  }
+  return key_compute_mnemonic_fingerprint_hex(hex_out, stored_mnemonic);
 }
 
 // Parse BIP32 path like "m/84'/0'/0'" into uint32_t array
