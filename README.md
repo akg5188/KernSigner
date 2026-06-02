@@ -10,7 +10,7 @@
 >
 > 请不要默认相信本项目可以直接用于真实资产或生产环境。使用前请自行审查、测试和修改；如果你不会修改，也可以联系本人，在本人有空的时候协助修改。
 
-KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, Satochip/SeedKeeper smart-card workflows, and hardware wallet research. It is based on the upstream Kern project and combines ideas, code, and testing notes from several open-source wallet projects.
+KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, Satochip/SeedKeeper smart-card workflows over PN532 NFC or USB CCID readers, and hardware wallet research. It is based on the upstream Kern project and combines ideas, code, and testing notes from several open-source wallet projects.
 
 It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for the Waveshare ESP32-P4 4.3-inch touch-screen device.
 
@@ -21,6 +21,19 @@ One of the most important upstream references here is [3rdIteration/SeedSigner](
 This repository was largely assembled with AI assistance. It is still unfinished, intended for learning and discussion only, and must not be used to store or sign real funds.
 
 The current tree is a **test-funds validation build**, not an audited production wallet. It contains real wallet paths and Satochip/Web3 work, but production use with mainnet funds requires the security gates and real-device acceptance checks in `docs/` to pass.
+
+## Smart-Card Access / 智能卡连接方式
+
+KernSigner can talk to Satochip / SeedKeeper smart cards through **two card-reader paths**:
+
+| Reader path | Current status | Notes |
+| --- | --- | --- |
+| PN532 NFC module | 已接入主固件测试路径 | Uses the red PN532 board over dedicated I2C. The default `wave_43` wiring is `SDA -> GPIO28`, `SCL -> GPIO31`, `VCC -> 3V3`, `GND -> GND`. Keep the card steady on the PN532 antenna during APDU/signing operations. |
+| USB CCID reader | 已接入主固件测试路径 | Uses an external USB smart-card reader such as ACR39U-NF Pocketmate II. The Waveshare ESP32-P4 OTG port needs a powered OTG cable or externally powered USB hub for reliable reader power. |
+
+The wallet and maintenance pages use the same Satochip / SeedKeeper APDU layer for both transports. In automatic mode, USB is preferred when a USB reader is already connected; unplug the USB reader when you want to test NFC only.
+
+Detailed NFC setup and safety notes: [NFC 智能卡签名测试说明](docs/NFC_SMARTCARD_TEST.zh-CN.md). USB reader power and OTG notes: [智能卡供电和 OTG 排障](docs/TROUBLESHOOTING_SMARTCARD_POWER_OTG.md).
 
 ## Screenshots / 界面截图
 
@@ -56,7 +69,7 @@ The current tree is a **test-funds validation build**, not an audited production
 - QR input/output: SeedQR, PSBT/message-signing paths, BBQR/cUR plumbing, text QR generation, and QR classification.
 - Mnemonic and backup tooling: manual word entry, numbered imports, grid/1248/Tinyseed/Stackbit-style restore paths, encrypted backup pages, and BIP39 checks.
 - Custom derivation: Bitcoin legacy, nested SegWit, native SegWit, Taproot, testnet variants, and EVM address display.
-- Satochip/SeedKeeper smart-card validation paths: USB CCID detection, ATR/status reads, Satochip Web3 connection/signing tests, path address display, BTC watch-only public keys, and SeedKeeper setup/write/view/reset maintenance flows for test cards.
+- Satochip/SeedKeeper smart-card validation paths: PN532 NFC and USB CCID detection, ATR/status reads, Satochip Web3 connection/signing tests, path address display, BTC watch-only public keys, and SeedKeeper setup/write/view/reset maintenance flows for test cards.
 - Hardware tooling: display/touch setup, camera preview, storage browser, brightness control, device status, and real-device delivery checks.
 - Desktop simulator: runs the LVGL UI in an SDL2 window for UI review and automated screenshots.
 
@@ -67,7 +80,7 @@ The current tree is a **test-funds validation build**, not an audited production
 连接钱包、查看地址和签名流程支持两种密钥来源：
 
 - **助记词方式**：在开发板内临时加载或创建助记词，敏感材料只用于当前会话；适合测试普通离线钱包流程。
-- **智能卡方式**：通过外接供电 OTG 读卡器连接 Satochip / SeedKeeper 智能卡；适合测试智能卡账户、Web3 连接码、签名和 BTC 观察公钥。
+- **智能卡方式**：通过 PN532 NFC 模块或外接供电 OTG USB 读卡器连接 Satochip / SeedKeeper 智能卡；适合测试智能卡账户、Web3 连接码、签名和 BTC 观察公钥。
 
 典型流程是：先选择要连接的钱包或要签名的二维码，再选择使用 **助记词** 还是 **智能卡**。
 
@@ -96,7 +109,7 @@ The current tree is a **test-funds validation build**, not an audited production
 
 - Web3 钱包重点是 `OKX / Bitget / MetaMask / imToken / Rabby / TokenPocket / Keystone`。
 - BTC 钱包重点是 `BlueWallet / Electrum`。
-- 每个钱包连接或签名时，都可以按实际情况选择 `助记词` 或 `智能卡` 来源；智能卡需要外接供电 OTG 读卡器。
+- 每个钱包连接或签名时，都可以按实际情况选择 `助记词` 或 `智能卡` 来源；智能卡可以走 PN532 NFC，也可以走外接供电 OTG USB 读卡器。
 
 ## Safety Status
 
@@ -132,7 +145,7 @@ ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board inc
 - Waveshare ESP32-P4 4.3 寸开发板：约 **35 美元**
 - 3D 打印外壳：约 **2 美元**
 
-这个价格只计算开发板和打印外壳，不包含智能卡读卡器、Satochip/SeedKeeper 智能卡、带供电 OTG 转接线/Hub、摄像头备件、运费、税费或后续试错打印成本。
+这个价格只计算开发板和打印外壳，不包含 PN532 NFC 模块、USB 智能卡读卡器、Satochip/SeedKeeper 智能卡、带供电 OTG 转接线/Hub、摄像头备件、运费、税费或后续试错打印成本。
 
 ## Smart-Card OTG Power / 智能卡 OTG 供电
 
@@ -174,7 +187,7 @@ main/core/          Bitcoin, key, PSBT, PIN, storage, EVM, and wallet logic
 main/pages/         LVGL page flows and wallet screens
 main/ui/            Reusable UI widgets, theme, icons, fonts, and navigation
 main/qr/            QR parser, scanner, encoder, and viewer
-main/smartcard/     USB CCID and Satochip integration
+main/smartcard/     PN532 NFC, USB CCID, and Satochip/SeedKeeper integration
 main/signer_port/     KernSigner-style shell, hardware probes, and service adapters
 components/         ESP-IDF components and third-party libraries
 simulator/          SDL2 desktop simulator
