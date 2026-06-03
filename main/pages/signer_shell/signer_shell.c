@@ -5393,8 +5393,7 @@ static void satochip_seedkeeper_select_item_cb(lv_event_t *event) {
   if (!event)
     return;
   uintptr_t sid_value = (uintptr_t)lv_event_get_user_data(event);
-  if (sid_value == 0)
-    return;
+  /* Some SeedKeeper cards can surface SID 0, so do not treat it as a null tap. */
   satochip_seedkeeper_lookup_select_item((uint16_t)sid_value);
 }
 
