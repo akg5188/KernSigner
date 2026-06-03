@@ -3857,6 +3857,19 @@ static void satochip_append_detail(char *detail, size_t detail_len,
   va_end(args);
 }
 
+static int satochip_seedkeeper_header_id_cmp(const void *lhs,
+                                             const void *rhs) {
+  const smartcard_seedkeeper_header_t *a =
+      (const smartcard_seedkeeper_header_t *)lhs;
+  const smartcard_seedkeeper_header_t *b =
+      (const smartcard_seedkeeper_header_t *)rhs;
+  if (a->id < b->id)
+    return -1;
+  if (a->id > b->id)
+    return 1;
+  return 0;
+}
+
 static bool satochip_fill_apdu_ok(smartcard_satochip_apdu_result_t *out,
                                   uint16_t sw, const char *ok_text) {
   if (!out)
@@ -5282,6 +5295,11 @@ esp_err_t smartcard_seedkeeper_list_secret_headers(
     out->sw = sw;
     if (err != ESP_OK)
       break;
+  }
+
+  if (out->count > 1) {
+    qsort(out->headers, out->count, sizeof(out->headers[0]),
+          satochip_seedkeeper_header_id_cmp);
   }
 
   if (sw != 0x9C12 && sw != 0x9000 && err == ESP_OK)

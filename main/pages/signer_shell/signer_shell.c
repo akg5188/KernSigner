@@ -5415,6 +5415,14 @@ static void satochip_seedkeeper_lookup_edit_back_cb(lv_event_t *event) {
   (void)signer_shell_show_screen(s_current_screen_id);
 }
 
+static bool satochip_seedkeeper_lookup_has_selected_item(void) {
+  return s_satochip_seedkeeper_selected_header_valid &&
+         (s_satochip_seedkeeper_lookup_stage ==
+              SATOCHIP_SEEDKEEPER_LOOKUP_ITEM ||
+          s_satochip_seedkeeper_lookup_stage ==
+              SATOCHIP_SEEDKEEPER_LOOKUP_EDIT);
+}
+
 static void satochip_seedkeeper_lookup_item_action_cb(lv_event_t *event) {
   uintptr_t action = (uintptr_t)lv_event_get_user_data(event);
   s_satochip_seedkeeper_item_op = (satochip_seedkeeper_item_op_t)action;
@@ -7538,8 +7546,10 @@ static void satochip_maint_task(void *arg) {
   case SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC:
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC: {
     uint16_t sid = 0;
-    bool has_sid_input = s_satochip_maint_text_a[0] != '\0';
-    if (!has_sid_input) {
+    bool sid_from_selected_item = satochip_seedkeeper_lookup_has_selected_item();
+    if (sid_from_selected_item) {
+      sid = s_satochip_seedkeeper_selected_header.id;
+    } else if (s_satochip_maint_text_a[0] == '\0') {
       smartcard_seedkeeper_header_list_t *list = heap_caps_calloc(
           1, sizeof(*list), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
       if (!list)
@@ -7551,7 +7561,8 @@ static void satochip_maint_task(void *arg) {
         break;
       }
       s_satochip_maint_task_err = smartcard_seedkeeper_list_secret_headers(
-          s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, list, 30000);
+          s_satochip_maint_pin[0] ? s_satochip_maint_pin : NULL, list,
+          30000);
       satochip_format_seedkeeper_header_list_result(
           list, s_satochip_maint_result, sizeof(s_satochip_maint_result));
       satochip_seedkeeper_store_last_list(list, s_satochip_maint_mode);
@@ -7561,16 +7572,11 @@ static void satochip_maint_task(void *arg) {
       free(list);
       break;
     }
-    if (!satochip_parse_u16_text(s_satochip_maint_text_a, &sid)) {
+    if (!sid_from_selected_item &&
+        !satochip_parse_u16_text(s_satochip_maint_text_a, &sid)) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
                "Invalid SID.");
-      break;
-    }
-    if (sid == 0) {
-      s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
-      snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
-               "Enter SID.");
       break;
     }
 
@@ -8153,13 +8159,9 @@ static void satochip_maint_start(void) {
     break;
   case SATOCHIP_MAINT_SEEDKEEPER_VIEW_MNEMONIC:
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_MNEMONIC:
-    if ((s_satochip_seedkeeper_lookup_stage ==
-             SATOCHIP_SEEDKEEPER_LOOKUP_ITEM ||
-         s_satochip_seedkeeper_lookup_stage ==
-             SATOCHIP_SEEDKEEPER_LOOKUP_EDIT) &&
-        s_satochip_seedkeeper_selected_sid != 0) {
+    if (satochip_seedkeeper_lookup_has_selected_item()) {
       snprintf(s_satochip_maint_text_a, sizeof(s_satochip_maint_text_a), "%u",
-               (unsigned)s_satochip_seedkeeper_selected_sid);
+               (unsigned)s_satochip_seedkeeper_selected_header.id);
     } else {
       s_satochip_maint_text_a[0] = '\0';
     }
