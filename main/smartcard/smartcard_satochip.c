@@ -5501,7 +5501,7 @@ esp_err_t smartcard_seedkeeper_import_secret(
   if (header_len < 2)
     return ESP_ERR_INVALID_ARG;
   if (secure_import) {
-    if (sid_pubkey == 0 || !iv || iv_len != 16 || !hmac || hmac_len != 20)
+    if (!iv || iv_len != 16 || !hmac || hmac_len != 20)
       return ESP_ERR_INVALID_ARG;
   }
 
@@ -5684,10 +5684,6 @@ esp_err_t smartcard_seedkeeper_export_secret(
     return ESP_ERR_INVALID_ARG;
   if (!pin || pin[0] == '\0')
     return ESP_ERR_INVALID_ARG;
-  if (sid == 0)
-    return ESP_ERR_INVALID_ARG;
-  if (secure_export && sid_pubkey == 0)
-    return ESP_ERR_INVALID_ARG;
 
   memset(out, 0, sizeof(*out));
   out->err = ESP_ERR_INVALID_STATE;
@@ -5815,8 +5811,6 @@ esp_err_t smartcard_seedkeeper_export_secret_to_satochip(
   if (!out)
     return ESP_ERR_INVALID_ARG;
   if (!pin || pin[0] == '\0')
-    return ESP_ERR_INVALID_ARG;
-  if (sid == 0 || sid_pubkey == 0)
     return ESP_ERR_INVALID_ARG;
 
   memset(out, 0, sizeof(*out));

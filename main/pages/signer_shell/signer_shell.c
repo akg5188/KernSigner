@@ -5470,7 +5470,7 @@ static void satochip_seedkeeper_render_list_entries(lv_obj_t *panel) {
 	    seedkeeper_header_mnemonic_fingerprint_hex(header, fingerprint);
 	    char label[96];
 	    if (seedkeeper_header_is_loadable_mnemonic(header)) {
-	      snprintf(label, sizeof(label), "%s",
+	      snprintf(label, sizeof(label), "SID %u %s", (unsigned)header->id,
 	               fingerprint[0] ? fingerprint : "--------");
     } else if (seedkeeper_header_is_generic_secret(header)) {
       if (header->label[0])
@@ -7740,7 +7740,7 @@ static void satochip_maint_task(void *arg) {
   }
   case SATOCHIP_MAINT_SEEDKEEPER_LOAD_DESCRIPTOR: {
     uint16_t sid = 0;
-    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid) || sid == 0) {
+    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid)) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
                "Enter descriptor SID.");
@@ -7815,9 +7815,8 @@ static void satochip_maint_task(void *arg) {
   case SATOCHIP_MAINT_SEEDKEEPER_CLONE: {
     uint16_t sid = 0;
     uint16_t sid_pubkey = 0;
-    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid) || sid == 0 ||
-        !satochip_parse_u16_text(s_satochip_maint_text_c, &sid_pubkey) ||
-        sid_pubkey == 0) {
+    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid) ||
+        !satochip_parse_u16_text(s_satochip_maint_text_c, &sid_pubkey)) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
                "Enter SID and target public key SID.");
@@ -7874,7 +7873,7 @@ static void satochip_maint_task(void *arg) {
   }
   case SATOCHIP_MAINT_SEEDKEEPER_DERIVE_MASTER_PASSWORD: {
     uint16_t sid = 0;
-    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid) || sid == 0) {
+    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid)) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
                "Enter SID.");
@@ -7891,7 +7890,7 @@ static void satochip_maint_task(void *arg) {
   }
   case SATOCHIP_MAINT_SEEDKEEPER_RESET_SECRET: {
     uint16_t sid = 0;
-    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid) || sid == 0) {
+    if (!satochip_parse_u16_text(s_satochip_maint_text_b, &sid)) {
       s_satochip_maint_task_err = ESP_ERR_INVALID_ARG;
       snprintf(s_satochip_maint_result, sizeof(s_satochip_maint_result),
                "Enter SID.");
