@@ -19,7 +19,14 @@
 */
 
 $fn = 56;
-part = "case"; // case, fit_check, preview, reference
+part = "case"; // case, snap_tray, snap_box, snap_preview, snap_exploded_preview, fit_check, preview, reference
+nfc_bump_enabled = false; // false: original case, true: NFC module clearance case
+nfc_clearance_enabled =
+    nfc_bump_enabled ||
+    part == "snap_tray" ||
+    part == "snap_box" ||
+    part == "snap_preview" ||
+    part == "snap_exploded_preview";
 
 // Main board and display dimensions
 glass_w = 114.40;
@@ -72,7 +79,7 @@ drop_in_r = 2.40;
 // and USB-C are on the short edges; measure the holes from the actual lower
 // shell edges, not from the larger screen-side outer frame.
 use_mount_screws = true;
-mount_screw_clearance_d = 2.50;
+mount_screw_clearance_d = nfc_clearance_enabled ? 3.00 : 2.50;
 mount_screw_counterbore_d = 7.20;
 mount_screw_counterbore_depth = 1.50;
 mount_screw_bevel_d = 9.20;
@@ -80,6 +87,40 @@ mount_screw_bevel_depth = 0.85;
 mount_long_edge_from_lower_edge = 9.00;
 mount_camera_side_from_lower_edge = 11.00;
 mount_usb_side_from_lower_edge = 8.00;
+
+// Optional NFC/PN532 exterior bottom and recess. This keeps the printed/tested
+// long clearance pocket: 8 mm in from the camera-side screw holes, 25 mm in
+// from the USB-C-side screw holes, and full-width across the narrowed bottom.
+// The NFC version lowers the whole bottom as one flat printable face, avoiding
+// unsupported back-plate bridges around the screw and camera holes.
+nfc_bump_depth = 6.00;
+nfc_recess_camera_side_from_mount = 8.00;
+nfc_recess_usb_side_from_mount = 25.00;
+nfc_recess_edge_wall = 2.10;
+nfc_recess_floor_thickness = back_thickness;
+nfc_bump_overlap = 0.80;
+nfc_bump_corner_r = 6.00;
+nfc_recess_corner_r = 2.40;
+nfc_bottom_slope_inset = 0.30;
+nfc_continuous_taper_steps = 36;
+
+// Two-piece snap-in NFC tray. The tray case keeps the thin back shell and cuts
+// a bottom window; the separate box prints flat and snaps in from the back.
+nfc_snap_clearance = 0.30;
+nfc_snap_side_bridge = 0.00;
+nfc_snap_lip = 1.60;
+nfc_snap_lip_depth = 0.80;
+nfc_snap_wall = 1.60;
+nfc_snap_floor = 1.20;
+nfc_snap_tab_w = 10.00;
+nfc_snap_tab_h = 0.95;
+nfc_snap_tab_depth = 1.00;
+nfc_snap_tab_inset = 18.00;
+nfc_snap_tab_overlap = 0.35;
+nfc_snap_tab_slot_clearance = 0.30;
+nfc_snap_tab_z_min = 0.65;
+nfc_snap_insert_top_z = back_thickness - 0.15;
+nfc_snap_window_corner_r = 3.00;
 
 // Camera module location measured from the printed back cover.
 // The camera is on the short edge, centered between the two long edges.
@@ -130,11 +171,13 @@ usb_center_separator_w = 3.00;
 usb_outer_side_fill = 4.00;
 usb_screen_side_fill = 1.50;
 usb_screen_side_extra_clearance = 2.00;
+usb_bottom_side_extra_clearance = nfc_clearance_enabled ? 2.00 : 0.00;
 usb_cutout_pos_y_min = usb_center_separator_w / 2;
 usb_cutout_pos_y_max = usb_cutout_y1 + usb_cutout_w / 2 - usb_outer_side_fill;
 usb_cutout_neg_y_min = usb_cutout_y2 - usb_cutout_w / 2 + usb_outer_side_fill;
 usb_cutout_neg_y_max = -usb_center_separator_w / 2;
-usb_cutout_z_min = port_z_center - usb_cutout_h / 2;
+usb_cutout_z_min = port_z_center - usb_cutout_h / 2 -
+                   usb_bottom_side_extra_clearance;
 usb_cutout_z_max = port_z_center + usb_cutout_h / 2 -
                    usb_screen_side_fill + usb_screen_side_extra_clearance;
 
@@ -170,6 +213,7 @@ function lerp(a, b, t) = a + (b - a) * t;
 function smoothstep(t) = t * t * (3 - 2 * t);
 function taper_profile(t) =
     lerp(t, smoothstep(t), lower_shell_profile_roundness);
+function nfc_outer_profile(t) = smoothstep(t);
 function lower_shell_inset_pos_x() =
     usb_edge_sign() > 0 ? lower_shell_usb_inset : lower_shell_opposite_inset;
 function lower_shell_inset_neg_x() =
@@ -207,6 +251,55 @@ function lower_shell_taper_start_z() =
     total_depth - lower_shell_taper_h;
 function cavity_transition_start_z() =
     max(back_thickness, lower_shell_taper_start_z());
+function nfc_outer_start_z() = nfc_bump_enabled ? -nfc_bump_depth : 0;
+function nfc_outer_taper_h() = total_depth - nfc_outer_start_z();
+function mount_camera_x() = lower_shell_x_min() + mount_camera_side_from_lower_edge;
+function mount_usb_x() = lower_shell_x_max() - mount_usb_side_from_lower_edge;
+function mount_top_y() = lower_shell_y_max() - mount_long_edge_from_lower_edge;
+function mount_bottom_y() = lower_shell_y_min() + mount_long_edge_from_lower_edge;
+function nfc_bump_x_min() =
+    max(lower_shell_x_min(), mount_camera_x() + nfc_recess_camera_side_from_mount);
+function nfc_bump_x_max() =
+    min(lower_shell_x_max(), mount_usb_x() - nfc_recess_usb_side_from_mount);
+function nfc_bump_y_min() = lower_shell_y_min();
+function nfc_bump_y_max() = lower_shell_y_max();
+function nfc_bump_w() = nfc_bump_x_max() - nfc_bump_x_min();
+function nfc_bump_h() = nfc_bump_y_max() - nfc_bump_y_min();
+function nfc_bump_x() = (nfc_bump_x_min() + nfc_bump_x_max()) / 2;
+function nfc_bump_y() = (nfc_bump_y_min() + nfc_bump_y_max()) / 2;
+function nfc_recess_x_min() =
+    nfc_bump_x_min() + nfc_recess_edge_wall;
+function nfc_recess_x_max() =
+    nfc_bump_x_max() - nfc_recess_edge_wall;
+function nfc_recess_y_min() =
+    nfc_bump_y_min() + nfc_recess_edge_wall;
+function nfc_recess_y_max() =
+    nfc_bump_y_max() - nfc_recess_edge_wall;
+function nfc_recess_x() = (nfc_recess_x_min() + nfc_recess_x_max()) / 2;
+function nfc_recess_y() = (nfc_recess_y_min() + nfc_recess_y_max()) / 2;
+function nfc_recess_w() = nfc_recess_x_max() - nfc_recess_x_min();
+function nfc_recess_h() = nfc_recess_y_max() - nfc_recess_y_min();
+function nfc_recess_floor_z() = -nfc_bump_depth + nfc_recess_floor_thickness;
+function nfc_outer_cut_start_z() = nfc_bump_enabled ? -nfc_bump_depth - eps : -eps;
+function nfc_snap_window_w() = nfc_bump_w();
+function nfc_snap_window_h() =
+    max(1, nfc_bump_h() - 2 * nfc_snap_side_bridge);
+function nfc_snap_insert_w() = nfc_snap_window_w() - 2 * nfc_snap_clearance;
+function nfc_snap_insert_h() = nfc_snap_window_h() - 2 * nfc_snap_clearance;
+function nfc_snap_flange_w() =
+    min(lower_shell_w() - 2 * lower_shell_min_wall,
+        nfc_snap_insert_w() + 2 * nfc_snap_lip);
+function nfc_snap_flange_h() =
+    min(lower_shell_h() - 2 * lower_shell_min_wall,
+        nfc_snap_insert_h() + 2 * nfc_snap_lip);
+function nfc_snap_cavity_w() =
+    max(1, nfc_snap_insert_w() - 2 * nfc_snap_wall);
+function nfc_snap_cavity_h() =
+    max(1, nfc_snap_insert_h() - 2 * nfc_snap_wall);
+function nfc_snap_cavity_depth() =
+    nfc_bump_depth - nfc_snap_floor;
+function nfc_snap_tab_x() =
+    nfc_snap_insert_w() / 2 - nfc_snap_tab_overlap;
 
 module rounded_rect(size, r) {
     w = size[0];
@@ -225,13 +318,8 @@ module rounded_prism(size, r) {
 }
 
 module mount_positions() {
-    mount_camera_x = lower_shell_x_min() + mount_camera_side_from_lower_edge;
-    mount_usb_x = lower_shell_x_max() - mount_usb_side_from_lower_edge;
-    mount_top_y = lower_shell_y_max() - mount_long_edge_from_lower_edge;
-    mount_bottom_y = lower_shell_y_min() + mount_long_edge_from_lower_edge;
-
-    for (x = [mount_camera_x, mount_usb_x])
-        for (y = [mount_top_y, mount_bottom_y])
+    for (x = [mount_camera_x(), mount_usb_x()])
+        for (y = [mount_top_y(), mount_bottom_y()])
             translate([x, y, 0])
                 children();
 }
@@ -257,14 +345,27 @@ module top_pin_hole(x) {
 }
 
 module camera_hole() {
-    translate([camera_x(), camera_y(), -eps])
+    camera_entry_z = nfc_bump_enabled ? -eps : -eps;
+
+    if (nfc_bump_enabled) {
+        translate([camera_x(), camera_y(), nfc_outer_cut_start_z()])
+            cylinder(
+                d = camera_lens_relief_d,
+                h = -nfc_outer_cut_start_z() + 2 * eps
+            );
+    }
+
+    translate([camera_x(), camera_y(), camera_entry_z])
         cylinder(
             d1 = camera_lens_bevel_d,
             d2 = camera_lens_hole_d,
             h = camera_lens_bevel_depth + eps
         );
-    translate([camera_x(), camera_y(), -eps])
-        cylinder(d = camera_lens_hole_d, h = back_thickness + 2 * eps);
+    translate([camera_x(), camera_y(), camera_entry_z])
+        cylinder(
+            d = camera_lens_hole_d,
+            h = back_thickness - camera_entry_z + 2 * eps
+        );
 
     // Inner square recess for the camera module/lens body. The outside remains
     // flat; only the circular optical hole is visible from the back.
@@ -281,16 +382,22 @@ module camera_hole() {
 
 module mount_screw_cuts() {
     mount_positions() {
-        translate([0, 0, -eps])
+        translate([0, 0, nfc_outer_cut_start_z()])
             cylinder(
                 d1 = mount_screw_bevel_d,
                 d2 = mount_screw_counterbore_d,
                 h = mount_screw_bevel_depth + eps
             );
-        translate([0, 0, -eps])
-            cylinder(d = mount_screw_counterbore_d, h = mount_screw_counterbore_depth + eps);
-        translate([0, 0, -eps])
-            cylinder(d = mount_screw_clearance_d, h = back_thickness + inside_depth + front_rim_h + 2 * eps);
+        translate([0, 0, nfc_outer_cut_start_z()])
+            cylinder(
+                d = mount_screw_counterbore_d,
+                h = mount_screw_counterbore_depth + eps
+            );
+        translate([0, 0, nfc_outer_cut_start_z()])
+            cylinder(
+                d = mount_screw_clearance_d,
+                h = total_depth + front_rim_h - nfc_outer_cut_start_z() + 2 * eps
+            );
     }
 }
 
@@ -351,20 +458,120 @@ module smooth_outer_transition() {
     }
 }
 
+module nfc_bump_outer() {
+    if (nfc_bump_enabled) {
+        for (i = [0 : nfc_continuous_taper_steps - 1]) {
+            t0 = i / nfc_continuous_taper_steps;
+            t1 = (i + 1) / nfc_continuous_taper_steps;
+            s0 = nfc_outer_profile(t0);
+            s1 = nfc_outer_profile(t1);
+
+            hull() {
+                translate([
+                    lerp(lower_shell_x(), 0, s0),
+                    lerp(lower_shell_y(), 0, s0),
+                    nfc_outer_start_z() + nfc_outer_taper_h() * t0
+                ])
+                    thin_rounded_plate(
+                        lerp(
+                            lower_shell_w() - 2 * nfc_bottom_slope_inset,
+                            outer_w,
+                            s0
+                        ),
+                        lerp(
+                            lower_shell_h() - 2 * nfc_bottom_slope_inset,
+                            outer_h,
+                            s0
+                        ),
+                        lerp(lower_shell_corner_r, outer_r, s0)
+                    );
+                translate([
+                    lerp(lower_shell_x(), 0, s1),
+                    lerp(lower_shell_y(), 0, s1),
+                    nfc_outer_start_z() + nfc_outer_taper_h() * t1
+                ])
+                    thin_rounded_plate(
+                        lerp(
+                            lower_shell_w() - 2 * nfc_bottom_slope_inset,
+                            outer_w,
+                            s1
+                        ),
+                        lerp(
+                            lower_shell_h() - 2 * nfc_bottom_slope_inset,
+                            outer_h,
+                            s1
+                        ),
+                        lerp(lower_shell_corner_r, outer_r, s1)
+                    );
+            }
+        }
+    }
+}
+
 module outer_body() {
     union() {
-        // Smaller lower shell: this is the PCB-side body that exposes the
-        // recessed USB-C plugs while still leaving a printable side wall.
-        lower_shell_body();
+        if (nfc_bump_enabled) {
+            nfc_bump_outer();
+        } else {
+            // Smaller lower shell: this is the PCB-side body that exposes the
+            // recessed USB-C plugs while still leaving a printable side wall.
+            lower_shell_body();
 
-        // Smooth multi-step transition from the smaller lower shell to the
-        // full-size screen-side rim. This avoids the previous square-looking
-        // straight chamfer.
-        smooth_outer_transition();
+            // Smooth multi-step transition from the smaller lower shell to the
+            // full-size screen-side rim. This avoids the previous square-looking
+            // straight chamfer.
+            smooth_outer_transition();
+        }
 
         translate([0, 0, total_depth])
             rounded_prism([outer_w, outer_h, front_rim_h], outer_r);
     }
+}
+
+module nfc_recess_cut() {
+    if (nfc_bump_enabled) {
+        translate([nfc_recess_x(), nfc_recess_y(), nfc_recess_floor_z()])
+            rounded_prism([
+                nfc_recess_w(),
+                nfc_recess_h(),
+                back_thickness - nfc_recess_floor_z() + eps
+            ], nfc_recess_corner_r);
+    }
+}
+
+module nfc_snap_window_cut() {
+    translate([nfc_bump_x(), nfc_bump_y(), -eps])
+        rounded_prism([
+            nfc_snap_window_w(),
+            nfc_snap_window_h(),
+            back_thickness + 2 * eps
+        ], nfc_snap_window_corner_r);
+}
+
+module nfc_snap_lip_cut() {
+    translate([nfc_bump_x(), nfc_bump_y(), -nfc_snap_lip_depth])
+        rounded_prism([
+            nfc_snap_flange_w() + 2 * nfc_snap_clearance,
+            nfc_snap_flange_h() + 2 * nfc_snap_clearance,
+            nfc_snap_lip_depth + eps
+        ], nfc_snap_window_corner_r + nfc_snap_lip);
+}
+
+module nfc_snap_tab_slots() {
+    for (x_sign = [-1, 1])
+        translate([
+            nfc_bump_x() + x_sign * nfc_snap_tab_x() -
+                nfc_snap_tab_depth / 2 - nfc_snap_tab_slot_clearance,
+            nfc_bump_y() - nfc_snap_insert_h() / 2 + nfc_snap_tab_inset -
+                nfc_snap_tab_slot_clearance,
+            nfc_snap_tab_z_min
+        ])
+            cube([
+                nfc_snap_tab_depth + 2 * nfc_snap_tab_slot_clearance,
+                nfc_snap_insert_h() - 2 * nfc_snap_tab_inset +
+                    2 * nfc_snap_tab_slot_clearance,
+                back_thickness - nfc_snap_tab_z_min + eps
+            ]);
 }
 
 module drop_in_cavity() {
@@ -395,6 +602,7 @@ module protective_case() {
     difference() {
         outer_body();
         drop_in_cavity();
+        nfc_recess_cut();
 
         // Only the requested edge openings.
         side_usb_cutout(usb_cutout_pos_y_min, usb_cutout_pos_y_max);
@@ -406,6 +614,77 @@ module protective_case() {
         if (use_mount_screws)
             mount_screw_cuts();
     }
+}
+
+module snap_tray_case() {
+    difference() {
+        outer_body();
+        drop_in_cavity();
+        nfc_snap_window_cut();
+        nfc_snap_lip_cut();
+        nfc_snap_tab_slots();
+
+        // Only the requested edge openings.
+        side_usb_cutout(usb_cutout_pos_y_min, usb_cutout_pos_y_max);
+        side_usb_cutout(usb_cutout_neg_y_min, usb_cutout_neg_y_max);
+        camera_hole();
+
+        if (use_mount_screws)
+            mount_screw_cuts();
+    }
+}
+
+module nfc_snap_tab(x_sign) {
+    translate([
+            nfc_bump_x() + x_sign * nfc_snap_tab_x() -
+                nfc_snap_tab_depth / 2,
+            nfc_bump_y() - nfc_snap_insert_h() / 2 + nfc_snap_tab_inset,
+            nfc_snap_tab_z_min
+        ])
+        cube([
+            nfc_snap_tab_depth,
+            nfc_snap_insert_h() - 2 * nfc_snap_tab_inset,
+            nfc_snap_tab_h
+        ]);
+}
+
+module nfc_snap_box() {
+    difference() {
+        union() {
+            translate([nfc_bump_x(), nfc_bump_y(), -nfc_bump_depth])
+                rounded_prism([
+                    nfc_snap_insert_w(),
+                    nfc_snap_insert_h(),
+                    nfc_bump_depth + nfc_snap_insert_top_z + eps
+                ], nfc_snap_window_corner_r);
+
+            nfc_snap_tab(1);
+            nfc_snap_tab(-1);
+        }
+
+        translate([nfc_bump_x(), nfc_bump_y(), -nfc_bump_depth + nfc_snap_floor])
+            rounded_prism([
+                nfc_snap_cavity_w(),
+                nfc_snap_cavity_h(),
+                nfc_bump_depth + nfc_snap_insert_top_z -
+                    nfc_snap_floor + 2 * eps
+            ], max(0.8, nfc_snap_window_corner_r - nfc_snap_wall));
+    }
+}
+
+module snap_assembly_preview() {
+    color([1.00, 0.34, 0.04, 1.00])
+        snap_tray_case();
+    color([0.08, 0.18, 0.85, 1.00])
+        nfc_snap_box();
+}
+
+module snap_exploded_preview() {
+    color([1.00, 0.34, 0.04, 1.00])
+        snap_tray_case();
+    color([0.08, 0.18, 0.85, 1.00])
+        translate([0, 0, -8.00])
+            nfc_snap_box();
 }
 
 module reference() {
@@ -480,6 +759,14 @@ if (part == "reference") {
     printable_reference();
 } else if (part == "preview") {
     printable_preview();
+} else if (part == "snap_tray") {
+    snap_tray_case();
+} else if (part == "snap_box") {
+    nfc_snap_box();
+} else if (part == "snap_preview") {
+    snap_assembly_preview();
+} else if (part == "snap_exploded_preview") {
+    snap_exploded_preview();
 } else if (part == "fit_check") {
     fit_check_plate();
 } else {

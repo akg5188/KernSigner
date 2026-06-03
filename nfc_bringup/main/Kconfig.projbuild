@@ -1,0 +1,19 @@
+menu "KernSigner NFC Bring-up"
+
+    config NFC_BRINGUP_I2C_PORT
+        int "PN532 I2C port"
+        default -1
+
+    config NFC_BRINGUP_PIN_SDA
+        int "PN532 SDA GPIO"
+        default -1
+
+    config NFC_BRINGUP_PIN_SCL
+        int "PN532 SCL GPIO"
+        default -1
+
+    config NFC_BRINGUP_I2C_HZ
+        int "PN532 I2C clock Hz"
+        default 100000
+
+endmenu

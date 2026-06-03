@@ -7,7 +7,9 @@
 ## 当前设计
 
 - 单件主壳：`screen_protective_case.stl`
+- NFC 凸底版：`screen_protective_case_nfc.stl`（未实打验证）
 - 预览图：`case_preview.png`
+- NFC 凸底版预览图：`nfc_case_preview.png`
 - 这版已经实际打印装配，可正常使用。
 - 屏幕一圈按实打反馈额外放宽约 `0.50mm`，避免挤压屏幕出现斑块。
 - 只保留这些开口：两个 USB-C、一个摄像头孔、四个螺丝孔。
@@ -21,11 +23,16 @@
 - 屏幕正面保护边整圈已加高 `0.50mm`，当前高度为 `1.70mm`。
 - 摄像头外侧只留圆孔，内侧留方形凹槽给摄像头模组避空。
 - 摄像头孔在摄像头短边这一列，距摄像头短边 `11.00mm`；到上下两条长边各 `33.60mm`，圆孔直径 `5.00mm`。
+- NFC 凸底版把整块背面底板下沉到 `6.00mm` 深，形成更平整的一体打印底面；内部仍按之前可装配版本保留长 NFC 凹槽，不改变原来的主板放置凹槽，也不遮挡四个螺丝孔和相机孔。原版外壳不带这个凸底。
 - 因为 SD 卡槽和侧边按键都封住了，日常操作主要依赖触摸屏、USB-C、摄像头和固件自身功能；如果需要频繁按实体 POWER/BOOT/RESET 或插拔 SD 卡，不要直接打印这一版。
 
 ## 预览
 
 <img src="case_preview.png" width="620" alt="AI-designed unverified ESP32-P4 4.3 case preview">
+
+### NFC 凸底版
+
+<img src="nfc_case_preview.png" width="620" alt="ESP32-P4 4.3 case preview with NFC bottom bump">
 
 ## 实拍
 
@@ -49,11 +56,14 @@
 - 如果打印材料、打印机公差或装配方式不同，仍建议先打一个确认屏幕、USB-C、摄像头、螺丝孔和整体手感。
 - 屏幕一圈如果做得过紧，会因为挤压屏幕出现斑块；当前版本已优先放宽约 `0.50mm` 来避免压屏。
 - 特别确认 SD 卡槽和 POWER / BOOT / RESET 三个侧边按键是否可以接受被封住。
+- NFC 凸底版 `screen_protective_case_nfc.stl` 只是按本次 PN532/NFC 模块位置改出的未验证版，建议先用 PLA 快速打一件确认 NFC 模块、排线和螺丝不会顶住。
 - 如果孔位不合适，优先改 OpenSCAD 参数，再重新导出 STL。
-- 当前 GitHub 只保留这版新外壳打印文件 `screen_protective_case.stl`，旧版开孔错误的外壳照片、旧展示和重复 STL 已删除。
+- 当前 GitHub 保留两个打印文件：原版 `screen_protective_case.stl` 和 NFC 凸底版 `screen_protective_case_nfc.stl`。
 
 ## 修改记录
 
+- `2026-06-01`：未实际打印装配验证。按发给卖家的 NFC 打印文件恢复长凹槽基准：深 `6.00mm`，内部凹槽从摄像头侧螺丝孔往内 `8.00mm` 起，到 USB-C 侧螺丝孔往内 `25.00mm` 止，左右沿原收腰底板走；外底改成整块背面平整一体下沉，让螺丝孔和相机孔周围也落在同一打印底面上，减少悬空桥接毛边。
+- `2026-05-30`：未实际打印装配验证。新增 NFC 凸底版 `screen_protective_case_nfc.stl`，原版外壳保留。NFC 凸包只在外侧背面新增，不改变原来的主板放置凹槽；左右两侧直接做到原收腰底板两侧；上下位置按实测从摄像头侧螺丝孔往内 `8.00mm` 开始，到 USB-C 侧螺丝孔往内 `25.00mm` 结束；凸包与原底板做 `0.80mm` 实体重叠，避免切片时出现贴合缝。
 - `2026-05-25`：这版外壳已实际打印装配验证，可正常使用。根据实打反馈，屏幕一圈如果过紧会因挤压屏幕出现斑块，因此当前版本特意把屏幕一圈额外放宽约 `0.50mm`，优先避免压屏。
 - `2026-05-21`：只修正正面屏幕/玻璃保护圈。根据上一轮试打反馈，屏幕四周约大 `0.5mm`，已把 `glass_clearance` 从 `0.38` 改为 `0.12`，开口总宽/总高各收小约 `0.52mm`。USB、TF、按钮、摄像头、螺丝孔暂时不改，后续按实物逐项修。
 - `2026-05-21`：修正两个 USB-C 侧边开孔。中间隔条改为 `3.00mm`；左右两个最外侧各填充 `4.00mm`，避免开孔过大；靠屏幕/正面一侧整体填充 `1.50mm`，降低两个 C 口开孔高度。其他开孔暂时不改。
@@ -141,6 +151,17 @@ mount_camera_side_from_lower_edge = 11.00;
 mount_usb_side_from_lower_edge = 8.00;
 ```
 
+NFC 凸底版相关：
+
+```scad
+nfc_bump_enabled = false; // 导出 NFC 版时用 -D 'nfc_bump_enabled=true'
+nfc_bump_depth = 6.00;
+nfc_recess_camera_side_from_mount = 8.00;
+nfc_recess_usb_side_from_mount = 25.00;
+nfc_recess_edge_wall = 2.10;
+nfc_bump_overlap = 0.80;
+```
+
 当前 USB-C 开口屏幕侧余量：
 
 ```scad
@@ -168,16 +189,17 @@ button_slot_h = 5.20;
 ## 导出 STL
 
 ```bash
-cd /home/ak/123/Kern/hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera
+cd /home/ak/123/KernSigner/hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera
 make all
 ```
 
-需要先安装 `openscad`。`make all` 只会导出主壳 `screen_protective_case.stl`。`make reference` 可生成带参考板位置的预览 STL，但不是打印件。
+需要先安装 `openscad`。`make all` 会导出原版 `screen_protective_case.stl` 和 NFC 凸底版 `screen_protective_case_nfc.stl`。`make case` 只导出原版，`make nfc` 只导出 NFC 凸底版，`make reference` 可生成带参考板位置的预览 STL，但不是打印件。
 
-GitHub 上用于打印的文件只有：
+GitHub 上用于打印的文件是：
 
 ```text
 screen_protective_case.stl
+screen_protective_case_nfc.stl
 ```
 
 其他旧外壳打印文件不再保留，避免误打印旧版本。
