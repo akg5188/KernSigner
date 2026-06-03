@@ -3,6 +3,9 @@
 cmake_minimum_required(VERSION 3.22)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+if(DEFINED SDKCONFIG_DEFAULTS AND SDKCONFIG_DEFAULTS MATCHES "sdkconfig\\.defaults\\.high_value")
+    idf_build_set_property(MINIMAL_BUILD ON)
+endif()
 
 add_compile_options(-Wno-format)
 add_compile_options(-Wno-ignored-qualifiers)

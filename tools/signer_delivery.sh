@@ -127,6 +127,16 @@ production_sdkconfig_path() {
     return
   fi
 
+  if [[ -s "$ROOT_DIR/build_high_value_wave_43/sdkconfig" ]]; then
+    printf '%s\n' "$ROOT_DIR/build_high_value_wave_43/sdkconfig"
+    return
+  fi
+
+  if [[ -s "$ROOT_DIR/sdkconfig.release.wave_43" ]]; then
+    printf '%s\n' "$ROOT_DIR/sdkconfig.release.wave_43"
+    return
+  fi
+
   if [[ -s "$ROOT_DIR/$BUILD_DIR/sdkconfig" ]]; then
     printf '%s\n' "$ROOT_DIR/$BUILD_DIR/sdkconfig"
     return

@@ -1,21 +1,31 @@
 # KernSigner 大资金安全版目标
 
-日期：2026-05-27
+日期：2026-06-03
 
 这份文件把“大资金安全版”拆成可执行门禁。它不是安全承诺，也不是审计报告；只有全部门禁、真机证据和独立审计通过后，才允许考虑大额资金。
 
 ## 当前结论
 
-当前源码仍是测试资金/研究版。`tools/signer_production_check.sh sdkconfig.release.wave_43` 现在会失败，主要缺口包括：
+当前源码仍是测试资金/研究版，不允许直接上大额资金。
 
-- Secure Boot 未启用。
-- Flash Encryption 未启用。
-- NVS Encryption 未启用。
-- `CONFIG_KSIG_PRODUCTION_REQUIRE_PIN_HMAC` 未启用。
-- USB Serial/JTAG console、UART console、GDB stub 未全部关闭。
-- ETH/LWIP 网络栈仍在 release 配置里出现。
-- task watchdog panic 未启用。
-- 工作区不是 clean 状态。
+2026-06-03 已新增并验证 `build_high_value_wave_43` high-value 构建路径。该路径的
+sdkconfig 门禁已经收紧到：
+
+- Secure Boot 构建签名镜像。
+- Flash Encryption 配置启用。
+- NVS Encryption 配置启用。
+- `CONFIG_KSIG_PRODUCTION_REQUIRE_PIN_HMAC` 启用。
+- USB Serial/JTAG、UART/USB console、GDB stub 关闭。
+- ETH/LWIP 网络栈在 high-value minimal build 中不进入目标组件集。
+- task watchdog panic 启用。
+- high-value 专用分区表把 partition table 移到 `0x10000`，给签名 bootloader 留出空间。
+
+但是这仍然不是生产放行。当前 `tools/signer_production_check.sh
+build_high_value_wave_43/sdkconfig` 仍会因为工作区不是 clean committed 状态而失败；即使
+这项通过，也只代表配置/构建门禁通过，不代表已经完成不可逆 eFuse 烧录、制造记录、真机回归或独立审计。
+
+本地 `secure_boot_signing_key.pem` 只允许作为实验签名私钥，不能作为生产私钥提交、上传或复用。
+生产版必须重新走离线 key ceremony，并记录签名 key digest、固件哈希和烧录证据。
 
 ## 新增目标配置
 
@@ -40,7 +50,11 @@ idf.py -B build_high_value_wave_43 \
 tools/signer_production_check.sh build_high_value_wave_43/sdkconfig
 ```
 
-`prodcheck` 不通过，就不是大资金安全版。
+`prodcheck` 不通过，就不是大资金安全版。`prodcheck` 通过，也只能叫
+`high-value candidate`，还必须继续完成 eFuse 和真机验收。
+
+注意：high-value overlay 会让根 CMake 进入 `MINIMAL_BUILD`，普通 `wave_43` 开发构建不会
+开启该模式。这样可以让 high-value 关闭网络栈，同时避免安全构建路径影响日常开发固件。
 
 ## 第一阶段：先做只读硬化版
 

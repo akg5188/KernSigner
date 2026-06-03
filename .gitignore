@@ -4,12 +4,15 @@ build_wave_35/
 build_wave_4b/
 build_wave_43/
 build_wave_43_fresh/
+build_high_value_wave_43/
 build_wave_5/
 tmp_*/
 sdkconfig
 sdkconfig.old
 managed_components/
 compile_commands.json
+log/
+secure_boot_signing_key.pem
 
 # Release
 release/

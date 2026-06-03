@@ -33,6 +33,18 @@ require_set() {
   failures=1
 }
 
+require_any_set() {
+  local key
+  for key in "$@"; do
+    if grep -Eq "^${key}=y$" "$SDKCONFIG"; then
+      log "PASS: $key=y"
+      return
+    fi
+  done
+  log "FAIL: one of [$*] must be y"
+  failures=1
+}
+
 require_clean_worktree() {
   if ! command -v git >/dev/null 2>&1; then
     log "WARN: git not found; cannot verify release worktree cleanliness"
@@ -99,7 +111,7 @@ else
 fi
 
 require_set CONFIG_SECURE_BOOT
-require_set CONFIG_FLASH_ENCRYPTION_ENABLED
+require_any_set CONFIG_SECURE_FLASH_ENC_ENABLED CONFIG_FLASH_ENCRYPTION_ENABLED
 require_set CONFIG_NVS_ENCRYPTION
 require_set CONFIG_KSIG_PRODUCTION_REQUIRE_PIN_HMAC
 
@@ -110,11 +122,12 @@ require_comment_not_set CONFIG_ETH_ENABLED
 require_comment_not_set CONFIG_LWIP_ENABLE
 
 require_comment_not_set CONFIG_USJ_ENABLE_USB_SERIAL_JTAG
-require_comment_not_set CONFIG_ESP_GDBSTUB_ENABLED
+require_comment_not_set CONFIG_ESP_SYSTEM_GDBSTUB_RUNTIME
 require_comment_not_set CONFIG_ESP_SYSTEM_PANIC_GDBSTUB
 require_set CONFIG_ESP_SYSTEM_PANIC_SILENT_REBOOT
 
 require_set CONFIG_ESP_CONSOLE_NONE
+require_set CONFIG_ESP_CONSOLE_SECONDARY_NONE
 require_comment_not_set CONFIG_ESP_CONSOLE_UART_DEFAULT
 require_comment_not_set CONFIG_ESP_CONSOLE_UART_CUSTOM
 require_comment_not_set CONFIG_ESP_CONSOLE_UART
