@@ -10,6 +10,7 @@
 
 | 你现在要做什么 | 先看 |
 | --- | --- |
+| 下载 GitHub Release 固件、日常只刷一个 `kernsigner.bin`、完整刷机地址 | [WAVE43_FIRMWARE_FLASHING_GUIDE.zh-CN.md](WAVE43_FIRMWARE_FLASHING_GUIDE.zh-CN.md) |
 | 第一次上手、刷机、开机、创建或加载测试助记词 | [小白照抄完整使用手册.zh-CN.md](小白照抄完整使用手册.zh-CN.md) |
 | 设备出问题，想按现象一步步排查 | [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md) |
 | PN5180 NFC 接线、5V/GND、GPIO、贴卡没反应 | [PN5180_NFC_WIRING_AND_USAGE.zh-CN.md](PN5180_NFC_WIRING_AND_USAGE.zh-CN.md) |
@@ -71,6 +72,7 @@
 
 | 文档 | 用途 |
 | --- | --- |
+| [WAVE43_FIRMWARE_FLASHING_GUIDE.zh-CN.md](WAVE43_FIRMWARE_FLASHING_GUIDE.zh-CN.md) | GitHub Release 固件刷机教程：日常只刷 `kernsigner.bin` 到 `0x20000`，完整包 4 个 bin 的地址 |
 | [FLASH_PRECHECK.md](FLASH_PRECHECK.md) | 刷机前检查，防止刷错包、刷错地址、刷错板 |
 | [BUILD_FLASH_DEBUG_GUIDE.zh-CN.md](BUILD_FLASH_DEBUG_GUIDE.zh-CN.md) | 构建、刷机、串口、模拟器、交付命令 |
 | [REPRODUCIBLE_BUILD.md](REPRODUCIBLE_BUILD.md) | 当前预置固件的可复现构建记录 |

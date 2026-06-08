@@ -28,6 +28,7 @@ The current tree is a **test-funds validation build**, not an audited production
 
 | 你要做什么 | 文档 |
 | --- | --- |
+| 下载发布版固件、日常只刷一个 `kernsigner.bin`、完整刷机地址 | [Wave43 固件刷机教程](docs/WAVE43_FIRMWARE_FLASHING_GUIDE.zh-CN.md) |
 | PN5180 NFC 接线、5V/GND、GPIO、手机贴上没反应怎么查 | [PN5180 NFC 接线和使用说明](docs/PN5180_NFC_WIRING_AND_USAGE.zh-CN.md) |
 | NFC 智能卡状态、Satochip、SeedKeeper、签名、常见报错 | [NFC 智能卡操作和排错](docs/NFC_SMARTCARD_OPERATION_AND_TROUBLESHOOTING.zh-CN.md) |
 | Wi-Fi、蓝牙、ESP32-C6 无线伴随芯片怎么从固件极端关闭 | [Wi-Fi、蓝牙和无线连接极端关闭说明](docs/WIRELESS_RADIO_OFF_EXTREME_GUIDE.zh-CN.md) |
