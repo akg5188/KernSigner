@@ -12,6 +12,7 @@
 #include <bsp/display.h>
 #include <bsp/esp-bsp.h>
 #include <bsp/pmic.h>
+#include <bsp/radio.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_system.h>
@@ -22,6 +23,14 @@
 
 static const char *TAG = "KSIG_MAIN";
 static lv_obj_t *s_main_screen;
+
+#if defined(CONFIG_BT_ENABLED) || defined(CONFIG_ESP_WIFI_ENABLED) ||          \
+    defined(CONFIG_ESP_HOST_WIFI_ENABLED) || defined(CONFIG_ETH_ENABLED) ||    \
+    defined(CONFIG_IEEE802154_ENABLED) || defined(CONFIG_ESP_COEX_ENABLED) ||  \
+    defined(CONFIG_ESP_PHY_ENABLED) || defined(CONFIG_LWIP_ENABLE) ||          \
+    defined(CONFIG_OPENTHREAD_ENABLED)
+#error "KernSigner must be built without wireless or network stacks."
+#endif
 
 static void show_pin_gate(void);
 
@@ -113,6 +122,8 @@ static void smartcard_boot_probe_task(void *arg) {
 #endif
 
 void app_main(void) {
+  ESP_ERROR_CHECK(bsp_wireless_disable());
+
   // Initialize NVS for persistent settings
   esp_err_t ret = nvs_flash_init();
   if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||

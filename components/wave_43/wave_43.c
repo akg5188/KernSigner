@@ -1,5 +1,6 @@
 #include "bsp/display.h"
 #include "bsp/esp32_p4_wifi6_touch_lcd_43.h"
+#include "bsp/radio.h"
 #include "bsp/touch.h"
 #include "bsp_err_check.h"
 #include "driver/gpio.h"
@@ -23,6 +24,27 @@ static const char *TAG = "wave_43";
 
 static bool i2c_initialized = false;
 static i2c_master_bus_handle_t i2c_handle = NULL;
+
+esp_err_t bsp_wireless_disable(void) {
+  ESP_RETURN_ON_ERROR(gpio_set_level(BSP_ESP32_C6_CHIP_PU, 0), TAG,
+                      "Set ESP32-C6 CHIP_PU low");
+
+  const gpio_config_t c6_disable_gpio = {
+      .pin_bit_mask = (1ULL << BSP_ESP32_C6_CHIP_PU),
+      .mode = GPIO_MODE_OUTPUT,
+      .pull_up_en = GPIO_PULLUP_DISABLE,
+      .pull_down_en = GPIO_PULLDOWN_ENABLE,
+      .intr_type = GPIO_INTR_DISABLE,
+  };
+  ESP_RETURN_ON_ERROR(gpio_config(&c6_disable_gpio), TAG,
+                      "Configure ESP32-C6 CHIP_PU disable GPIO");
+  ESP_RETURN_ON_ERROR(gpio_set_level(BSP_ESP32_C6_CHIP_PU, 0), TAG,
+                      "Hold ESP32-C6 CHIP_PU low");
+
+  ESP_LOGI(TAG, "ESP32-C6 wireless companion held disabled on GPIO%d",
+           BSP_ESP32_C6_CHIP_PU);
+  return ESP_OK;
+}
 
 /* Vendor-specific ST7701 init sequence (from Waveshare upstream BSP for the
    4.3" panel — required for correct gamma/timing/voltage on this glass). */

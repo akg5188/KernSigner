@@ -1,0 +1,35 @@
+menu "KernSigner PN5180 Bring-up"
+
+    config PN5180_BRINGUP_PIN_SCK
+        int "PN5180 SCK GPIO"
+        default 52
+
+    config PN5180_BRINGUP_PIN_MOSI
+        int "PN5180 MOSI GPIO"
+        default 51
+
+    config PN5180_BRINGUP_PIN_MISO
+        int "PN5180 MISO GPIO"
+        default 50
+
+    config PN5180_BRINGUP_PIN_NSS
+        int "PN5180 NSS/CS GPIO"
+        default 49
+
+    config PN5180_BRINGUP_PIN_BUSY
+        int "PN5180 BUSY GPIO"
+        default 31
+
+    config PN5180_BRINGUP_PIN_RST
+        int "PN5180 RST/NRESET GPIO"
+        default 30
+
+    config PN5180_BRINGUP_PIN_IRQ
+        int "PN5180 IRQ GPIO, -1 to skip"
+        default -1
+
+    config PN5180_BRINGUP_SPI_HZ
+        int "PN5180 SPI clock Hz"
+        default 1000000
+
+endmenu

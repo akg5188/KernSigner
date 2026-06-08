@@ -22,6 +22,7 @@
 #include "utils/secure_mem.h"
 
 #ifndef SIMULATOR
+#include "esp_attr.h"
 #include "core/mnemonic_slots.h"
 #include "core/wallet.h"
 #include "pages/home/addresses.h"
@@ -62,6 +63,10 @@
 #endif
 #ifdef SIMULATOR
 #include "pages/shared/custom_derivation_page.h"
+#endif
+
+#ifndef EXT_RAM_BSS_ATTR
+#define EXT_RAM_BSS_ATTR
 #endif
 
 #include <bsp/display.h>
@@ -3426,6 +3431,14 @@ static bool satochip_build_external_account(
         NULL, false, 0, false, -1, -1, "account.ledger_live");
     account->ledger_live_count++;
   }
+  if (account->ledger_live_count == 0 &&
+      card->address_key.has_compressed_pubkey) {
+    satochip_fill_external_hdkey(
+        &account->ledger_live[account->ledger_live_count],
+        &card->address_key, "m/44'/60'/0'/0/0", NULL, false, false,
+        NULL, false, 0, false, -1, -1, "account.ledger_live");
+    account->ledger_live_count++;
+  }
 
   for (size_t i = 0; i < card->btc_count && i < EVM_WEB3_MAX_EXTERNAL_BTC_KEYS;
        i++) {
@@ -3512,9 +3525,13 @@ static void satochip_connect_task(void *arg) {
   memset(&s_satochip_task_card_account, 0,
          sizeof(s_satochip_task_card_account));
   const bool delete_with_caps = s_satochip_task_with_caps;
-  ESP_LOGD(TAG, "SATOCHIP_CONNECT begin");
+  const bool include_okx_multi_accounts =
+      s_satochip_pending_profile == EVM_WEB3_PROFILE_OKX;
+  ESP_LOGD(TAG, "SATOCHIP_CONNECT begin okx_multi=%u",
+           include_okx_multi_accounts ? 1U : 0U);
   s_satochip_task_err = smartcard_satochip_get_web3_account(
-      s_satochip_task_pin, &s_satochip_task_card_account, 20000);
+      s_satochip_task_pin, &s_satochip_task_card_account, 10000,
+      include_okx_multi_accounts);
   ESP_LOGD(TAG, "SATOCHIP_CONNECT done err=%s",
            esp_err_to_name(s_satochip_task_err));
   secure_memzero(s_satochip_task_pin, sizeof(s_satochip_task_pin));
@@ -3619,7 +3636,7 @@ static TaskHandle_t s_card_info_task_handle;
 static volatile bool s_card_info_task_done;
 static volatile bool s_card_info_task_with_caps;
 static esp_err_t s_card_info_task_err = ESP_OK;
-static char s_card_info_result[2048];
+static EXT_RAM_BSS_ATTR char s_card_info_result[2048];
 
 static void card_info_finish_ui(void);
 static void card_info_poll_cb(lv_timer_t *timer);
@@ -4598,7 +4615,7 @@ static volatile bool s_satochip_status_task_done;
 static volatile bool s_satochip_status_task_with_caps;
 static esp_err_t s_satochip_status_task_err = ESP_OK;
 static bool s_satochip_status_app_selected;
-static char s_satochip_status_text[768];
+static EXT_RAM_BSS_ATTR char s_satochip_status_text[768];
 
 static void refresh_smartcard_label(lv_obj_t *label) {
   if (!label)
@@ -4611,7 +4628,7 @@ static void refresh_smartcard_label(lv_obj_t *label) {
   lv_color_t color = main_color();
   smartcard_transport_t active = smartcard_transport_active();
   if (active == SMARTCARD_TRANSPORT_USB_CCID ||
-      active == SMARTCARD_TRANSPORT_NFC_PN532) {
+      active == SMARTCARD_TRANSPORT_NFC_PN5180) {
     color = yes_color();
   }
   if (s_smartcard_probe_task_err != ESP_OK) {
@@ -4946,13 +4963,13 @@ static TaskHandle_t s_satochip_maint_task_handle;
 static volatile bool s_satochip_maint_task_done;
 static volatile bool s_satochip_maint_task_with_caps;
 static esp_err_t s_satochip_maint_task_err = ESP_OK;
-static char s_satochip_maint_result[8192];
+static EXT_RAM_BSS_ATTR char s_satochip_maint_result[8192];
 static char s_satochip_maint_pin[80];
-static char s_satochip_maint_text_a[1024];
-static char s_satochip_maint_text_b[4096];
-static char s_satochip_maint_text_c[4096];
-static char s_satochip_seedkeeper_scanned_secret[4096];
-static char s_satochip_seedkeeper_export_secret_qr[4096];
+static EXT_RAM_BSS_ATTR char s_satochip_maint_text_a[1024];
+static EXT_RAM_BSS_ATTR char s_satochip_maint_text_b[4096];
+static EXT_RAM_BSS_ATTR char s_satochip_maint_text_c[4096];
+static EXT_RAM_BSS_ATTR char s_satochip_seedkeeper_scanned_secret[4096];
+static EXT_RAM_BSS_ATTR char s_satochip_seedkeeper_export_secret_qr[4096];
 static char s_satochip_seedkeeper_export_secret_qr_title[96];
 static bool s_satochip_seedkeeper_export_secret_qr_pending;
 static smartcard_seedkeeper_header_list_t s_satochip_seedkeeper_last_list;

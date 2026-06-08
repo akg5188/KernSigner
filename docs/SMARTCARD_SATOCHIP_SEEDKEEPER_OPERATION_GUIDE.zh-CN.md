@@ -8,9 +8,27 @@
 
 ## 一句话结论
 
-Satochip 是签名钱包卡，SeedKeeper 是秘密保存卡。两者都必须通过带外接供电的 OTG 读卡器使用，不能指望开发板 OTG 口直接给 ACR39U-NF 稳定供电。
+Satochip 是签名钱包卡，SeedKeeper 是秘密保存卡。当前所有智能卡流程都先用 PN5180 NFC 贴卡读取；如果 PN5180 硬件不可用，才使用 USB CCID 接触式读卡器作为备用。USB CCID 必须通过带外接供电的 OTG 转接线或外接供电 Hub，不能指望开发板 OTG 口直接给 ACR39U-NF 稳定供电。PN532 不再参与当前主固件运行路径。
 
 ## 必须这样接线
+
+当前 NFC 主路线：
+
+```text
+PN5180 5V     -> 开发板 5V
+PN5180 GND    -> 开发板 GND
+PN5180 SCK    -> GPIO52
+PN5180 MOSI   -> GPIO51
+PN5180 MISO   -> GPIO50
+PN5180 NSS/CS -> GPIO49
+PN5180 BUSY   -> GPIO31
+PN5180 RST    -> GPIO30
+PN5180 IRQ    -> 不接
+```
+
+PN5180 详细接线、5V 注意事项和贴卡排错看 [PN5180 NFC 接线和使用说明](PN5180_NFC_WIRING_AND_USAGE.zh-CN.md)。
+
+USB CCID 读卡器路线：
 
 ```text
 ESP32-P4 USB OTG 口
@@ -22,6 +40,8 @@ ESP32-P4 USB OTG 口
 下载口只用于电脑串口和刷机，不是 USB Host 读卡口。
 
 如果读卡器灯只闪一下、亮度很弱、键盘鼠标也不亮、Hub 能看到但读卡器看不到，优先判断为外设供电不足或 OTG 方向错误，不要先改驱动。
+
+如果手机贴 PN5180 没有 NFC 感应，优先判断为 PN5180 供电、GND、模块焊接或天线摆位问题，不要先改 Satochip / SeedKeeper 上层逻辑。
 
 ## Satochip 和 SeedKeeper 区别
 
@@ -48,19 +68,20 @@ ESP32-P4 USB OTG 口
 
 ## 空白 Satochip 第一次使用
 
-1. 接好带供电 OTG、读卡器和 Satochip 卡。
-2. 进入 `设备检查 -> 智能卡检测`，确认能识别到读卡器和卡。
-3. 进入 `智能卡 -> Satochip -> 设置PIN` 或维护里的 setup 入口。
-4. 输入新 PIN，并按页面要求再次确认。
-5. 记录好 PIN 和 PUK 信息，不要和开发板 PIN 混在一起。
-6. 进入本机助记词页面，选择 `写入智能卡 -> Satochip`。
-7. 写入完成后，用 `连接钱包` 或 `派生地址` 验证地址是否正确。
+1. 先确认要走 PN5180 NFC 还是 USB CCID 读卡器。
+2. 如果走 PN5180，把 Satochip 贴在 NFC 天线区域；如果走 USB，接好带供电 OTG、读卡器和 Satochip 卡。
+3. 进入 `设备检查 -> 智能卡检测`，确认能识别到卡。
+4. 进入 `智能卡 -> Satochip -> 设置PIN` 或维护里的 setup 入口。
+5. 输入新 PIN，并按页面要求再次确认。
+6. 记录好 PIN 和 PUK 信息，不要和开发板 PIN 混在一起。
+7. 进入本机助记词页面，选择 `写入智能卡 -> Satochip`。
+8. 写入完成后，用 `连接钱包` 或 `派生地址` 验证地址是否正确。
 
 如果 Satochip 已经有种子，写入会被拒绝。需要先确认备份，再执行重置种子或出厂重置。
 
 ## 空白 SeedKeeper 第一次使用
 
-1. 接好带供电 OTG、读卡器和 SeedKeeper 卡。
+1. 如果走 PN5180，把 SeedKeeper 贴在 NFC 天线区域；如果走 USB，接好带供电 OTG、读卡器和 SeedKeeper 卡。
 2. 进入 `设备检查 -> 智能卡检测`，确认卡能被识别。
 3. 进入 `智能卡 -> SeedKeeper -> 设置PIN`。
 4. 输入新 PIN，并再次确认。

@@ -2,22 +2,29 @@
 
 #include "smartcard_ccid.h"
 
-#ifdef SIMULATOR
+#ifndef SIMULATOR
+#include "sdkconfig.h"
+#endif
 
-#include <stdarg.h>
+#ifndef CONFIG_KSIG_PN532_ENABLED
+#define CONFIG_KSIG_PN532_ENABLED 1
+#endif
+
+#if defined(SIMULATOR) || !CONFIG_KSIG_PN532_ENABLED
+
 #include <stdio.h>
 #include <string.h>
 
-static smartcard_pn532_report_t s_report = {
-    .detail = "Simulator does not access PN532 NFC hardware.",
-};
+#if defined(SIMULATOR)
+#define PN532_UNAVAILABLE_DETAIL "Simulator does not access PN532 NFC hardware."
+#else
+#define PN532_UNAVAILABLE_DETAIL "PN532 NFC support is disabled in this build."
+#endif
 
 esp_err_t smartcard_pn532_start(void) { return ESP_ERR_NOT_SUPPORTED; }
 
 esp_err_t smartcard_pn532_probe(uint32_t timeout_ms) {
   (void)timeout_ms;
-  snprintf(s_report.detail, sizeof(s_report.detail),
-           "Simulator does not access PN532 NFC hardware.");
   return ESP_ERR_NOT_SUPPORTED;
 }
 
@@ -37,14 +44,16 @@ esp_err_t smartcard_pn532_transmit_apdu(const uint8_t *apdu, size_t apdu_len,
 }
 
 void smartcard_pn532_snapshot(smartcard_pn532_report_t *out) {
-  if (out)
-    *out = s_report;
+  if (!out)
+    return;
+  memset(out, 0, sizeof(*out));
+  snprintf(out->detail, sizeof(out->detail), "%s", PN532_UNAVAILABLE_DETAIL);
 }
 
 void smartcard_pn532_format_report(char *out, size_t out_len) {
   if (!out || out_len == 0)
     return;
-  snprintf(out, out_len, "%s", s_report.detail);
+  snprintf(out, out_len, "%s", PN532_UNAVAILABLE_DETAIL);
 }
 
 #else
@@ -105,7 +114,7 @@ static bool s_own_i2c_bus;
 static bool s_started;
 static bool s_target_active;
 static uint8_t s_target_number = 1;
-static smartcard_pn532_report_t s_report;
+static smartcard_pn532_report_t *s_report;
 
 #define PN532_DEFAULT_TIMEOUT_MS 30000U
 
@@ -116,7 +125,7 @@ static uint32_t default_timeout(uint32_t timeout_ms) {
 static void report_detail(const char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
-  vsnprintf(s_report.detail, sizeof(s_report.detail), fmt, ap);
+  vsnprintf(s_report->detail, sizeof(s_report->detail), fmt, ap);
   va_end(ap);
 }
 
@@ -124,6 +133,11 @@ static esp_err_t ensure_lock(void) {
   if (!s_lock) {
     s_lock = xSemaphoreCreateMutex();
     if (!s_lock)
+      return ESP_ERR_NO_MEM;
+  }
+  if (!s_report) {
+    s_report = calloc(1, sizeof(*s_report));
+    if (!s_report)
       return ESP_ERR_NO_MEM;
   }
   return ESP_OK;
@@ -144,14 +158,14 @@ static void give_lock(void) {
 static void pn532_clear_target_report(void) {
   s_target_active = false;
   s_target_number = 1;
-  s_report.target_present = false;
-  s_report.target_number = 0;
-  s_report.uid_len = 0;
-  memset(s_report.uid, 0, sizeof(s_report.uid));
-  s_report.atqa[0] = 0;
-  s_report.atqa[1] = 0;
-  s_report.sak = 0;
-  s_report.iso_dep = false;
+  s_report->target_present = false;
+  s_report->target_number = 0;
+  s_report->uid_len = 0;
+  memset(s_report->uid, 0, sizeof(s_report->uid));
+  s_report->atqa[0] = 0;
+  s_report->atqa[1] = 0;
+  s_report->sak = 0;
+  s_report->iso_dep = false;
 }
 
 static void pn532_drop_device_locked(void) {
@@ -488,7 +502,7 @@ static esp_err_t pn532_start_locked(void) {
   if (s_started)
     return ESP_OK;
 
-  memset(&s_report, 0, sizeof(s_report));
+  memset(s_report, 0, sizeof(*s_report));
   report_detail("PN532 not initialized.");
 
   i2c_master_bus_handle_t bus = NULL;
@@ -549,8 +563,8 @@ static esp_err_t pn532_start_locked(void) {
   }
 
   s_started = true;
-  s_report.initialized = true;
-  s_report.pn532_present = true;
+  s_report->initialized = true;
+  s_report->pn532_present = true;
   pn532_clear_target_report();
   report_detail("PN532 ready.");
   return ESP_OK;
@@ -565,7 +579,7 @@ static esp_err_t pn532_poll_target_locked(uint32_t timeout_ms) {
                     timeout_ms ? timeout_ms : 1000);
   if (err != ESP_OK) {
     s_target_active = false;
-    s_report.target_present = false;
+    s_report->target_present = false;
     report_detail(err == ESP_ERR_TIMEOUT ? "No ISO14443A NFC card found."
                                           : "NFC card polling failed: %s.",
                   esp_err_to_name(err));
@@ -574,7 +588,7 @@ static esp_err_t pn532_poll_target_locked(uint32_t timeout_ms) {
 
   if (resp_len < 6 || resp[0] == 0) {
     s_target_active = false;
-    s_report.target_present = false;
+    s_report->target_present = false;
     report_detail("No ISO14443A NFC card found.");
     return ESP_ERR_NOT_FOUND;
   }
@@ -582,25 +596,25 @@ static esp_err_t pn532_poll_target_locked(uint32_t timeout_ms) {
   uint8_t uid_len = resp[5];
   if (6U + uid_len > resp_len || uid_len > SMARTCARD_PN532_UID_MAX_LEN) {
     s_target_active = false;
-    s_report.target_present = false;
+    s_report->target_present = false;
     report_detail("NFC target response has invalid UID length.");
     return ESP_ERR_INVALID_RESPONSE;
   }
 
   s_target_number = resp[1] ? resp[1] : 1;
   s_target_active = true;
-  s_report.target_present = true;
-  s_report.target_number = s_target_number;
-  s_report.atqa[0] = resp[2];
-  s_report.atqa[1] = resp[3];
-  s_report.sak = resp[4];
-  s_report.iso_dep = (s_report.sak & 0x20) != 0;
-  s_report.uid_len = uid_len;
-  memcpy(s_report.uid, resp + 6, uid_len);
+  s_report->target_present = true;
+  s_report->target_number = s_target_number;
+  s_report->atqa[0] = resp[2];
+  s_report->atqa[1] = resp[3];
+  s_report->sak = resp[4];
+  s_report->iso_dep = (s_report->sak & 0x20) != 0;
+  s_report->uid_len = uid_len;
+  memcpy(s_report->uid, resp + 6, uid_len);
 
   report_detail("NFC card detected; UID length=%u SAK=0x%02X%s.",
-                (unsigned)uid_len, s_report.sak,
-                s_report.iso_dep ? " ISO-DEP" : "");
+                (unsigned)uid_len, s_report->sak,
+                s_report->iso_dep ? " ISO-DEP" : "");
   return ESP_OK;
 }
 
@@ -617,14 +631,14 @@ static esp_err_t pn532_probe_target_locked(uint32_t timeout_ms) {
   esp_err_t last_err = ESP_ERR_NOT_FOUND;
 
   s_target_active = false;
-  s_report.target_present = false;
-  s_report.target_number = 0;
-  s_report.uid_len = 0;
-  memset(s_report.uid, 0, sizeof(s_report.uid));
-  s_report.atqa[0] = 0;
-  s_report.atqa[1] = 0;
-  s_report.sak = 0;
-  s_report.iso_dep = false;
+  s_report->target_present = false;
+  s_report->target_number = 0;
+  s_report->uid_len = 0;
+  memset(s_report->uid, 0, sizeof(s_report->uid));
+  s_report->atqa[0] = 0;
+  s_report->atqa[1] = 0;
+  s_report->sak = 0;
+  s_report->iso_dep = false;
 
   do {
     uint32_t remaining_ms = total_timeout;
@@ -768,7 +782,7 @@ void smartcard_pn532_snapshot(smartcard_pn532_report_t *out) {
              esp_err_to_name(err));
     return;
   }
-  *out = s_report;
+  *out = *s_report;
   give_lock();
 }
 

@@ -218,7 +218,7 @@ esp_err_t smartcard_satochip_get_eth_account(const char *pin, const char *path,
                                              uint32_t timeout_ms);
 esp_err_t smartcard_satochip_get_web3_account(
     const char *pin, smartcard_satochip_web3_account_t *out,
-    uint32_t timeout_ms);
+    uint32_t timeout_ms, bool include_okx_multi_accounts);
 esp_err_t smartcard_satochip_sign_evm_digest(
     const char *pin, const char *path, const uint8_t digest[32],
     smartcard_satochip_signature_t *out, uint32_t timeout_ms);

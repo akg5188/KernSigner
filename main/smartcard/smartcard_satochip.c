@@ -3248,7 +3248,7 @@ static bool satochip_read_optional_web3_key(
 
 esp_err_t smartcard_satochip_get_web3_account(
     const char *pin, smartcard_satochip_web3_account_t *out,
-    uint32_t timeout_ms) {
+    uint32_t timeout_ms, bool include_okx_multi_accounts) {
   if (!pin || !out)
     return ESP_ERR_INVALID_ARG;
 
@@ -3300,30 +3300,36 @@ esp_err_t smartcard_satochip_get_web3_account(
         out->parent_key.compressed_pubkey, out->parent_fingerprint);
   }
 
-  for (size_t i = 0; i < 10; i++) {
-    char path[48];
-    snprintf(path, sizeof(path), "m/44'/60'/%u'/0/0", (unsigned)i);
-    if (satochip_read_optional_web3_key(
-            &session, path, &out->ledger_live[out->ledger_live_count],
-            timeout_ms)) {
-      out->ledger_live_count++;
+  if (include_okx_multi_accounts) {
+    if (out->address_key.has_compressed_pubkey) {
+      out->ledger_live[out->ledger_live_count++] = out->address_key;
     }
-  }
+    for (size_t i = 1; i < 10; i++) {
+      char path[48];
+      snprintf(path, sizeof(path), "m/44'/60'/%u'/0/0", (unsigned)i);
+      if (satochip_read_optional_web3_key(
+              &session, path, &out->ledger_live[out->ledger_live_count],
+              timeout_ms)) {
+        out->ledger_live_count++;
+      }
+    }
 
-  const char *btc_paths[] = {"m/84'/0'/0'",  "m/49'/0'/0'",
-                             "m/44'/0'/0'",  "m/44'/195'/0'",
-                             "m/49'/2'/0'",  "m/44'/5'/0'",
-                             "m/44'/145'/0'", "m/86'/0'/0'"};
-  for (size_t i = 0; i < sizeof(btc_paths) / sizeof(btc_paths[0]); i++) {
-    if (satochip_read_optional_web3_key(
-            &session, btc_paths[i], &out->btc[out->btc_count], timeout_ms)) {
-      out->btc_count++;
+    const char *btc_paths[] = {"m/84'/0'/0'",  "m/49'/0'/0'",
+                               "m/44'/0'/0'",  "m/44'/195'/0'",
+                               "m/49'/2'/0'",  "m/44'/5'/0'",
+                               "m/44'/145'/0'", "m/86'/0'/0'"};
+    for (size_t i = 0; i < sizeof(btc_paths) / sizeof(btc_paths[0]); i++) {
+      if (satochip_read_optional_web3_key(
+              &session, btc_paths[i], &out->btc[out->btc_count],
+              timeout_ms)) {
+        out->btc_count++;
+      }
     }
   }
 
   out->err = ESP_OK;
   snprintf(out->detail, sizeof(out->detail),
-           "Satochip Web3 account read successfully: EVM %s, OKX %u, BTC %u.",
+           "Satochip Web3 account read successfully: EVM %s, optional EVM %u, BTC %u.",
            out->address_key.address, (unsigned)out->ledger_live_count,
            (unsigned)out->btc_count);
 

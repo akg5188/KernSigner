@@ -9,7 +9,7 @@
 typedef enum {
   SMARTCARD_TRANSPORT_AUTO = 0,
   SMARTCARD_TRANSPORT_USB_CCID,
-  SMARTCARD_TRANSPORT_NFC_PN532,
+  SMARTCARD_TRANSPORT_NFC_PN5180,
 } smartcard_transport_t;
 
 void smartcard_transport_set(smartcard_transport_t transport);

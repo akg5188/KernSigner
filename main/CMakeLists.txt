@@ -27,7 +27,7 @@ set(SOURCES
     "qr/scanner.c"
     "qr/viewer.c"
     "smartcard/smartcard_ccid.c"
-    "smartcard/smartcard_pn532.c"
+    "smartcard/smartcard_pn5180.c"
     "smartcard/smartcard_satochip.c"
     "smartcard/smartcard_transport.c"
     "ui/battery.c"
@@ -138,7 +138,7 @@ idf_component_register(
     PRIV_REQUIRES lvgl ${TOUCH_DRIVER} wave_4b wave_35 wave_5 wave_43
                   nvs_flash sd_card spiffs esp_partition video k_quirc zbar_qr
                   esp_driver_ppa esp_app_format efuse esp_security esp_timer
-                  esp_driver_i2c
+                  esp_driver_i2c esp_driver_spi
                   heap mbedtls usb bbqr libwally-core cUR
                   json
 )

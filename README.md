@@ -10,7 +10,7 @@
 >
 > 请不要默认相信本项目可以直接用于真实资产或生产环境。使用前请自行审查、测试和修改；如果你不会修改，也可以联系本人，在本人有空的时候协助修改。
 
-KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, Satochip/SeedKeeper smart-card workflows over PN532 NFC or USB CCID readers, and hardware wallet research. It is based on the upstream Kern project and combines ideas, code, and testing notes from several open-source wallet projects.
+KernSigner is an experimental ESP32-P4 firmware for air-gapped Bitcoin signing, QR-based wallet workflows, Satochip/SeedKeeper smart-card workflows over PN5180 NFC or USB CCID readers, and hardware wallet research. It is based on the upstream Kern project and combines ideas, code, and testing notes from several open-source wallet projects.
 
 It uses LVGL for the embedded UI, libwally for Bitcoin primitives, and a C codebase tuned for the Waveshare ESP32-P4 4.3-inch touch-screen device.
 
@@ -22,18 +22,46 @@ This repository was largely assembled with AI assistance. It is still unfinished
 
 The current tree is a **test-funds validation build**, not an audited production wallet. It contains real wallet paths and Satochip/Web3 work, but production use with mainnet funds requires the security gates and real-device acceptance checks in `docs/` to pass.
 
+## 当前实测状态 / 首页必看
+
+当前真机主线已经切到 **PN5180 NFC**。连接钱包、签名、读状态、读公钥、SeedKeeper 操作都会先走 PN5180；USB CCID 只在 PN5180 硬件不可用时作为备用；PN532 不再参与主固件运行路径。你现在要接 NFC、测 Satochip / SeedKeeper，先看这几篇，不要再按旧 PN532 线乱接：
+
+| 你要做什么 | 文档 |
+| --- | --- |
+| PN5180 NFC 接线、5V/GND、GPIO、手机贴上没反应怎么查 | [PN5180 NFC 接线和使用说明](docs/PN5180_NFC_WIRING_AND_USAGE.zh-CN.md) |
+| NFC 智能卡状态、Satochip、SeedKeeper、签名、常见报错 | [NFC 智能卡操作和排错](docs/NFC_SMARTCARD_OPERATION_AND_TROUBLESHOOTING.zh-CN.md) |
+| Wi-Fi、蓝牙、ESP32-C6 无线伴随芯片怎么从固件极端关闭 | [Wi-Fi、蓝牙和无线连接极端关闭说明](docs/WIRELESS_RADIO_OFF_EXTREME_GUIDE.zh-CN.md) |
+| Satochip / SeedKeeper PIN、写入助记词、重置和维护 | [Satochip / SeedKeeper 智能卡实测操作手册](docs/SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md) |
+
+PN5180 当前实测接线：
+
+```text
+PN5180 5V     -> 开发板 5V
+PN5180 GND    -> 开发板 GND
+PN5180 SCK    -> GPIO52
+PN5180 MOSI   -> GPIO51
+PN5180 MISO   -> GPIO50
+PN5180 NSS/CS -> GPIO49
+PN5180 BUSY   -> GPIO31
+PN5180 RST    -> GPIO30
+PN5180 IRQ    -> 不接
+```
+
+重要提醒：`5V` 只接 PN5180 模块电源输入，绝对不要接到任何 GPIO。当前无线关闭是固件控制 `GPIO54 / C6_CHIP_PU` 拉低，不是电烙铁短路，也不是拆电容。
+
 ## Smart-Card Access / 智能卡连接方式
 
-KernSigner can talk to Satochip / SeedKeeper smart cards through **two card-reader paths**:
+KernSigner can talk to Satochip / SeedKeeper smart cards through these card-reader paths:
 
 | Reader path | Current status | Notes |
 | --- | --- | --- |
-| PN532 NFC module | 已接入主固件测试路径 | Uses the red PN532 board over dedicated I2C. The default `wave_43` wiring is `SDA -> GPIO28`, `SCL -> GPIO31`, `VCC -> 3V3`, `GND -> GND`. Keep the card steady on the PN532 antenna during APDU/signing operations. |
-| USB CCID reader | 已接入主固件测试路径 | Uses an external USB smart-card reader such as ACR39U-NF Pocketmate II. The Waveshare ESP32-P4 OTG port needs a powered OTG cable or externally powered USB hub for reliable reader power. |
+| PN5180 NFC module | 当前主 NFC 路线，已真机跑通 | SPI 接线：`SCK GPIO52`、`MOSI GPIO51`、`MISO GPIO50`、`NSS GPIO49`、`BUSY GPIO31`、`RST GPIO30`、`IRQ 不接`。本次实测 PN5180 模块用开发板 `5V` 供电才稳定，信号线仍只接 GPIO。 |
+| USB CCID reader | 保留可用，需要外接供电 OTG | Uses an external USB smart-card reader such as ACR39U-NF Pocketmate II. The Waveshare ESP32-P4 OTG port needs a powered OTG cable or externally powered USB hub for reliable reader power. |
+| PN532 NFC module | 已从当前主固件运行路径禁用 | Kept only as old documentation/source history. It is not probed, not used as fallback, and not compiled into the current PN5180 primary build. |
 
-The wallet and maintenance pages use the same Satochip / SeedKeeper APDU layer for both transports. In automatic mode, USB is preferred when a USB reader is already connected; unplug the USB reader when you want to test NFC only.
+The wallet and maintenance pages use the same Satochip / SeedKeeper APDU layer. All smart-card flows try PN5180 first; USB CCID is only a fallback when PN5180 hardware is unavailable. PN532 is disabled for the current build.
 
-Detailed NFC setup and safety notes: [NFC 智能卡签名测试说明](docs/NFC_SMARTCARD_TEST.zh-CN.md). USB reader power and OTG notes: [智能卡供电和 OTG 排障](docs/TROUBLESHOOTING_SMARTCARD_POWER_OTG.md).
+Detailed NFC setup and safety notes: [PN5180 NFC 接线和使用说明](docs/PN5180_NFC_WIRING_AND_USAGE.zh-CN.md) and [NFC 智能卡操作和排错](docs/NFC_SMARTCARD_OPERATION_AND_TROUBLESHOOTING.zh-CN.md). USB reader power and OTG notes: [智能卡供电和 OTG 排障](docs/TROUBLESHOOTING_SMARTCARD_POWER_OTG.md).
 
 ## Screenshots / 界面截图
 
@@ -69,7 +97,7 @@ Detailed NFC setup and safety notes: [NFC 智能卡签名测试说明](docs/NFC_
 - QR input/output: SeedQR, PSBT/message-signing paths, BBQR/cUR plumbing, text QR generation, and QR classification.
 - Mnemonic and backup tooling: manual word entry, numbered imports, grid/1248/Tinyseed/Stackbit-style restore paths, encrypted backup pages, and BIP39 checks.
 - Custom derivation: Bitcoin legacy, nested SegWit, native SegWit, Taproot, testnet variants, and EVM address display.
-- Satochip/SeedKeeper smart-card validation paths: PN532 NFC and USB CCID detection, ATR/status reads, Satochip Web3 connection/signing tests, path address display, BTC watch-only public keys, and SeedKeeper setup/write/view/reset maintenance flows for test cards.
+- Satochip/SeedKeeper smart-card validation paths: PN5180 NFC and USB CCID detection, ATR/status reads, Satochip Web3 connection/signing tests, path address display, BTC watch-only public keys, and SeedKeeper setup/write/view/reset maintenance flows for test cards.
 - Hardware tooling: display/touch setup, camera preview, storage browser, brightness control, device status, and real-device delivery checks.
 - Desktop simulator: runs the LVGL UI in an SDL2 window for UI review and automated screenshots.
 
@@ -80,7 +108,7 @@ Detailed NFC setup and safety notes: [NFC 智能卡签名测试说明](docs/NFC_
 连接钱包、查看地址和签名流程支持两种密钥来源：
 
 - **助记词方式**：在开发板内临时加载或创建助记词，敏感材料只用于当前会话；适合测试普通离线钱包流程。
-- **智能卡方式**：通过 PN532 NFC 模块或外接供电 OTG USB 读卡器连接 Satochip / SeedKeeper 智能卡；适合测试智能卡账户、Web3 连接码、签名和 BTC 观察公钥。
+- **智能卡方式**：通过 PN5180 NFC 模块或外接供电 OTG USB 读卡器连接 Satochip / SeedKeeper 智能卡；适合测试智能卡账户、Web3 连接码、签名和 BTC 观察公钥。
 
 典型流程是：先选择要连接的钱包或要签名的二维码，再选择使用 **助记词** 还是 **智能卡**。
 
@@ -109,7 +137,7 @@ Detailed NFC setup and safety notes: [NFC 智能卡签名测试说明](docs/NFC_
 
 - Web3 钱包重点是 `OKX / Bitget / MetaMask / imToken / Rabby / TokenPocket / Keystone`。
 - BTC 钱包重点是 `BlueWallet / Electrum`。
-- 每个钱包连接或签名时，都可以按实际情况选择 `助记词` 或 `智能卡` 来源；智能卡可以走 PN532 NFC，也可以走外接供电 OTG USB 读卡器。
+- 每个钱包连接或签名时，都可以按实际情况选择 `助记词` 或 `智能卡` 来源；智能卡可以走 PN5180 NFC，也可以走外接供电 OTG USB 读卡器。
 
 ## Safety Status
 
@@ -138,6 +166,8 @@ An OV5647 camera module is required for camera and QR workflows. On first use, f
 
 ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board includes an ESP32-C6 companion chip, but KernSigner's signer model treats the firmware as an offline, QR-first device.
 
+当前固件会在 bootloader 和 app 启动早期把 `GPIO54 / C6_CHIP_PU` 拉低，保持 ESP32-C6 无线伴随芯片禁用。细节看 [Wi-Fi、蓝牙和无线连接极端关闭说明](docs/WIRELESS_RADIO_OFF_EXTREME_GUIDE.zh-CN.md)。
+
 ## Approximate Hardware Cost / 基础硬件成本
 
 当前基础硬件成本约 **37 美元**：
@@ -145,7 +175,7 @@ ESP32-P4 itself has no Wi-Fi or BLE radio. The supported Waveshare 4.3 board inc
 - Waveshare ESP32-P4 4.3 寸开发板：约 **35 美元**
 - 3D 打印外壳：约 **2 美元**
 
-这个价格只计算开发板和打印外壳，不包含 PN532 NFC 模块、USB 智能卡读卡器、Satochip/SeedKeeper 智能卡、带供电 OTG 转接线/Hub、摄像头备件、运费、税费或后续试错打印成本。
+这个价格只计算开发板和打印外壳，不包含 PN5180 NFC 模块、USB 智能卡读卡器、Satochip/SeedKeeper 智能卡、带供电 OTG 转接线/Hub、摄像头备件、运费、税费或后续试错打印成本。
 
 ## Smart-Card OTG Power / 智能卡 OTG 供电
 
@@ -187,7 +217,7 @@ main/core/          Bitcoin, key, PSBT, PIN, storage, EVM, and wallet logic
 main/pages/         LVGL page flows and wallet screens
 main/ui/            Reusable UI widgets, theme, icons, fonts, and navigation
 main/qr/            QR parser, scanner, encoder, and viewer
-main/smartcard/     PN532 NFC, USB CCID, and Satochip/SeedKeeper integration
+main/smartcard/     PN5180 NFC primary transport, USB CCID fallback, and Satochip/SeedKeeper integration
 main/signer_port/     KernSigner-style shell, hardware probes, and service adapters
 components/         ESP-IDF components and third-party libraries
 simulator/          SDL2 desktop simulator

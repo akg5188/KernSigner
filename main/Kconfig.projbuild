@@ -28,46 +28,64 @@ menu "KernSigner Configuration"
             real-funds builds must enable this option so PIN setup/verification
             fails unless eFuse KEY5 is provisioned for the HMAC peripheral.
 
-    config KSIG_PN532_I2C_HZ
-        int "PN532 NFC I2C clock Hz"
-        default 100000
-        range 50000 400000
-        help
-            I2C clock used for the optional PN532 NFC smartcard reader module.
-            The cheap red PN532 V3 boards are most reliable at 100 kHz.
-
-    config KSIG_PN532_DEDICATED_I2C
-        bool "Use a dedicated I2C bus for PN532 NFC"
+    config KSIG_PN5180_ENABLED
+        bool "Enable PN5180 NFC smartcard reader"
         default y if KSIG_BOARD_WAVE_43
         default n
         help
-            Put the PN532 module on its own I2C bus instead of sharing the
-            board touch/camera I2C bus. This is recommended on the Waveshare
-            4.3 inch board because the shared GT911 touch bus made NFC card
-            traffic unreliable in testing.
+            Enable the PN5180 SPI NFC reader transport for ISO14443A
+            CPU smartcards.
 
-    config KSIG_PN532_I2C_PORT
-        int "PN532 dedicated I2C port"
-        default -1
-        depends on KSIG_PN532_DEDICATED_I2C
+    config KSIG_PN5180_SPI_HZ
+        int "PN5180 SPI clock Hz"
+        default 1000000
+        range 100000 5000000
+        depends on KSIG_PN5180_ENABLED
         help
-            I2C port for the PN532 dedicated bus. Use -1 to let ESP-IDF pick
-            an available hardware controller.
+            SPI clock used for the PN5180 NFC module. The tested module is
+            reliable at 1 MHz with short jumper wires.
 
-    config KSIG_PN532_SDA_GPIO
-        int "PN532 dedicated SDA GPIO"
-        default 28 if KSIG_BOARD_WAVE_43
+    config KSIG_PN5180_PIN_SCK
+        int "PN5180 SCK GPIO"
+        default 52 if KSIG_BOARD_WAVE_43
         default -1
-        depends on KSIG_PN532_DEDICATED_I2C
-        help
-            SDA GPIO for the PN532 dedicated I2C bus.
+        depends on KSIG_PN5180_ENABLED
 
-    config KSIG_PN532_SCL_GPIO
-        int "PN532 dedicated SCL GPIO"
+    config KSIG_PN5180_PIN_MOSI
+        int "PN5180 MOSI GPIO"
+        default 51 if KSIG_BOARD_WAVE_43
+        default -1
+        depends on KSIG_PN5180_ENABLED
+
+    config KSIG_PN5180_PIN_MISO
+        int "PN5180 MISO GPIO"
+        default 50 if KSIG_BOARD_WAVE_43
+        default -1
+        depends on KSIG_PN5180_ENABLED
+
+    config KSIG_PN5180_PIN_NSS
+        int "PN5180 NSS/CS GPIO"
+        default 49 if KSIG_BOARD_WAVE_43
+        default -1
+        depends on KSIG_PN5180_ENABLED
+
+    config KSIG_PN5180_PIN_BUSY
+        int "PN5180 BUSY GPIO"
         default 31 if KSIG_BOARD_WAVE_43
         default -1
-        depends on KSIG_PN532_DEDICATED_I2C
+        depends on KSIG_PN5180_ENABLED
+
+    config KSIG_PN5180_PIN_RST
+        int "PN5180 RST GPIO"
+        default 30 if KSIG_BOARD_WAVE_43
+        default -1
+        depends on KSIG_PN5180_ENABLED
+
+    config KSIG_PN5180_PIN_IRQ
+        int "PN5180 IRQ GPIO"
+        default -1
+        depends on KSIG_PN5180_ENABLED
         help
-            SCL GPIO for the PN532 dedicated I2C bus.
+            Optional PN5180 IRQ GPIO. Use -1 when IRQ is not connected.
 
 endmenu

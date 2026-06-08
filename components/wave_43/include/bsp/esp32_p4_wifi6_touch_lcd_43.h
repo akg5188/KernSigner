@@ -41,6 +41,11 @@
 #define BSP_CAM_I2C_SDA BSP_I2C_SDA
 #define BSP_CAM_HAS_MOTOR 0
 
+/* ESP32-C6 wireless companion control from the official Waveshare schematic.
+   GPIO54 is connected through R34 (0R) to C6_CHIP_PU. Driving it low holds the
+   ESP32-C6 Wi-Fi/Bluetooth module disabled. */
+#define BSP_ESP32_C6_CHIP_PU (GPIO_NUM_54)
+
 /**************************************************************************************************
  *
  * I2C interface

@@ -1,6 +1,6 @@
 # KernSigner 文档入口
 
-日期：2026-05-23
+日期：2026-06-08
 
 这个目录里有操作手册、排障手册、真机记录、发布记录和安全边界。日常使用不要从所有文件里乱翻，先按下面这张表选入口。
 
@@ -12,6 +12,9 @@
 | --- | --- |
 | 第一次上手、刷机、开机、创建或加载测试助记词 | [小白照抄完整使用手册.zh-CN.md](小白照抄完整使用手册.zh-CN.md) |
 | 设备出问题，想按现象一步步排查 | [故障排查照抄手册.zh-CN.md](故障排查照抄手册.zh-CN.md) |
+| PN5180 NFC 接线、5V/GND、GPIO、贴卡没反应 | [PN5180_NFC_WIRING_AND_USAGE.zh-CN.md](PN5180_NFC_WIRING_AND_USAGE.zh-CN.md) |
+| NFC 智能卡状态、Satochip、SeedKeeper、APDU 报错 | [NFC_SMARTCARD_OPERATION_AND_TROUBLESHOOTING.zh-CN.md](NFC_SMARTCARD_OPERATION_AND_TROUBLESHOOTING.zh-CN.md) |
+| Wi-Fi、蓝牙、ESP32-C6 无线伴随芯片极端关闭 | [WIRELESS_RADIO_OFF_EXTREME_GUIDE.zh-CN.md](WIRELESS_RADIO_OFF_EXTREME_GUIDE.zh-CN.md) |
 | 扫码慢、扫不到、小尺寸高密度码、OKX 圆点码、树莓派摄像头复刻 | [QR_CAMERA_TROUBLESHOOTING.zh-CN.md](QR_CAMERA_TROUBLESHOOTING.zh-CN.md) |
 | 连接 OKX、Bitget、MetaMask、Rabby、TokenPocket、BlueWallet、Electrum | [连接钱包教程.zh-CN.md](连接钱包教程.zh-CN.md) |
 | Satochip、SeedKeeper、智能卡 PIN/PUK、外接供电 OTG | [SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md](SMARTCARD_SATOCHIP_SEEDKEEPER_OPERATION_GUIDE.zh-CN.md) |
@@ -23,7 +26,7 @@
 
 1. 新手只看“小白手册”和“故障排查照抄手册”就够了。
 2. 扫码问题统一先看 `QR_CAMERA_TROUBLESHOOTING`，OKX 事故复盘只当证据和踩坑记录。
-3. 智能卡问题先确认供电和 OTG，再看 Satochip/SeedKeeper 手册。
+3. NFC 智能卡先看 PN5180 接线和 NFC 排错；USB 读卡器问题先确认供电和 OTG，再看 Satochip/SeedKeeper 手册。
 4. 构建和刷机必须先确认 full/app 类型、地址、SHA256 和串口。
 5. 评审、交付、历史记录类文档不要当作当前操作步骤。
 
@@ -55,8 +58,11 @@
 | 文档 | 用途 |
 | --- | --- |
 | [HARDWARE_OVERVIEW_AND_OTG.md](HARDWARE_OVERVIEW_AND_OTG.md) | 开发板、摄像头、OTG、供电和接口说明 |
+| [PN5180_NFC_WIRING_AND_USAGE.zh-CN.md](PN5180_NFC_WIRING_AND_USAGE.zh-CN.md) | 当前主 NFC 模块：PN5180 接线、5V 供电、GPIO52/51/50/49/31/30、天线摆位 |
+| [NFC_SMARTCARD_OPERATION_AND_TROUBLESHOOTING.zh-CN.md](NFC_SMARTCARD_OPERATION_AND_TROUBLESHOOTING.zh-CN.md) | PN5180 读 Satochip / SeedKeeper、状态页、APDU、WTX、常见错误 |
 | [TROUBLESHOOTING_SMARTCARD_POWER_OTG.md](TROUBLESHOOTING_SMARTCARD_POWER_OTG.md) | ACR39U-NF、供电 Hub、OTG 读卡器排障 |
-| [pn5180_bringup/README.zh-CN.md](../pn5180_bringup/README.zh-CN.md) | PN5180 NFC 模块接线、铁氧体摆位和首次上板测试 |
+| [pn5180_bringup/README.zh-CN.md](../pn5180_bringup/README.zh-CN.md) | PN5180 独立小固件和低层 SPI 硬件链路测试 |
+| [NFC_SMARTCARD_TEST.zh-CN.md](NFC_SMARTCARD_TEST.zh-CN.md) | PN532 旧方案历史说明，当前不推荐新接 |
 | [SMARTCARD_ADAPTER_TEST_WORKFLOW.md](SMARTCARD_ADAPTER_TEST_WORKFLOW.md) | 只测读卡器和 APDU 状态的验收流程 |
 | [SMARTCARD_CAPABILITY_BOUNDARY.md](SMARTCARD_CAPABILITY_BOUNDARY.md) | 智能卡哪些功能开放、隐藏或禁止 |
 | [SMARTCARD_REAL_DEVICE_ACCEPTANCE.md](SMARTCARD_REAL_DEVICE_ACCEPTANCE.md) | 智能卡真机验收 |
@@ -77,6 +83,7 @@
 | 文档 | 用途 |
 | --- | --- |
 | [COMMERCIAL_RELEASE_GATE.md](COMMERCIAL_RELEASE_GATE.md) | 生产发布必须满足的条件 |
+| [WIRELESS_RADIO_OFF_EXTREME_GUIDE.zh-CN.md](WIRELESS_RADIO_OFF_EXTREME_GUIDE.zh-CN.md) | 不动硬件、不烧 eFuse 前提下关闭 Wi-Fi、蓝牙、ESP32-C6 无线伴随芯片 |
 | [security-plan.md](security-plan.md) | 安全计划 |
 | [secure-boot.md](secure-boot.md) | Secure Boot、签名、锁定和发布流程 |
 | [UNOPENED_FEATURES.md](UNOPENED_FEATURES.md) | 故意不开放的功能 |
