@@ -123,13 +123,50 @@ static esp_err_t compute_stored_pin_salt(uint8_t salt_out[PIN_HASH_SIZE],
   return compute_device_salt(salt_out, used_hmac);
 }
 
+static esp_err_t hash_pin_with_salt_iterations(
+    const char *pin, size_t len, const uint8_t salt[PIN_HASH_SIZE],
+    uint32_t iterations, uint8_t hash_out[PIN_HASH_SIZE]) {
+  int rc = crypto_pbkdf2_sha256((const uint8_t *)pin, len, salt,
+                                PIN_HASH_SIZE, iterations, hash_out,
+                                PIN_HASH_SIZE);
+  return (rc == CRYPTO_OK) ? ESP_OK : ESP_FAIL;
+}
+
 static esp_err_t hash_pin_with_salt(const char *pin, size_t len,
                                     const uint8_t salt[PIN_HASH_SIZE],
                                     uint8_t hash_out[PIN_HASH_SIZE]) {
-  int rc = crypto_pbkdf2_sha256((const uint8_t *)pin, len, salt,
-                                PIN_HASH_SIZE, PIN_PBKDF2_ITERATIONS,
-                                hash_out, PIN_HASH_SIZE);
-  return (rc == CRYPTO_OK) ? ESP_OK : ESP_FAIL;
+  return hash_pin_with_salt_iterations(pin, len, salt, PIN_PBKDF2_ITERATIONS,
+                                       hash_out);
+}
+
+static bool pin_hash_matches(const char *pin, size_t len,
+                             const uint8_t salt[PIN_HASH_SIZE],
+                             const uint8_t stored_hash[PIN_HASH_SIZE],
+                             bool *used_legacy_iterations) {
+  if (used_legacy_iterations)
+    *used_legacy_iterations = false;
+
+  uint8_t attempt_hash[PIN_HASH_SIZE];
+  bool match = false;
+  if (hash_pin_with_salt(pin, len, salt, attempt_hash) == ESP_OK) {
+    match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE) == 0;
+  }
+  secure_memzero(attempt_hash, sizeof(attempt_hash));
+  if (match)
+    return true;
+
+#if PIN_PBKDF2_LEGACY_ITERATIONS != PIN_PBKDF2_ITERATIONS
+  if (hash_pin_with_salt_iterations(pin, len, salt,
+                                    PIN_PBKDF2_LEGACY_ITERATIONS,
+                                    attempt_hash) == ESP_OK) {
+    match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE) == 0;
+  }
+  secure_memzero(attempt_hash, sizeof(attempt_hash));
+  if (match && used_legacy_iterations)
+    *used_legacy_iterations = true;
+#endif
+
+  return match;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,24 +397,12 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
     return PIN_VERIFY_DELAY;
   }
 
-  uint8_t attempt_hash[PIN_HASH_SIZE];
-  esp_err_t hash_err = hash_pin_with_salt(pin, len, salt, attempt_hash);
-  secure_memzero(salt, sizeof(salt));
-  if (hash_err != ESP_OK) {
-    secure_memzero(attempt_hash, sizeof(attempt_hash));
-    if (pending_cnt >= max_fail) {
-      pin_power_off_protect();
-      return PIN_VERIFY_WIPED; // unreachable
-    }
-    return PIN_VERIFY_DELAY;
-  }
-
   // Load stored hash
   uint8_t stored_hash[PIN_HASH_SIZE];
   size_t hash_len = PIN_HASH_SIZE;
   esp_err_t err = nvs_get_blob(pin_nvs, KEY_PIN_HASH, stored_hash, &hash_len);
   if (err != ESP_OK || hash_len != PIN_HASH_SIZE) {
-    secure_memzero(attempt_hash, sizeof(attempt_hash));
+    secure_memzero(salt, sizeof(salt));
     secure_memzero(stored_hash, sizeof(stored_hash));
     if (pending_cnt >= max_fail) {
       pin_power_off_protect();
@@ -386,40 +411,34 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
     return PIN_VERIFY_DELAY;
   }
 
-  // Constant-time comparison
-  int match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE);
-  secure_memzero(attempt_hash, sizeof(attempt_hash));
+  bool used_legacy_iterations = false;
+  bool match =
+      pin_hash_matches(pin, len, salt, stored_hash, &used_legacy_iterations);
+  secure_memzero(salt, sizeof(salt));
+  bool migrate_hash = match && used_legacy_iterations;
 
-  if (match != 0 && used_hmac) {
-    if (compute_fallback_salt(salt) == ESP_OK &&
-        hash_pin_with_salt(pin, len, salt, attempt_hash) == ESP_OK) {
-      match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE);
+  if (!match && used_hmac) {
+    if (compute_fallback_salt(salt) == ESP_OK) {
+      match = pin_hash_matches(pin, len, salt, stored_hash,
+                               &used_legacy_iterations);
+      migrate_hash = match;
     }
     secure_memzero(salt, sizeof(salt));
-    secure_memzero(attempt_hash, sizeof(attempt_hash));
 
-    if (match == 0) {
+    if (match) {
       ESP_LOGW(TAG, "PIN matched legacy fallback salt; migrating hash");
-      uint8_t split = pin_get_split_position();
-      if (split < 1 || split >= len) {
-        split = len / 2;
-        if (split < 1)
-          split = 1;
-      }
-      (void)pin_setup(pin, len, split);
-      return PIN_VERIFY_OK;
     }
   }
 
-  if (match != 0 && !used_hmac) {
-    if (compute_hmac_salt(salt) == ESP_OK &&
-        hash_pin_with_salt(pin, len, salt, attempt_hash) == ESP_OK) {
-      match = secure_memcmp(attempt_hash, stored_hash, PIN_HASH_SIZE);
+  if (!match && !used_hmac) {
+    if (compute_hmac_salt(salt) == ESP_OK) {
+      match = pin_hash_matches(pin, len, salt, stored_hash,
+                               &used_legacy_iterations);
+      migrate_hash = match && used_legacy_iterations;
     }
     secure_memzero(salt, sizeof(salt));
-    secure_memzero(attempt_hash, sizeof(attempt_hash));
 
-    if (match == 0) {
+    if (match && !used_legacy_iterations) {
       ESP_LOGW(TAG, "PIN matched HMAC salt; migrating salt marker");
       nvs_set_u8(pin_nvs, KEY_HAS_EFUSE, 1);
       nvs_set_u8(pin_nvs, KEY_FAIL_CNT, 0);
@@ -431,7 +450,21 @@ pin_verify_result_t pin_verify(const char *pin, size_t len) {
 
   secure_memzero(stored_hash, sizeof(stored_hash));
 
-  if (match == 0) {
+  if (match) {
+    if (migrate_hash) {
+      if (used_legacy_iterations)
+        ESP_LOGW(TAG, "PIN matched legacy PBKDF2 iterations; migrating hash");
+      uint8_t split = pin_get_split_position();
+      if (split < 1 || split >= len) {
+        split = len / 2;
+        if (split < 1)
+          split = 1;
+      }
+      if (pin_setup(pin, len, split) == ESP_OK)
+        return PIN_VERIFY_OK;
+      ESP_LOGW(TAG, "PIN hash migration failed; continuing unlock");
+    }
+
     // Correct PIN — roll back the pre-incremented failure count
     nvs_set_u8(pin_nvs, KEY_FAIL_CNT, 0);
     nvs_commit(pin_nvs);

@@ -5145,8 +5145,10 @@ static void satochip_maint_result_clear(void) {
 
 static void seedkeeper_secret_qr_state_reset(void) {
   s_satochip_seedkeeper_export_secret_qr_pending = false;
-  s_satochip_seedkeeper_export_secret_qr[0] = '\0';
-  s_satochip_seedkeeper_export_secret_qr_title[0] = '\0';
+  secure_memzero(s_satochip_seedkeeper_export_secret_qr,
+                 sizeof(s_satochip_seedkeeper_export_secret_qr));
+  secure_memzero(s_satochip_seedkeeper_export_secret_qr_title,
+                 sizeof(s_satochip_seedkeeper_export_secret_qr_title));
 }
 
 #ifndef SIMULATOR
@@ -5177,7 +5179,8 @@ static void seedkeeper_secret_return_from_qr_cb(void) {
   size_t content_len = 0;
   char *scanned = qr_scanner_get_completed_content_with_len(&content_len);
   qr_scanner_page_destroy();
-  s_satochip_seedkeeper_scanned_secret[0] = '\0';
+  secure_memzero(s_satochip_seedkeeper_scanned_secret,
+                 sizeof(s_satochip_seedkeeper_scanned_secret));
   if (scanned && content_len > 0) {
     size_t copy_len = content_len;
     if (copy_len >= sizeof(s_satochip_seedkeeper_scanned_secret))
@@ -5642,6 +5645,9 @@ static void satochip_maint_prepare(satochip_maint_mode_t mode) {
   s_satochip_maint_mode = mode;
   smartcard_ccid_set_factory_reset_mode(
       mode == SATOCHIP_MAINT_RESET_FACTORY);
+  if (mode_changed && mode != SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET)
+    secure_memzero(s_satochip_seedkeeper_scanned_secret,
+                   sizeof(s_satochip_seedkeeper_scanned_secret));
   if (mode_changed && (is_seedkeeper_lookup || was_seedkeeper_lookup))
     satochip_seedkeeper_lookup_state_reset();
 }
@@ -7725,6 +7731,7 @@ static void satochip_maint_task(void *arg) {
       char secret[4096];
       smartcard_seedkeeper_header_t header;
       if (seedkeeper_extract_text_secret(apdu, secret, sizeof(secret), &header)) {
+        seedkeeper_secret_qr_state_reset();
         snprintf(s_satochip_seedkeeper_export_secret_qr,
                  sizeof(s_satochip_seedkeeper_export_secret_qr), "%s", secret);
         snprintf(s_satochip_seedkeeper_export_secret_qr_title,
@@ -7968,6 +7975,9 @@ satochip_maint_done:
   secure_memzero(s_satochip_maint_text_a, sizeof(s_satochip_maint_text_a));
   secure_memzero(s_satochip_maint_text_b, sizeof(s_satochip_maint_text_b));
   secure_memzero(s_satochip_maint_text_c, sizeof(s_satochip_maint_text_c));
+  if (s_satochip_maint_mode == SATOCHIP_MAINT_SEEDKEEPER_SAVE_SECRET)
+    secure_memzero(s_satochip_seedkeeper_scanned_secret,
+                   sizeof(s_satochip_seedkeeper_scanned_secret));
   __atomic_store_n(&s_satochip_maint_task_done, true, __ATOMIC_RELEASE);
   if (delete_with_caps) {
     vTaskDeleteWithCaps(NULL);
