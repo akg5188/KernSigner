@@ -1,38 +1,29 @@
-# Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 屏幕保护壳（已实际打印装配验证）
+# Waveshare ESP32-P4-WIFI6-Touch-LCD-4.3 NFC 屏幕保护壳（已实际打印装配验证）
 
 这是给 Waveshare `ESP32-P4-WIFI6-Touch-LCD-4.3` 带摄像头版本做的单件托盘式保护壳。板子从正面放进去，背面保护 PCB，屏幕四周有一圈略高的长方形保护边，跌落或正面朝下放置时先碰到外壳边缘。
 
-> 实打反馈：这版外壳已经实际打印并装配，可正常使用。之前屏幕一圈如果做得太紧，会因为挤压屏幕出现斑块；当前版本已按这个反馈把屏幕一圈额外放宽约 `0.50mm`，优先避免压屏。
+> 实打反馈：当前推荐的 NFC 外壳已经按 `filputt_cover_source_preserved_tapered_bottom_large_usb_thick_screen_rim.stl` 发给卖家打印，并完成装配验证，可正常使用。GitHub 上统一命名为 `screen_protective_case_nfc.stl`，对应源文件是 `screen_protective_case_nfc.FCStd`。
 
 ## 当前设计
 
-- 单件主壳：`screen_protective_case.stl`
-- NFC 凸底版：`screen_protective_case_nfc.stl`（未实打验证）
+- 推荐打印：`screen_protective_case_nfc.stl`（NFC 版，已实打装配验证）
+- NFC FreeCAD 源文件：`screen_protective_case_nfc.FCStd`
+- 旧 OpenSCAD 普通壳：`screen_protective_case.stl`
 - 预览图：`case_preview.png`
-- NFC 凸底版预览图：`nfc_case_preview.png`
-- 这版已经实际打印装配，可正常使用。
+- NFC 版 STL 对应本次发给卖家打印成功的 `filputt_cover_source_preserved_tapered_bottom_large_usb_thick_screen_rim.stl`。
 - 屏幕一圈按实打反馈额外放宽约 `0.50mm`，避免挤压屏幕出现斑块。
-- 只保留这些开口：两个 USB-C、一个摄像头孔、四个螺丝孔。
+- 只保留这些开口：两个 USB-C 口、一个摄像头孔、四个螺丝孔。
 - TF/SD 卡口已封住，POWER / BOOT / RESET 三个侧边按键孔也全部封住。
-- 不保留 GPIO、麦克风、散热槽等其他开口。
+- GPIO/排针侧孔、麦克风孔、散热槽和其他侧边开口都不保留。
 - 固定方式：推荐用板子已有四角孔，从壳底穿 4 颗更长螺丝固定。
-- PCB 不按屏幕正中放置，而是按官方背面机械图偏移。
-- 官方图是背面视角；模型已在 X 方向镜像，按屏幕朝向你时去比对。
-- USB 开口已按实打反馈收窄并向背面 PCB 侧偏置，减少靠屏幕面的切口。
-- USB-C 开口靠屏幕方向额外加高 `2.00mm`，给插头更多余量。
-- 屏幕正面保护边整圈已加高 `0.50mm`，当前高度为 `1.70mm`。
-- 摄像头外侧只留圆孔，内侧留方形凹槽给摄像头模组避空。
-- 摄像头孔在摄像头短边这一列，距摄像头短边 `11.00mm`；到上下两条长边各 `33.60mm`，圆孔直径 `5.00mm`。
-- NFC 凸底版把整块背面底板下沉到 `6.00mm` 深，形成更平整的一体打印底面；内部仍按之前可装配版本保留长 NFC 凹槽，不改变原来的主板放置凹槽，也不遮挡四个螺丝孔和相机孔。原版外壳不带这个凸底。
-- 因为 SD 卡槽和侧边按键都封住了，日常操作主要依赖触摸屏、USB-C、摄像头和固件自身功能；如果需要频繁按实体 POWER/BOOT/RESET 或插拔 SD 卡，不要直接打印这一版。
+- NFC 版使用 FreeCAD 文件维护，背面给 NFC 模块和走线留空间，USB-C 开口按实打反馈放大，屏幕边框加厚。
+- 因为 SD 卡槽、GPIO/排针侧孔和侧边按键都封住了，日常操作主要依赖触摸屏、USB-C、摄像头、PN5180 NFC 和固件自身功能；如果需要频繁按实体 POWER/BOOT/RESET、插拔 SD 卡或从侧边接 GPIO，不要直接打印这一版。
 
 ## 预览
 
-<img src="case_preview.png" width="620" alt="AI-designed unverified ESP32-P4 4.3 case preview">
+<img src="case_preview.png" width="620" alt="ESP32-P4 4.3 case preview">
 
-### NFC 凸底版
-
-<img src="nfc_case_preview.png" width="620" alt="ESP32-P4 4.3 case preview with NFC bottom bump">
+NFC 实打版以 `screen_protective_case_nfc.stl` 为准，暂不放单独预览图，避免误把旧 OpenSCAD NFC 草模当成正式打印件。
 
 ## 实拍
 
@@ -52,16 +43,16 @@
 
 ## 打印前请确认
 
-- 这版已经实打装配验证，可作为当前可用版本。
-- 如果打印材料、打印机公差或装配方式不同，仍建议先打一个确认屏幕、USB-C、摄像头、螺丝孔和整体手感。
+- 推荐打印 `screen_protective_case_nfc.stl`，这是当前已实打装配验证的 NFC 版。
+- 如果打印材料、打印机公差或装配方式不同，仍建议先打一件确认屏幕、USB-C、摄像头、螺丝孔、NFC 模块和整体手感。
 - 屏幕一圈如果做得过紧，会因为挤压屏幕出现斑块；当前版本已优先放宽约 `0.50mm` 来避免压屏。
-- 特别确认 SD 卡槽和 POWER / BOOT / RESET 三个侧边按键是否可以接受被封住。
-- NFC 凸底版 `screen_protective_case_nfc.stl` 只是按本次 PN532/NFC 模块位置改出的未验证版，建议先用 PLA 快速打一件确认 NFC 模块、排线和螺丝不会顶住。
-- 如果孔位不合适，优先改 OpenSCAD 参数，再重新导出 STL。
-- 当前 GitHub 保留两个打印文件：原版 `screen_protective_case.stl` 和 NFC 凸底版 `screen_protective_case_nfc.stl`。
+- 特别确认只有两个 USB-C 口保留，TF/SD、POWER / BOOT / RESET、GPIO/排针侧孔、麦克风孔、散热槽和其他侧边开口都已封住。
+- 如果 NFC 版孔位不合适，优先改 `screen_protective_case_nfc.FCStd`，再从 FreeCAD 导出 STL。
+- 当前 GitHub 推荐打印文件：`screen_protective_case_nfc.stl`。
 
 ## 修改记录
 
+- `2026-06-10`：把实际发给卖家打印并装配可用的 `filputt_cover_source_preserved_tapered_bottom_large_usb_thick_screen_rim.stl` 作为正式 NFC 打印文件，GitHub 统一命名为 `screen_protective_case_nfc.stl`，并新增 `screen_protective_case_nfc.FCStd`。文档明确：只保留两个 USB-C 口、摄像头孔和四个螺丝孔；TF/SD、POWER / BOOT / RESET、GPIO/排针侧孔、麦克风孔、散热槽和其他侧边开口都封住。
 - `2026-06-01`：未实际打印装配验证。按发给卖家的 NFC 打印文件恢复长凹槽基准：深 `6.00mm`，内部凹槽从摄像头侧螺丝孔往内 `8.00mm` 起，到 USB-C 侧螺丝孔往内 `25.00mm` 止，左右沿原收腰底板走；外底改成整块背面平整一体下沉，让螺丝孔和相机孔周围也落在同一打印底面上，减少悬空桥接毛边。
 - `2026-05-30`：未实际打印装配验证。新增 NFC 凸底版 `screen_protective_case_nfc.stl`，原版外壳保留。NFC 凸包只在外侧背面新增，不改变原来的主板放置凹槽；左右两侧直接做到原收腰底板两侧；上下位置按实测从摄像头侧螺丝孔往内 `8.00mm` 开始，到 USB-C 侧螺丝孔往内 `25.00mm` 结束；凸包与原底板做 `0.80mm` 实体重叠，避免切片时出现贴合缝。
 - `2026-05-25`：这版外壳已实际打印装配验证，可正常使用。根据实打反馈，屏幕一圈如果过紧会因挤压屏幕出现斑块，因此当前版本特意把屏幕一圈额外放宽约 `0.50mm`，优先避免压屏。
@@ -151,7 +142,7 @@ mount_camera_side_from_lower_edge = 11.00;
 mount_usb_side_from_lower_edge = 8.00;
 ```
 
-NFC 凸底版相关：
+旧 OpenSCAD NFC 草模参数，仅作为历史参考；当前实打 NFC 版不再用这些参数导出：
 
 ```scad
 nfc_bump_enabled = false; // 导出 NFC 版时用 -D 'nfc_bump_enabled=true'
@@ -193,16 +184,21 @@ cd /home/ak/123/KernSigner/hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3
 make all
 ```
 
-需要先安装 `openscad`。`make all` 会导出原版 `screen_protective_case.stl` 和 NFC 凸底版 `screen_protective_case_nfc.stl`。`make case` 只导出原版，`make nfc` 只导出 NFC 凸底版，`make reference` 可生成带参考板位置的预览 STL，但不是打印件。
+需要先安装 `openscad`。`make all` 只导出旧 OpenSCAD 普通版 `screen_protective_case.stl`。当前正式 NFC 版是 FreeCAD 实打版，不通过 `make all` 生成，避免覆盖已经验证的 `screen_protective_case_nfc.stl`。
 
-GitHub 上用于打印的文件是：
+- 修改 NFC 正式版：打开 `screen_protective_case_nfc.FCStd`，从 FreeCAD 重新导出 `screen_protective_case_nfc.stl`。
+- 只导出旧 OpenSCAD 普通版：`make case`
+- 导出旧 OpenSCAD NFC 草模：`make scad-nfc`，输出 `screen_protective_case_nfc_scad_unverified.stl`，这不是正式打印件。
+- `make nfc` 只会提示当前 NFC 版是 FreeCAD 实打文件，不会覆盖正式 STL。
+- `make reference` 可生成带参考板位置的预览 STL，但不是打印件。
+
+GitHub 上推荐用于打印的文件是：
 
 ```text
-screen_protective_case.stl
 screen_protective_case_nfc.stl
 ```
 
-其他旧外壳打印文件不再保留，避免误打印旧版本。
+其他旧外壳打印文件不再作为推荐打印件，避免误打印旧版本。
 
 ## 打印建议
 

@@ -199,17 +199,18 @@ ESP32-P4 OTG 口
 
 ## 3D Printed Case / 3D 打印外壳
 
-本仓库已收录 Waveshare ESP32-P4 4.3 寸带摄像头版本的 AI/OpenSCAD 外壳草模。**这只是未验证草模：由 AI 辅助设计，当前还没有实际打印回来装配验证，不确定尺寸、孔位、USB-C 插线余量、摄像头孔、螺丝孔和手感是否合适。**
+本仓库已收录 Waveshare ESP32-P4 4.3 寸带摄像头版本的打印外壳。当前推荐使用 **NFC 实打版**：已经按 `filputt_cover_source_preserved_tapered_bottom_large_usb_thick_screen_rim.stl` 发给卖家打印，并完成装配验证。
 
 - 外壳目录：[hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera)
-- 新打印文件：[screen_protective_case.stl](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/screen_protective_case.stl)
-- 参数化源码：[esp32_p4_4_3_camera_case.scad](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/esp32_p4_4_3_camera_case.scad)
+- 推荐 NFC 打印文件：[screen_protective_case_nfc.stl](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/screen_protective_case_nfc.stl)
+- NFC FreeCAD 源文件：[screen_protective_case_nfc.FCStd](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/screen_protective_case_nfc.FCStd)
+- 旧 OpenSCAD 参数化源码：[esp32_p4_4_3_camera_case.scad](hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/esp32_p4_4_3_camera_case.scad)
 
-当前 GitHub 只保留这一版新的打印 STL，旧版开孔错误的外壳照片、旧展示和重复 STL 已删除。请不要直接批量打印，建议先用低成本材料只试打一个，确认屏幕、USB-C、摄像头、螺丝孔都合适后，再考虑继续打印。
+`screen_protective_case_nfc.stl` 是 GitHub 上统一命名后的正式 NFC 打印文件，内容对应本次发给卖家打印成功的 STL。旧 OpenSCAD 普通版仍保留作历史参考，不建议优先打印。
 
-注意：这版外壳为了简化外观，已经把 **TF/SD 卡槽** 和侧边 **POWER / BOOT / RESET 三个按键孔** 全部封住；日常使用主要依赖触摸屏、USB-C、摄像头和固件自身功能。需要频繁使用实体按键或 SD 卡的人，不要直接打印这一版。
+注意：这版外壳只保留两个 **USB-C 口**、摄像头孔和四个螺丝孔；**TF/SD 卡槽**、侧边 **POWER / BOOT / RESET** 按键孔、GPIO/排针侧孔、麦克风孔、散热槽和其他侧边开口都封住了。日常使用主要依赖触摸屏、USB-C、摄像头、PN5180 NFC 和固件自身功能。
 
-<img src="hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/case_preview.png" width="620" alt="AI-designed unverified ESP32-P4 4.3 case preview">
+<img src="hardware/cases/waveshare_esp32_p4_wifi6_touch_lcd_4_3_camera/case_preview.png" width="620" alt="ESP32-P4 4.3 case preview">
 
 ## Repository Layout
 
@@ -225,7 +226,7 @@ simulator/          SDL2 desktop simulator
 scripts/            Format, test, CI, and release helpers
 tools/              Delivery, production-check, and asset-baking helpers
 docs/               Acceptance plans, security gates, and delivery records
-hardware/           3D printed case files, OpenSCAD source, and fit notes
+hardware/           3D printed case files, FreeCAD/OpenSCAD sources, and fit notes
 ```
 
 ## Download Firmware / 直接下载固件
