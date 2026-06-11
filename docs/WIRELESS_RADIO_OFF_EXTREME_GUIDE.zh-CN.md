@@ -59,6 +59,22 @@ CONFIG_OPENTHREAD_ENABLED
 
 这些配置只要被启用，正式离线构建就不应通过。
 
+## app-only 和完整刷机的区别
+
+GitHub Release 通常会同时提供日常升级用的 `kernsigner.bin` 和完整刷机包。
+这两个东西不要混淆：
+
+| 刷法 | 会更新什么 | 对无线关闭的影响 |
+| --- | --- | --- |
+| 只刷 `kernsigner.bin` 到 `0x20000` | 只更新主固件 App | App 里的无线关闭会更新；已有 bootloader hook 会保留，但不会新写入 bootloader |
+| 完整刷机 4 个 bin | bootloader、分区表、OTA 初始化数据、主固件 | bootloader hook 和 App 无线关闭都会写入 |
+
+所以：
+
+- 已经刷过 KernSigner 完整包的设备，日常升级只刷 `kernsigner.bin` 就行，bootloader hook 不会被删除。
+- 刚刷回过原厂固件、bootloader 被覆盖、或者想重新确认 bootloader 级无线关闭写进去时，应该刷完整 4 个 bin。
+- 只刷 app 不能把 bootloader hook 安装到一个没有该 hook 的 bootloader 里。
+
 ## 这和短路/拆电容不是一回事
 
 把 GPIO54 输出低电平，是对无线伴随芯片的使能脚施加“关闭”状态，相当于按原理图控制它不上电或不启动。它不是把电源和地短在一起，也不是用烙铁强行破坏线路。

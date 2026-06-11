@@ -28,7 +28,7 @@ static const i18n_language_info_t LANGUAGE_TABLE[I18N_LANG_COUNT] = {
     {I18N_LANG_ZH_HANS_CN, "zh_Hans_CN", "Simplified Chinese", "简体中文", false},
 };
 
-#define I18N_MESSAGE_COUNT 1127
+#define I18N_MESSAGE_COUNT 1128
 
 static const char *const I18N_KEYS[I18N_MESSAGE_COUNT] = {
     "dialog.ok",
@@ -1158,6 +1158,7 @@ static const char *const I18N_KEYS[I18N_MESSAGE_COUNT] = {
     "camera.qr_payment_action",
     "camera.qr_url",
     "camera.qr_url_action",
+    "backup.punch_numbers",
 };
 
 static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
@@ -27081,6 +27082,10 @@ static const char *const I18N_MESSAGES[I18N_MESSAGE_COUNT][I18N_LANG_COUNT] = {
         [I18N_LANG_TR] = "Yalnızca URL metni gösteriliyor. Herhangi bir ağ isteği yapılmaz.",
         [I18N_LANG_VI] = "Chỉ hiển thị văn bản URL. Không có yêu cầu mạng nào được thực hiện.",
         [I18N_LANG_ZH_HANS_CN] = "仅显示 URL 文本。没有发出网络请求。",
+    },
+    {
+        [I18N_LANG_EN] = "Punch Numbers",
+        [I18N_LANG_ZH_HANS_CN] = "打孔数字",
     },
 };
 

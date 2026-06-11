@@ -27,6 +27,22 @@ static void fill_string(char *dst, size_t dst_len, const char *src) {
 
 static int sim_max_i(int a, int b) { return a > b ? a : b; }
 
+typedef struct {
+  size_t index;
+  const char *word;
+} sim_bip39_word_t;
+
+static const sim_bip39_word_t SIM_BIP39_WORDS[] = {
+    {0, "abandon"}, {1, "ability"}, {2, "able"},    {3, "about"},
+    {7, "abstract"}, {15, "acid"},  {31, "advance"}, {63, "among"},
+    {127, "avocado"}, {255, "cable"}, {511, "divide"}, {1023, "lend"},
+};
+
+static const char *const SIM_MNEMONIC_WORDS[] = {
+    "abandon", "ability", "able",  "about", "abstract", "acid",
+    "advance", "among",   "avocado", "cable", "divide", "lend",
+};
+
 static void sim_style_black_orange_box(lv_obj_t *obj, int radius) {
   if (!obj)
     return;
@@ -40,7 +56,50 @@ static void sim_style_black_orange_box(lv_obj_t *obj, int radius) {
   lv_obj_set_style_outline_width(obj, 0, LV_STATE_DEFAULT);
 }
 
+bool key_is_loaded(void) { return true; }
+bool key_mnemonic_is_valid(void) { return true; }
 bool key_has_signing_key(void) { return true; }
+bool key_get_mnemonic(char **mnemonic_out) {
+  if (!mnemonic_out)
+    return false;
+
+  const char *mnemonic =
+      "abandon ability able about abstract acid advance among avocado cable "
+      "divide lend";
+  *mnemonic_out = strdup(mnemonic);
+  return *mnemonic_out != NULL;
+}
+bool key_get_mnemonic_words(char ***words_out, size_t *word_count_out) {
+  if (!words_out || !word_count_out)
+    return false;
+
+  const size_t word_count =
+      sizeof(SIM_MNEMONIC_WORDS) / sizeof(SIM_MNEMONIC_WORDS[0]);
+  char **words = calloc(word_count, sizeof(*words));
+  if (!words)
+    return false;
+
+  for (size_t i = 0; i < word_count; i++) {
+    words[i] = strdup(SIM_MNEMONIC_WORDS[i]);
+    if (!words[i]) {
+      for (size_t j = 0; j < i; j++)
+        free(words[j]);
+      free(words);
+      return false;
+    }
+  }
+
+  *words_out = words;
+  *word_count_out = word_count;
+  return true;
+}
+void key_free_mnemonic_words(char **words, size_t word_count) {
+  if (!words)
+    return;
+  for (size_t i = 0; i < word_count; i++)
+    free(words[i]);
+  free(words);
+}
 bool key_get_fingerprint_hex(char *hex_out) {
   fill_string(hex_out, 9, "12345678");
   return true;
@@ -126,8 +185,17 @@ int wally_free_string(char *str) {
 int bip39_get_wordlist(const char *lang, struct words **output) {
   (void)lang;
   if (output)
-    *output = NULL;
-  return WALLY_ERROR;
+    *output = (struct words *)SIM_BIP39_WORDS;
+  return output ? WALLY_OK : WALLY_EINVAL;
+}
+const char *bip39_get_word_by_index(const struct words *w, size_t index) {
+  (void)w;
+  for (size_t i = 0; i < sizeof(SIM_BIP39_WORDS) / sizeof(SIM_BIP39_WORDS[0]);
+       i++) {
+    if (SIM_BIP39_WORDS[i].index == index)
+      return SIM_BIP39_WORDS[i].word;
+  }
+  return NULL;
 }
 int bip39_mnemonic_from_bytes(const struct words *w,
                               const unsigned char *bytes, size_t bytes_len,
@@ -724,8 +792,8 @@ esp_err_t smartcard_satochip_get_eth_account(const char *pin, const char *path,
 }
 esp_err_t smartcard_satochip_get_web3_account(
     const char *pin, smartcard_satochip_web3_account_t *out,
-    uint32_t timeout_ms) {
-  (void)pin; (void)timeout_ms;
+    uint32_t timeout_ms, bool include_okx_multi_accounts) {
+  (void)pin; (void)timeout_ms; (void)include_okx_multi_accounts;
   if (out) memset(out, 0, sizeof(*out));
   return ESP_OK;
 }

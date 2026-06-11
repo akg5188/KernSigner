@@ -42,6 +42,11 @@ static void return_from_mnemonic_grid_cb(void) {
   backup_menu_page_show();
 }
 
+static void return_from_mnemonic_grid_numbers_cb(void) {
+  mnemonic_grid_numbers_page_destroy();
+  backup_menu_page_show();
+}
+
 static void return_from_mnemonic_steel_cb(void) {
   mnemonic_steel_page_destroy();
   backup_menu_page_show();
@@ -78,6 +83,12 @@ static void launch_entropy(void) {
 static void launch_grid(void) {
   mnemonic_grid_page_create(lv_screen_active(), return_from_mnemonic_grid_cb);
   mnemonic_grid_page_show();
+}
+
+static void launch_grid_numbers(void) {
+  mnemonic_grid_numbers_page_create(lv_screen_active(),
+                                    return_from_mnemonic_grid_numbers_cb);
+  mnemonic_grid_numbers_page_show();
 }
 
 static void launch_steel(void) {
@@ -124,6 +135,8 @@ static void menu_qr_cb(void) { pin_then_warn(launch_qr); }
 static void menu_entropy_cb(void) { pin_then_warn(launch_entropy); }
 
 static void menu_grid_cb(void) { pin_then_warn(launch_grid); }
+
+static void menu_grid_numbers_cb(void) { pin_then_warn(launch_grid_numbers); }
 
 static void menu_steel_cb(void) { pin_then_warn(launch_steel); }
 
@@ -176,6 +189,9 @@ void backup_menu_page_create(lv_obj_t *parent, void (*return_cb)(void)) {
                     menu_encrypted_backup_cb);
   ui_menu_add_entry(backup_menu, i18n_tr_or("input.punch_grid", "Punch grid"),
                     menu_grid_cb);
+  ui_menu_add_entry(backup_menu,
+                    i18n_tr_or("backup.punch_numbers", "Punch numbers"),
+                    menu_grid_numbers_cb);
   ui_menu_add_entry(backup_menu,
                     i18n_tr_or("backup.steel_punch", "Steel punch"),
                     menu_steel_cb);

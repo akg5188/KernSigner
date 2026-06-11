@@ -74,7 +74,9 @@ set(STUB_SOURCES
 )
 
 # --- Application utilities ---
-set(APP_UTIL_SOURCES)
+set(APP_UTIL_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/utils/bip39_filter.c
+)
 
 # --- Core application modules ---
 set(APP_CORE_SOURCES
@@ -88,6 +90,7 @@ set(APP_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/signer_port/signer_services.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/signer_port/signer_storage_browser.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/smartcard/smartcard_ccid.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../main/smartcard/smartcard_pn5180.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/smartcard/smartcard_pn532.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../main/smartcard/smartcard_transport.c
 )
@@ -148,6 +151,7 @@ set(APP_PAGES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../main/pages)
 set(APP_PAGE_SOURCES
     # KernSigner migration shell
     ${APP_PAGES_DIR}/signer_shell/signer_shell.c
+    ${APP_PAGES_DIR}/home/backup/mnemonic_grid.c
     ${APP_PAGES_DIR}/shared/custom_derivation_page.c
     ${APP_PAGES_DIR}/shared/mnemonic_slots_page.c
 )

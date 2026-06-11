@@ -242,6 +242,7 @@ static const char *shell_i18n_key_for_id(const char *id) {
       {"backup_seed_qr", "menu.qr_code"},
       {"backup_kef", "menu.encrypted"},
       {"backup_grid", "input.punch_grid"},
+      {"backup_punch_numbers", "backup.punch_numbers"},
       {"backup_steel_punch", "input.steel_restore"},
       {"backup_stackbit", "input.grid_1248"},
       {"smartcard_satochip_tools", "brand.satochip"},
@@ -863,6 +864,7 @@ static const signer_menu_override_t SIGNER_BACKUP_MENU[] = {
     {"QR Code", "backup_seed_qr", "menu.qr_code"},
     {"Encrypted", "backup_kef", "menu.encrypted"},
     {"Punch Grid", "backup_grid", "input.punch_grid"},
+    {"Punch Numbers", "backup_punch_numbers", "backup.punch_numbers"},
     {"Steel", "backup_steel_punch", "input.steel_restore"},
     {"1248", "backup_stackbit", "input.grid_1248"},
 };
@@ -1021,6 +1023,7 @@ static const char *const PRODUCT_SCREEN_IDS[] = {
     "backup_steel_punch",
     "backup_stackbit",
     "backup_grid",
+    "backup_punch_numbers",
     "backup_seed_qr",
     "backup_kef",
     "smartcard_card_info",
@@ -1429,9 +1432,20 @@ static void shell_return_from_key_confirmation_cb(void) {
   (void)signer_shell_show_screen("pi_mnemonic_tools");
 }
 
+static void shell_return_from_loaded_mnemonic_cb(void) {
+  loaded_mnemonic_menu_page_destroy();
+  (void)signer_shell_show_screen("pi_mnemonic_tools");
+}
+
+static void shell_show_loaded_mnemonic_menu(void) {
+  lv_obj_t *root = legacy_wallet_prepare_root();
+  loaded_mnemonic_menu_page_create(root, shell_return_from_loaded_mnemonic_cb);
+  loaded_mnemonic_menu_page_show();
+}
+
 static void shell_success_from_key_confirmation_cb(void) {
   key_confirmation_page_destroy();
-  (void)signer_shell_show_screen("home");
+  shell_show_loaded_mnemonic_menu();
 }
 
 static void shell_return_from_mnemonic_editor_cb(void) {
@@ -1467,7 +1481,7 @@ static void shell_return_from_load_manual_input_cb(void) {
 static void shell_success_from_manual_input_cb(void) {
   key_confirmation_page_destroy();
   manual_input_page_destroy();
-  (void)signer_shell_show_screen("home");
+  shell_show_loaded_mnemonic_menu();
 }
 
 static void shell_show_generated_mnemonic(char *mnemonic) {
@@ -1645,6 +1659,11 @@ static void shell_return_from_backup_entropy_cb(void) {
 
 static void shell_return_from_backup_grid_cb(void) {
   mnemonic_grid_page_destroy();
+  (void)signer_shell_show_screen("backup_export");
+}
+
+static void shell_return_from_backup_punch_numbers_cb(void) {
+  mnemonic_grid_numbers_page_destroy();
   (void)signer_shell_show_screen("backup_export");
 }
 
@@ -2041,6 +2060,13 @@ static void legacy_wallet_launch_backup_grid_direct(void) {
   mnemonic_grid_page_show();
 }
 
+static void legacy_wallet_launch_backup_punch_numbers_direct(void) {
+  lv_obj_t *root = legacy_wallet_prepare_root();
+  mnemonic_grid_numbers_page_create(
+      root, shell_return_from_backup_punch_numbers_cb);
+  mnemonic_grid_numbers_page_show();
+}
+
 static void legacy_wallet_launch_backup_1248_direct(void) {
   lv_obj_t *root = legacy_wallet_prepare_root();
   mnemonic_1248_page_create(root, shell_return_from_backup_1248_cb);
@@ -2246,6 +2272,10 @@ static bool legacy_wallet_handle_direct_target(const char *target_id) {
     return legacy_wallet_require_backup_direct(
         legacy_wallet_launch_backup_grid_direct);
   }
+  if (strcmp(target_id, "backup_punch_numbers") == 0) {
+    return legacy_wallet_require_backup_direct(
+        legacy_wallet_launch_backup_punch_numbers_direct);
+  }
   if (strcmp(target_id, "backup_stackbit") == 0) {
     return legacy_wallet_require_backup_direct(
         legacy_wallet_launch_backup_1248_direct);
@@ -2307,6 +2337,7 @@ static bool legacy_wallet_handle_direct_target(const char *target_id) {
       strcmp(target_id, "backup_seed_words") == 0 ||
       strcmp(target_id, "backup_entropy") == 0 ||
       strcmp(target_id, "backup_grid") == 0 ||
+      strcmp(target_id, "backup_punch_numbers") == 0 ||
       strcmp(target_id, "backup_steel_punch") == 0 ||
       strcmp(target_id, "backup_stackbit") == 0 ||
       strcmp(target_id, "backup_seed_qr") == 0 ||
@@ -2346,7 +2377,7 @@ static const char *legacy_wallet_route_for_target(const char *target_id) {
       "legacy_backup_wallet", "wallet_backup",
       "backup_seed_words",    "backup_seed_qr",    "backup_kef",
       "backup_entropy",       "backup_steel_punch", "backup_stackbit",
-      "backup_grid",
+      "backup_grid",          "backup_punch_numbers",
   };
   static const char *const scan_ids[] = {
       "legacy_scan_sign",
@@ -3124,6 +3155,7 @@ static bool target_requires_shell_gate(const char *id) {
          strcmp(id, "backup_entropy") == 0 ||
          strcmp(id, "backup_steel_punch") == 0 ||
          strcmp(id, "backup_grid") == 0 ||
+         strcmp(id, "backup_punch_numbers") == 0 ||
          strcmp(id, "backup_stackbit") == 0 ||
          strcmp(id, "backup_seed_qr") == 0 ||
          strcmp(id, "backup_kef") == 0 ||
@@ -9615,6 +9647,7 @@ static void create_detail_cards(lv_obj_t *parent,
   if (strcmp(feature->id, "backup_seed_words") == 0 ||
       strcmp(feature->id, "backup_entropy") == 0 ||
       strcmp(feature->id, "backup_grid") == 0 ||
+      strcmp(feature->id, "backup_punch_numbers") == 0 ||
       strcmp(feature->id, "backup_steel_punch") == 0 ||
       strcmp(feature->id, "backup_stackbit") == 0 ||
       strcmp(feature->id, "backup_seed_qr") == 0 ||

@@ -7,6 +7,7 @@
 #include "../home/home.h"
 #include "../load_mnemonic/manual_input.h"
 #include "../shared/key_confirmation.h"
+#include "../shared/loaded_mnemonic_menu.h"
 #include "../shared/mnemonic_editor.h"
 #include "../shared/mnemonic_tool_page.h"
 #include "entropy_from_camera.h"
@@ -33,6 +34,7 @@ static void return_from_entropy_from_camera_cb(void);
 static void return_from_manual_input_cb(void);
 static void return_from_mnemonic_tool_cb(void);
 static void return_from_mnemonic_editor_cb(void);
+static void return_from_loaded_mnemonic_cb(void);
 static void return_from_key_confirmation_cb(void);
 static void success_from_key_confirmation_cb(void);
 
@@ -81,11 +83,18 @@ static void return_from_key_confirmation_cb(void) {
   new_mnemonic_menu_page_show();
 }
 
+static void return_from_loaded_mnemonic_cb(void) {
+  loaded_mnemonic_menu_page_destroy();
+  home_page_create(lv_screen_active());
+  home_page_show();
+}
+
 static void success_from_key_confirmation_cb(void) {
   key_confirmation_page_destroy();
   new_mnemonic_menu_page_destroy();
-  home_page_create(lv_screen_active());
-  home_page_show();
+  loaded_mnemonic_menu_page_create(lv_screen_active(),
+                                   return_from_loaded_mnemonic_cb);
+  loaded_mnemonic_menu_page_show();
 }
 
 static void launch_words(void) {

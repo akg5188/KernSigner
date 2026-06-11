@@ -147,7 +147,13 @@ static esp_err_t bsp_i2c_device_probe(uint8_t addr) {
 
 #define LCD_LEDC_CH CONFIG_BSP_DISPLAY_BRIGHTNESS_LEDC_CH
 
+static bool backlight_initialized = false;
+
 esp_err_t bsp_display_brightness_init(void) {
+  if (backlight_initialized) {
+    return ESP_OK;
+  }
+
   /* Backlight on this board is driven through an inverting buffer — set
      output_invert so 100% duty maps to maximum brightness. */
   const ledc_channel_config_t LCD_backlight_channel = {
@@ -170,6 +176,7 @@ esp_err_t bsp_display_brightness_init(void) {
   BSP_ERROR_CHECK_RETURN_ERR(ledc_timer_config(&LCD_backlight_timer));
   BSP_ERROR_CHECK_RETURN_ERR(ledc_channel_config(&LCD_backlight_channel));
 
+  backlight_initialized = true;
   return ESP_OK;
 }
 

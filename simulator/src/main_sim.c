@@ -16,6 +16,7 @@
 #include "i18n/i18n.h"
 #include "pages/signer_shell/signer_shell.h"
 #include "pages/scan/scan.h"
+#include "pages/home/backup/mnemonic_grid.h"
 #include "pages/shared/mnemonic_slots_page.h"
 #include "signer_port/signer_feature_catalog.h"
 #include "esp_lvgl_port.h"
@@ -450,6 +451,7 @@ static int run_button_interaction_checks(FILE *interaction_file) {
         {"backup_export", "序号", "backup_seed_words", NULL},
         {"backup_export", "原始熵", "backup_entropy", NULL},
         {"backup_export", "点阵板", "backup_grid", NULL},
+        {"backup_export", "打孔数字", "backup_punch_numbers", NULL},
         {"backup_export", "钢板", "backup_steel_punch", NULL},
         {"backup_export", "1248", "backup_stackbit", NULL},
         {"backup_export", "二维码", "backup_seed_qr", NULL},
@@ -697,6 +699,22 @@ static void simulator_capture_backup_export_children(
         (*failures)++;
     }
 
+    if (signer_shell_show_screen("backup_export")) {
+        run_lvgl_frames(3);
+        if (click_button_for_navigation("打孔数字", "backup_punch_numbers")) {
+            simulator_capture_current_page(dir, manifest, glyph_file, smoke_file,
+                                           scroll_file, (*next_index)++,
+                                           "backup_punch_numbers",
+                                           i18n_tr_or("backup.punch_numbers",
+                                                      "Punch Numbers"),
+                                           failures);
+            (void)signer_shell_show_screen("backup_export");
+            run_lvgl_frames(3);
+        } else {
+            (*failures)++;
+        }
+    }
+
     (void)signer_shell_show_screen("home");
     run_lvgl_frames(3);
 }
@@ -839,6 +857,7 @@ static int capture_loaded_mnemonic_menu_screen(const char *dir) {
     ui_menu_add_entry(menu, "扩展公钥", simulator_loaded_menu_noop_cb);
     ui_menu_add_entry(menu, "地址核对", simulator_loaded_menu_noop_cb);
     ui_menu_add_entry(menu, "派生地址", simulator_loaded_menu_noop_cb);
+    ui_menu_add_entry(menu, "备份", simulator_loaded_menu_noop_cb);
     ui_menu_add_entry(menu, "序号", simulator_loaded_menu_noop_cb);
     ui_menu_add_entry(menu, "原始熵", simulator_loaded_menu_noop_cb);
     ui_menu_add_entry(menu, "密码短语", simulator_loaded_menu_noop_cb);
@@ -854,6 +873,80 @@ static int capture_loaded_mnemonic_menu_screen(const char *dir) {
     int failures = write_screen_bmp(path);
     ui_menu_destroy(menu);
     return failures;
+}
+
+static int capture_punch_grid_screen(const char *dir) {
+    if (mkdir(dir, 0700) != 0 && errno != EEXIST) {
+        perror(dir);
+        return 1;
+    }
+
+    lv_obj_clean(lv_screen_active());
+    mnemonic_grid_page_create(lv_screen_active(), simulator_loaded_menu_noop_cb);
+    mnemonic_grid_page_show();
+    run_lvgl_frames(5);
+
+    int failures = 0;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/punch_grid.bmp", dir);
+    if (write_screen_bmp(path) != 0) {
+        failures++;
+    } else {
+        printf("screenshot: %s\n", path);
+    }
+
+    lv_obj_update_layout(lv_screen_active());
+    lv_obj_t *scroll_obj = find_scrollable_object_recursive(lv_screen_active());
+    if (scroll_obj) {
+        int32_t target_y =
+            lv_obj_get_scroll_y(scroll_obj) + lv_obj_get_scroll_bottom(scroll_obj);
+        lv_obj_scroll_to_y(scroll_obj, target_y, LV_ANIM_OFF);
+        run_lvgl_frames(3);
+
+        char bottom_path[512];
+        snprintf(bottom_path, sizeof(bottom_path), "%s/punch_grid_bottom.bmp", dir);
+        if (write_screen_bmp(bottom_path) != 0) {
+            failures++;
+        } else {
+            printf("screenshot: %s\n", bottom_path);
+        }
+    }
+
+    mnemonic_grid_page_destroy();
+    lv_obj_clean(lv_screen_active());
+
+    mnemonic_grid_numbers_page_create(lv_screen_active(),
+                                      simulator_loaded_menu_noop_cb);
+    mnemonic_grid_numbers_page_show();
+    run_lvgl_frames(5);
+
+    snprintf(path, sizeof(path), "%s/punch_numbers.bmp", dir);
+    if (write_screen_bmp(path) != 0) {
+        failures++;
+    } else {
+        printf("screenshot: %s\n", path);
+    }
+
+    lv_obj_update_layout(lv_screen_active());
+    scroll_obj = find_scrollable_object_recursive(lv_screen_active());
+    if (scroll_obj) {
+        int32_t target_y =
+            lv_obj_get_scroll_y(scroll_obj) + lv_obj_get_scroll_bottom(scroll_obj);
+        lv_obj_scroll_to_y(scroll_obj, target_y, LV_ANIM_OFF);
+        run_lvgl_frames(3);
+
+        char bottom_path[512];
+        snprintf(bottom_path, sizeof(bottom_path), "%s/punch_numbers_bottom.bmp",
+                 dir);
+        if (write_screen_bmp(bottom_path) != 0) {
+            failures++;
+        } else {
+            printf("screenshot: %s\n", bottom_path);
+        }
+    }
+
+    mnemonic_grid_numbers_page_destroy();
+    return failures == 0 ? 0 : 1;
 }
 
 static int capture_signer_shell_screens(const char *dir) {
@@ -1142,6 +1235,7 @@ static void print_usage(const char *prog) {
     printf("  -C, --custom-derivation-dir <path>  Capture derivation source/detail BMPs\n");
     printf("  -M, --mnemonic-slots-dir <path> Capture mnemonic slot picker BMP\n");
     printf("  -L, --loaded-menu-dir <path> Capture loaded mnemonic menu BMP\n");
+    printf("  -G, --punch-grid-dir <path> Capture real punch-grid backup BMP\n");
     printf("  -N, --word-count-dir <path> Capture word-count picker BMP\n");
     printf("  -R, --web3-review-dir <path> Capture Web3 confirm fixture BMPs\n");
     printf("  -w, --webcam [device]   Use webcam (default: /dev/video0)\n");
@@ -1182,6 +1276,7 @@ int main(int argc, char *argv[]) {
         { "custom-derivation-dir", required_argument, NULL, 'C' },
         { "mnemonic-slots-dir", required_argument, NULL, 'M' },
         { "loaded-menu-dir", required_argument, NULL, 'L' },
+        { "punch-grid-dir", required_argument, NULL, 'G' },
         { "word-count-dir", required_argument, NULL, 'N' },
         { "web3-review-dir", required_argument, NULL, 'R' },
         { "webcam",   optional_argument, NULL, 'w' },
@@ -1196,11 +1291,12 @@ int main(int argc, char *argv[]) {
     const char *custom_derivation_dir = NULL;
     const char *mnemonic_slots_dir = NULL;
     const char *loaded_menu_dir = NULL;
+    const char *punch_grid_dir = NULL;
     const char *word_count_dir = NULL;
     const char *web3_review_dir = NULL;
     const char *language_code = NULL;
     int opt;
-    while ((opt = getopt_long(argc, argv, "q:Q:d:W:H:S:B:C:M:L:N:R:w::vh", long_opts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "q:Q:d:W:H:S:B:C:M:L:G:N:R:w::vh", long_opts, NULL)) != -1) {
         switch (opt) {
             case 'q':
                 sim_video_set_qr_image(optarg);
@@ -1239,6 +1335,9 @@ int main(int argc, char *argv[]) {
             case 'L':
                 loaded_menu_dir = optarg;
                 break;
+            case 'G':
+                punch_grid_dir = optarg;
+                break;
             case 'N':
                 word_count_dir = optarg;
                 break;
@@ -1261,6 +1360,7 @@ int main(int argc, char *argv[]) {
                     " [--btc-review-dir DIR]"
                     " [--custom-derivation-dir DIR] [--mnemonic-slots-dir DIR]"
                     " [--loaded-menu-dir DIR]"
+                    " [--punch-grid-dir DIR]"
                     " [--word-count-dir DIR]"
                     " [--web3-review-dir DIR]"
                     " [--language CODE]"
@@ -1332,6 +1432,8 @@ int main(int argc, char *argv[]) {
         return capture_mnemonic_slots_screen(mnemonic_slots_dir);
     if (loaded_menu_dir)
         return capture_loaded_mnemonic_menu_screen(loaded_menu_dir);
+    if (punch_grid_dir)
+        return capture_punch_grid_screen(punch_grid_dir);
     if (word_count_dir)
         return capture_word_count_screen(word_count_dir);
     if (web3_review_dir)

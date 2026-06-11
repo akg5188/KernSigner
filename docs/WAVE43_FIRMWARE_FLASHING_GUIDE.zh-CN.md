@@ -16,6 +16,13 @@ kernsigner.bin -> 0x20000
 
 只有空白板、bootloader 损坏、分区表变化、或者需要完整恢复时，才用完整包里的 4 个 bin。
 
+重要区别：
+
+- 只刷 `kernsigner.bin`：只更新主固件 App，不会改 bootloader。
+- 完整刷机 4 个 bin：同时写入 bootloader、分区表、OTA 初始化数据和主固件。
+- 如果设备以前已经刷过带无线关闭 hook 的 bootloader，只刷 `kernsigner.bin` 会保留原来的 bootloader hook。
+- 如果设备刚从原厂固件回来、bootloader 被覆盖、或者要确认 bootloader 级无线关闭也写进去，用完整刷机 4 个 bin。
+
 ## 你要下载哪个文件
 
 到 GitHub Release 页面下载：
@@ -86,6 +93,9 @@ python -m esptool --chip esp32p4 -p COM3 -b 460800 --before default_reset --afte
 
 刷完会自动复位。开机后看到 KernSigner 界面，就说明主固件刷进去了。
 
+注意：这个方式不会更新 bootloader。如果你只是日常升级已配置好的 KernSigner
+设备，这是推荐方式；如果你需要把 bootloader 里的无线关闭 hook 也重新写入，请用下面的完整刷机。
+
 ## 完整刷机：只有需要时才用
 
 完整刷机需要 zip 里的 4 个 bin：
@@ -110,6 +120,9 @@ python -m esptool --chip esp32p4 -p COM3 -b 460800 --before default_reset --afte
 ```
 
 不确定时，优先用“日常升级”方式，只刷 `kernsigner.bin`。
+
+但如果你刚刷回过原厂固件，或者不确定当前 bootloader 是否包含无线关闭 hook，
+就不要只刷 app；用完整刷机把 bootloader 一起刷回 KernSigner 版本。
 
 ## 从源码编译后刷机
 

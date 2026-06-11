@@ -253,6 +253,8 @@ void loaded_mnemonic_menu_page_create(lv_obj_t *parent, void (*return_cb)(void))
                       custom_derivation_cb);
   }
   if (key_mnemonic_is_valid()) {
+    ui_menu_add_entry(loaded_menu, i18n_tr_or("menu.backup", "Backup"),
+                      backup_cb);
     ui_menu_add_entry(loaded_menu,
                       i18n_tr_or("backup.word_indexes", "Word indexes"),
                       words_cb);
@@ -276,10 +278,6 @@ void loaded_mnemonic_menu_page_create(lv_obj_t *parent, void (*return_cb)(void))
                     i18n_tr_or("input.mnemonic_encryption",
                                "Mnemonic Encryption"),
                     secondary_shift_cb);
-  if (key_can_backup_mnemonic())
-    ui_menu_add_entry(loaded_menu,
-                      i18n_tr_or("backup.export_backup", "Export Backup"),
-                      backup_cb);
 
   ui_menu_apply_compact_grid(loaded_menu);
 }

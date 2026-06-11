@@ -28,10 +28,10 @@ Final tested app image:
 
 ```text
 build_wave_43_fresh/kernsigner.bin
-SHA256: b3c2ae395714bd9b80514f738bffd88418bda8fd7746866267978857751c44ba
-Size: 0x3b3750
+SHA256: 4d023540566e76b33158ca8533083672e3bd683ffc74e805153414f1f09536a8
+Size: 0x3bc300
 Smallest app partition: 0x400000
-Free: 0x4c8b0
+Free: 0x43d00
 ```
 
 Evidence files:
@@ -47,6 +47,19 @@ Evidence files:
 - Kept old internal `smartcard_seedkeeper_save_password` route as a compatibility alias to `smartcard_seedkeeper_save_secret`.
 - SeedKeeper mnemonic headers now use the same mnemonic fingerprint path as the rest of the firmware.
 
+## 2026-06-11 Wave43 Update
+
+- Added the loaded-mnemonic backup entry back to the loaded mnemonic menu and
+  routed newly created/loaded mnemonics there after confirmation.
+- Added a high-contrast black/yellow punch-grid backup view.
+- Added a separate `Punch Numbers` / `打孔数字` backup view. Each row shows the
+  mnemonic position and only the punch weights to mark, such as `01 0`,
+  `04 1 2`, or `12 1 2 4 8 16 32 64 128 256 512`. It does not show mnemonic
+  words and does not show the 0-2047 word index.
+- The punch-number view uses larger rows and automatically wraps long punch
+  weight lists instead of squeezing them into one small line.
+- Verified by simulator menu acceptance and flashed on `/dev/ttyACM0`.
+
 ## Mnemonic Fingerprint Policy
 
 Mnemonic fingerprint display is based on:
@@ -57,6 +70,20 @@ BIP39 mnemonic -> seed with empty passphrase -> BIP32 master fingerprint
 
 This is intended to keep the same mnemonic fingerprint stable across KernSigner
 views and compatible wallet checks that use the same BIP39/BIP32 convention.
+
+## WiFi 和蓝牙关闭处理
+
+本固件用于 Wave43 的极端无线关闭方案：
+
+- ESP32-C6 wireless companion 在 bootloader 启动早期即通过 GPIO54 保持 disabled。
+- bootloader hook 和主固件 App 都包含无线关闭处理。
+- 主固件不启用 WiFi / 蓝牙连接功能。
+- PN532 已禁用，NFC 默认使用 PN5180。
+- 这是“不改硬件、不启用 Secure Boot + Flash Encryption”前提下的固件级极端关闭方案。
+
+注意：如果只刷 `kernsigner.bin`，只会更新主固件 App；如需确保
+bootloader 级无线关闭也写入设备，请使用完整刷机包刷入 `bootloader.bin`、
+`partition-table.bin`、`ota_data_initial.bin` 和 `kernsigner.bin`。
 
 ## Production Gate
 
