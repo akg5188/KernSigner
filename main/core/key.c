@@ -241,6 +241,7 @@ void key_unload(void) {
   SECURE_FREE_STRING(source_material_label);
   SECURE_FREE_STRING(source_material_text);
   SECURE_FREE_STRING(session_passphrase);
+  key_clear_pending_source_material();
   secure_memzero(fingerprint, sizeof(fingerprint));
   key_loaded = false;
   signing_key_loaded = false;
@@ -610,11 +611,29 @@ bool key_get_derived_key(const char *path, struct ext_key **key_out) {
     return false;
   }
 
+  *key_out = NULL;
+
   uint32_t path_indices[10];
   size_t path_depth = 0;
 
   if (!parse_derivation_path(path, path_indices, &path_depth, 10)) {
     return false;
+  }
+
+  /*
+   * libwally requires at least one child for its parent-path derivation
+   * helper.  "m" is the current root, so make an independent copy instead
+   * of trying to derive an empty path.
+   */
+  if (path_depth == 0) {
+    int ret = bip32_key_init_alloc(
+        master_key->version, master_key->depth, master_key->child_num,
+        master_key->chain_code, sizeof(master_key->chain_code),
+        master_key->pub_key, sizeof(master_key->pub_key),
+        master_key->priv_key + 1, sizeof(master_key->priv_key) - 1,
+        master_key->hash160, sizeof(master_key->hash160),
+        master_key->parent160, sizeof(master_key->parent160), key_out);
+    return ret == WALLY_OK;
   }
 
   int ret = bip32_key_from_parent_path_alloc(

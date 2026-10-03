@@ -3703,11 +3703,30 @@ static bool web3_sign_with_mnemonic(void) {
     return false;
   }
 
+  /*
+   * libwally's recoverable ECDSA layout is:
+   *   [header][r (32 bytes)][s (32 bytes)]
+   * where header = 27 + recovery_id + 4 for compressed keys.
+   * eth-signature expects [r][s][recovery_id], so split it first.
+   */
+  uint8_t compact_sig[EC_SIGNATURE_LEN];
+  memcpy(compact_sig, recoverable_sig + 1, sizeof(compact_sig));
+  if (recoverable_sig[0] < 31 || recoverable_sig[0] > 34) {
+    secure_memzero(compact_sig, sizeof(compact_sig));
+    secure_memzero(recoverable_sig, sizeof(recoverable_sig));
+    dialog_show_error(scan_tr("scan.signature_result_encode_failed",
+                              "Signature result encoding failed"),
+                      web3_show_request_summary, 0);
+    return false;
+  }
+  uint8_t recovery_id = (uint8_t)((recoverable_sig[0] - 31U) & 3U);
+
   uint8_t signature[72];
   size_t signature_len = 0;
-  if (!web3_compose_signature_bytes(&pending_web3_request, recoverable_sig,
-                                    recoverable_sig[64], signature,
+  if (!web3_compose_signature_bytes(&pending_web3_request, compact_sig,
+                                    recovery_id, signature,
                                     &signature_len)) {
+    secure_memzero(compact_sig, sizeof(compact_sig));
     secure_memzero(recoverable_sig, sizeof(recoverable_sig));
     dialog_show_error(scan_tr("scan.signature_result_encode_failed",
                               "Signature result encoding failed"),
@@ -3718,6 +3737,7 @@ static bool web3_sign_with_mnemonic(void) {
   char *response_ur = NULL;
   bool ok = web3_build_eth_signature_ur(&pending_web3_request, signature,
                                         signature_len, &response_ur);
+  secure_memzero(compact_sig, sizeof(compact_sig));
   secure_memzero(signature, sizeof(signature));
   secure_memzero(recoverable_sig, sizeof(recoverable_sig));
   if (!ok || !response_ur) {

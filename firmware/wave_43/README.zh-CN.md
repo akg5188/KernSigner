@@ -1,5 +1,7 @@
 # KernSigner 4.3 寸开发板固件
 
+**历史测试固件：**本目录是较早的镜像，不对应当前源码。2026-10-03 已刷入且可逐字节重建的版本见 [新版测试固件](../wave_43_20261003/README.zh-CN.md)。
+
 适用硬件：
 
 - Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3
@@ -67,29 +69,12 @@ Get-FileHash .\kernsigner-wave43-0.0.7-rc1-untested-full.bin -Algorithm SHA256
 完整固件 SHA256：
 
 ```text
-c31bb74caed08a17313ae0693c2b3a17e09cb3e0f9a2ae7cb7616df3622a282a
+cda073a2cc766bc34cd9b9dc1aa75eb6164fb9e582ba35113b8ea9cb2889c3be
 ```
 
-## 编译同样固件
+## 历史镜像与源码
 
-如果要从源码编译，使用 ESP-IDF v5.5.4：
-
-```bash
-git clone --recursive https://github.com/akg5188/KernSigner.git
-cd KernSigner
-. /home/ak/esp-idf-v5.5.4/export.sh
-idf.py -B build_wave_43_fresh \
-  -D SDKCONFIG=build_wave_43_fresh/sdkconfig \
-  -D 'SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.defaults.wave_43' \
-  build
-sha256sum build_wave_43_fresh/kernsigner.bin
-```
-
-正常情况下，`build_wave_43_fresh/kernsigner.bin` 应该和 app 固件 SHA256 一致：
-
-```text
-bd50d526089b13d7af360e0ef4514b5e961564138452bb2c5a028f6132dac502
-```
+当前仓库源码已更新，不能再用它复现本目录的历史镜像。要重建并验证当前刷入的版本，请使用 [2026-10-03 构建记录](../../docs/REPRODUCIBLE_BUILD.md)；历史镜像的实际 SHA256 以本目录 `SHA256SUMS.txt` 为准。
 
 ## 注意
 

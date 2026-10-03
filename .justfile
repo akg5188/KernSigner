@@ -1,4 +1,4 @@
-export IDF_PATH := env_var("HOME") + "/esp/esp-idf"
+export IDF_PATH := env_var_or_default("IDF_PATH", env_var("HOME") + "/esp-idf-v5.5.4")
 export IDF_PATH_FORCE := "1"
 
 # Board parameter: "wave_4b" (default), "wave_35", "wave_5", or "wave_43"

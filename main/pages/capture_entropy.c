@@ -530,6 +530,8 @@ void capture_entropy_page_destroy(void) {
   dialog_showing = false;
   active_frame_ops = 0;
   video_stream_stopped_for_destroy = false;
+  entropy_captured = false;
+  secure_memzero(captured_entropy, sizeof(captured_entropy));
 }
 
 bool capture_entropy_get_hash(uint8_t *hash_out) {

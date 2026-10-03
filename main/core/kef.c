@@ -551,6 +551,8 @@ kef_error_t kef_decrypt(const uint8_t *envelope, size_t env_len,
   /* --- Validate -------------------------------------------------- */
   if (!envelope || env_len == 0 || !password || pw_len == 0 || !out || !out_len)
     return KEF_ERR_INVALID_ARG;
+  if (env_len > KEF_MAX_ENVELOPE_LEN)
+    return KEF_ERR_LIMIT;
 
   /* --- Parse header ---------------------------------------------- */
   const uint8_t *id;
@@ -561,6 +563,8 @@ kef_error_t kef_decrypt(const uint8_t *envelope, size_t env_len,
       kef_parse_header(envelope, env_len, &id, &id_len, &version, &iterations);
   if (err != KEF_OK)
     return err;
+  if (iterations == 0 || iterations > KEF_MAX_PBKDF2_ITERATIONS)
+    return KEF_ERR_LIMIT;
 
   const kef_version_info_t *vi = find_version(version);
   if (!vi)
@@ -793,6 +797,9 @@ const char *kef_error_str(kef_error_t err) {
   case KEF_ERR_DUPLICATE_BLOCKS:
     return i18n_tr_or("kef.duplicate_encrypted_blocks",
                       "Duplicate encrypted blocks detected");
+  case KEF_ERR_LIMIT:
+    return i18n_tr_or("kef.resource_limit",
+                      "Encrypted file exceeds a safety limit");
   }
   return i18n_tr_or("kef.unknown_error", "Unknown error");
 }

@@ -37,6 +37,10 @@
 /* Maximum ID length (stored in 1 byte) */
 #define KEF_MAX_ID_LEN 255
 
+/* Resource limits enforced before expensive decryption work. */
+#define KEF_MAX_ENVELOPE_LEN (64U * 1024U)
+#define KEF_MAX_PBKDF2_ITERATIONS 1000000U
+
 /* Iteration encoding threshold */
 #define KEF_ITER_THRESHOLD 10000
 
@@ -51,6 +55,7 @@ typedef enum {
   KEF_ERR_DECOMPRESS = -7,
   KEF_ERR_ENVELOPE_TOO_SHORT = -8,
   KEF_ERR_DUPLICATE_BLOCKS = -9,
+  KEF_ERR_LIMIT = -10,
 } kef_error_t;
 
 /*

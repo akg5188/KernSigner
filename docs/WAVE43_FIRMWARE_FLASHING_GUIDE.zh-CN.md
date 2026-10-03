@@ -4,6 +4,8 @@
 
 适用设备：Waveshare ESP32-P4-WiFi6-Touch-LCD-4.3
 
+**当前测试固件（2026-10-03）：**请使用 [本次验证的固件及校验文件](../firmware/wave_43_20261003/README.zh-CN.md)。下文的发布包名称和日期属于旧版教程；旧目录 `firmware/wave_43/` 不对应当前源码。
+
 这份文档只讲“怎么把 GitHub Release 下载的固件刷进开发板”。日常升级通常只需要刷一个文件：`kernsigner.bin`。
 
 ## 先看结论

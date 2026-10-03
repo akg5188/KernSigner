@@ -1,8 +1,8 @@
-94de85681944debb95a0f5730d17ec364ecf16a93a9b3678e2e2c2b57b00841c  ./README.zh-CN.md
+e1e4c9a830532a214d6bfb8f99f65995703e9f5128c0c670226c8c412e08469b  ./README.zh-CN.md
 b32138c9f73c1641d65a6c9296d1460276967543d7f574c9b4bf0cebcfd07081  ./bootloader.bin
 8c442c1fbfa016c10c4160ad3df2fd6f293ca70105cb8d36ce247acbd4d339ce  ./flash_args
 f361b70eda11fc399916cbeb7a35e6eef864590971ee5432ab0c2f3bdb54f725  ./flash_wave43_linux.sh
-ef6d12a75ea3cbee22bf4574c0092974297e0360e36d1396acc6d2a8ecbd4dd4  ./flash_wave43_windows.bat
+050333fc745efd04bc8a9abbd32dd301f25fad563e02f654bdf8d70c126c9c11  ./flash_wave43_windows.bat
 d7753a14cb59a58785e614d848cf72aedbc21bef11e256a1f955a85c1da9e872  ./flasher_args.json
 fa87f6d38e7e8f259c0c1065b286f6ae70dafd21e2d52bfa3c345628ea277aab  ./kernsigner-wave43-0.0.7-rc1-untested-app.bin
 cda073a2cc766bc34cd9b9dc1aa75eb6164fb9e582ba35113b8ea9cb2889c3be  ./kernsigner-wave43-0.0.7-rc1-untested-full.bin

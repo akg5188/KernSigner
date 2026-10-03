@@ -3,6 +3,7 @@ build/
 build_wave_35/
 build_wave_4b/
 build_wave_43/
+build_wave_43_*/
 build_wave_43_fresh/
 build_wave_43_radio_off/
 build_high_value_wave_43/
@@ -51,6 +52,7 @@ main/core/test/test_custom_derivation
 main/core/test/test_btc_derivation
 main/core/test/test_message_sign
 main/core/test/test_mnemonic_tools
+main/core/test/test_bip85_key
 main/core/test/test_qr_relay_parser
 main/core/test/combined.o
 main/core/test/libwally.a

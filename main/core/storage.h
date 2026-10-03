@@ -56,9 +56,10 @@ esp_err_t storage_save_mnemonic(storage_location_t loc, const char *id,
                                 const uint8_t *kef_envelope, size_t len);
 
 /**
- * Load a mnemonic file. Flash: raw binary. SD: base64-decoded.
+ * Load a mnemonic file from the SD card. Mnemonics are never read from flash
+ * in stateless mode.
  *
- * @param loc              Flash or SD card
+ * @param loc              Must be STORAGE_SD
  * @param filename         Filename (e.g. "m_73C5DA0A.kef")
  * @param kef_envelope_out Receives heap-allocated binary KEF envelope
  * @param len_out          Receives length
@@ -67,9 +68,9 @@ esp_err_t storage_load_mnemonic(storage_location_t loc, const char *filename,
                                 uint8_t **kef_envelope_out, size_t *len_out);
 
 /**
- * List stored mnemonic files.
+ * List stored mnemonic files on the SD card.
  *
- * @param loc            Flash or SD card
+ * @param loc            Must be STORAGE_SD
  * @param filenames_out  Receives array of filename strings (caller frees
  *                       with storage_free_file_list)
  * @param count_out      Receives count
@@ -78,7 +79,10 @@ esp_err_t storage_list_mnemonics(storage_location_t loc, char ***filenames_out,
                                  int *count_out);
 
 /**
- * Delete a stored mnemonic file.
+ * Delete a stored mnemonic file from the SD card.
+ *
+ * @param loc       Must be STORAGE_SD
+ * @param filename  Filename to delete
  */
 esp_err_t storage_delete_mnemonic(storage_location_t loc, const char *filename);
 
@@ -90,7 +94,9 @@ esp_err_t storage_delete_mnemonic(storage_location_t loc, const char *filename);
 esp_err_t storage_wipe_flash(void);
 
 /**
- * Check if a mnemonic with the given ID already exists.
+ * Check if a mnemonic with the given ID already exists on the SD card.
+ *
+ * STORAGE_FLASH always returns false.
  */
 bool storage_mnemonic_exists(storage_location_t loc, const char *id);
 

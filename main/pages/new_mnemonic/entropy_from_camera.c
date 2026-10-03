@@ -15,9 +15,6 @@
 
 #include "../../utils/secure_mem.h"
 
-#define ENTROPY_12_WORDS 16
-#define ENTROPY_24_WORDS 32
-
 static lv_obj_t *entropy_screen = NULL;
 static lv_obj_t *hash_container = NULL;
 static lv_obj_t *proceed_btn = NULL;
@@ -38,6 +35,23 @@ static void back_cb(void);
 static void return_from_capture_cb(void);
 static void proceed_cb(lv_event_t *e);
 static void hash_back_cb(lv_event_t *e);
+
+static size_t entropy_len_for_word_count(int word_count) {
+  switch (word_count) {
+  case 12:
+    return 16;
+  case 15:
+    return 20;
+  case 18:
+    return 24;
+  case 21:
+    return 28;
+  case 24:
+    return 32;
+  default:
+    return 0;
+  }
+}
 
 static void cleanup_ui(void) {
   if (hash_container) {
@@ -107,15 +121,31 @@ static void show_hash_display(void) {
   theme_apply_transparent_container(hash_container);
   lv_obj_clear_flag(hash_container, LV_OBJ_FLAG_SCROLLABLE);
 
-  char display_text[128];
-  char hex_hash[65];
-  for (int i = 0; i < 32; i++) {
-    snprintf(hex_hash + i * 2, 3, "%02x", entropy_hash[i]);
+  char display_text[192];
+  char entropy_hex[128];
+  char entropy_bits[48];
+  size_t entropy_len = entropy_len_for_word_count(total_words);
+  if (entropy_len == 0) {
+    create_word_count_menu();
+    return;
   }
+
+  size_t pos = 0;
+  for (size_t i = 0; i < entropy_len && pos + 4 < sizeof(entropy_hex); i++) {
+    if (i > 0) {
+      entropy_hex[pos++] = (i % 8 == 0) ? '\n' : ' ';
+    }
+    pos += (size_t)snprintf(entropy_hex + pos, sizeof(entropy_hex) - pos,
+                            "%02x", entropy_hash[i]);
+  }
+  entropy_hex[pos] = '\0';
+
+  snprintf(entropy_bits, sizeof(entropy_bits),
+           i18n_tr_or("backup.entropy_bits_format", "Entropy: %u bits"),
+           (unsigned)(entropy_len * 8));
   snprintf(display_text, sizeof(display_text),
-           i18n_tr_or("input.snapshot_sha256_format",
-                      "Snapshot SHA256:\n%s"),
-           hex_hash);
+           "%s\n%s\n%s", i18n_tr_or("wallet.raw_entropy", "Raw entropy"),
+           entropy_bits, entropy_hex);
 
   lv_obj_t *hash_label = lv_label_create(hash_container);
   lv_label_set_text(hash_label, display_text);
@@ -124,6 +154,10 @@ static void show_hash_display(void) {
   lv_obj_set_style_text_align(hash_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_set_style_text_color(hash_label, highlight_color(), 0);
   lv_obj_set_style_text_font(hash_label, theme_font_small(), 0);
+
+  secure_memzero(display_text, sizeof(display_text));
+  secure_memzero(entropy_hex, sizeof(entropy_hex));
+  secure_memzero(entropy_bits, sizeof(entropy_bits));
 
   proceed_btn = theme_create_button(entropy_screen,
                                     i18n_tr_or("common.continue", "Continue"),
@@ -147,8 +181,13 @@ static void hash_back_cb(lv_event_t *e) {
 static void proceed_cb(lv_event_t *e) {
   (void)e;
 
-  size_t entropy_len =
-      (total_words == 12) ? ENTROPY_12_WORDS : ENTROPY_24_WORDS;
+  size_t entropy_len = entropy_len_for_word_count(total_words);
+  if (entropy_len == 0) {
+    dialog_show_error(i18n_tr_or("wallet.mnemonic_generation_failed",
+                                 "Mnemonic generation failed"),
+                      NULL, 0);
+    return;
+  }
 
   char *mnemonic = NULL;
   if (bip39_mnemonic_from_bytes(NULL, entropy_hash, entropy_len, &mnemonic) !=

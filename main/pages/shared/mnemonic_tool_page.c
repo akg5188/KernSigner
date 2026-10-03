@@ -17,6 +17,7 @@
 #define TOOL_TEXT_MAX 768
 #define MAX_INDEX_WORDS 24
 #define TOOL_INPUT_TEXT_MAX 768
+#define BIP85_MAX_INDEX UINT32_C(0x7fffffff)
 #define BINARY_BTN_0 0
 #define BINARY_BTN_1 1
 #define BINARY_BTN_DELETE 5
@@ -397,6 +398,33 @@ static int count_number_tokens(const char *text) {
   return count;
 }
 
+static bool parse_bip85_index(const char *text, uint32_t *out) {
+  if (!text || !out)
+    return false;
+
+  while (isspace((unsigned char)*text))
+    text++;
+  if (!isdigit((unsigned char)*text))
+    return false;
+
+  uint32_t value = 0;
+  do {
+    uint32_t digit = (uint32_t)(*text - '0');
+    if (value > (BIP85_MAX_INDEX - digit) / 10U)
+      return false;
+    value = value * 10U + digit;
+    text++;
+  } while (isdigit((unsigned char)*text));
+
+  while (isspace((unsigned char)*text))
+    text++;
+  if (*text != '\0')
+    return false;
+
+  *out = value;
+  return true;
+}
+
 static bool is_secondary_shift_mode(mnemonic_tool_mode_t mode) {
   return mode == MNEMONIC_TOOL_SECONDARY_SHIFT ||
          mode == MNEMONIC_TOOL_SECONDARY_ADD ||
@@ -719,8 +747,10 @@ static bool tool_input_ready_to_finish(void) {
   case MNEMONIC_TOOL_INDEX_IMPORT:
   case MNEMONIC_TOOL_STEEL_RESTORE:
     return count_number_tokens(text) == selected_words;
-  case MNEMONIC_TOOL_BIP85_MNEMONIC:
-    return count_number_tokens(text) > 0;
+  case MNEMONIC_TOOL_BIP85_MNEMONIC: {
+    uint32_t index = 0;
+    return parse_bip85_index(text, &index);
+  }
   case MNEMONIC_TOOL_SECONDARY_SHIFT:
   case MNEMONIC_TOOL_SECONDARY_ADD:
   case MNEMONIC_TOOL_SECONDARY_SUB:
@@ -799,7 +829,8 @@ static void tool_update_count(void) {
       break;
     case MNEMONIC_TOOL_BIP85_MNEMONIC:
       snprintf(status, sizeof(status), "%s",
-               i18n_tr_or("input.child_index", "Child index"));
+               i18n_tr_or("input.bip85_index_hint",
+                          "BIP85 index: 0-2147483647"));
       break;
     case MNEMONIC_TOOL_SECONDARY_SHIFT:
     case MNEMONIC_TOOL_SECONDARY_ADD:
@@ -974,6 +1005,9 @@ static const char *placeholder_for_mode(void) {
   case MNEMONIC_TOOL_SECONDARY_SUB:
     return i18n_tr_or("input.shift_placeholder",
                       "+N / -N, separated by spaces");
+  case MNEMONIC_TOOL_BIP85_MNEMONIC:
+    return i18n_tr_or("input.bip85_index_placeholder",
+                      "Enter one BIP85 index: 0-2147483647");
   default:
     return i18n_tr_or("input.index_placeholder_text", "0-2047 indexes");
   }
@@ -1095,7 +1129,7 @@ static void input_ready_cb(lv_event_t *e) {
     break;
   case MNEMONIC_TOOL_BIP85_MNEMONIC: {
     uint32_t index = 0;
-    if (mnemonic_tools_parse_uint32(text, &index))
+    if (parse_bip85_index(text, &index))
       mnemonic = mnemonic_tools_bip85_child((uint32_t)selected_words, index);
     break;
   }

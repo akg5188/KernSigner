@@ -22,6 +22,8 @@ This repository was largely assembled with AI assistance. It is still unfinished
 
 The current tree is a **test-funds validation build**, not an audited production wallet. It contains real wallet paths and Satochip/Web3 work, but production use with mainnet funds requires the security gates and real-device acceptance checks in `docs/` to pass.
 
+**2026-10-03 Wave43 测试固件：**[已刷入并校验的镜像、刷写地址和 SHA256](firmware/wave_43_20261003/README.zh-CN.md)。[可复现构建步骤](docs/REPRODUCIBLE_BUILD.md)。`firmware/wave_43/` 是历史测试镜像，不对应当前源码；新版仍未完成全功能真机验收，也不能用于真实资产。
+
 ## 当前实测状态 / 首页必看
 
 当前真机主线已经切到 **PN5180 NFC**。连接钱包、签名、读状态、读公钥、SeedKeeper 操作都会先走 PN5180；USB CCID 只在 PN5180 硬件不可用时作为备用；PN532 不再参与主固件运行路径。你现在要接 NFC、测 Satochip / SeedKeeper，先看这几篇，不要再按旧 PN532 线乱接：
@@ -231,15 +233,14 @@ hardware/           3D printed case files, FreeCAD/OpenSCAD sources, and fit not
 
 ## Download Firmware / 直接下载固件
 
-Prebuilt firmware is included for beginners who only want to flash the supported board:
+The current Wave43 **test-only** image is the [2026-10-03 firmware](firmware/wave_43_20261003/README.zh-CN.md):
 
-- Firmware notice: [docs/UNTESTED_FIRMWARE_NOTICE.md](docs/UNTESTED_FIRMWARE_NOTICE.md)
-- Full one-file firmware: [firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin](firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin)
-- App-only firmware: [firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin](firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-app.bin)
-- Beginner flashing guide: [firmware/wave_43/README.zh-CN.md](firmware/wave_43/README.zh-CN.md)
-- SHA256 checksums: [firmware/wave_43/SHA256SUMS.txt](firmware/wave_43/SHA256SUMS.txt)
+- Full one-file image: [kernsigner-full.bin](firmware/wave_43_20261003/kernsigner-full.bin) at `0x0`.
+- App-only image: [kernsigner.bin](firmware/wave_43_20261003/kernsigner.bin) at `0x20000`.
+- [Checksums](firmware/wave_43_20261003/SHA256SUMS.txt) and [build verification](docs/REPRODUCIBLE_BUILD.md).
+- [Older test firmware](firmware/wave_43/README.zh-CN.md) is archived and does not correspond to the current source tree.
 
-For a first-time board or a board with unknown firmware, use the full firmware at offset `0x0`. If the board already runs this project and you only want to update the app, use the app-only firmware at offset `0x20000`.
+For a first-time board or a board with unknown firmware, use the full image at offset `0x0`. To update only the app, use `kernsigner.bin` at offset `0x20000`. Neither image has completed a production security audit.
 
 扫码提示：
 
@@ -376,24 +377,24 @@ Merged binary flashing:
 
 ```bash
 esptool --chip esp32p4 --baud 460800 write-flash 0x0 \
-  firmware/wave_43/kernsigner-wave43-0.0.7-rc1-untested-full.bin
+  firmware/wave_43_20261003/kernsigner-full.bin
 ```
 
 To preserve NVS data, flash individual binaries instead:
 
 ```bash
-cd firmware/wave_43
+cd firmware/wave_43_20261003
 esptool --chip esp32p4 --baud 460800 write-flash \
   0x2000 bootloader.bin \
   0x8000 partition-table.bin \
   0xf000 ota_data_initial.bin \
-  0x20000 kernsigner-wave43-0.0.7-rc1-untested-app.bin
+  0x20000 kernsigner.bin
 ```
 
 ## Documentation
 
 - [Documentation index](docs/README.md)
-- [Prebuilt firmware flashing guide](firmware/wave_43/README.zh-CN.md)
+- [Prebuilt firmware flashing guide](firmware/wave_43_20261003/README.zh-CN.md)
 - [Copy-and-follow complete user manual](docs/小白照抄完整使用手册.zh-CN.md)
 - [Screen menu and feature index](docs/功能菜单逐项索引.zh-CN.md)
 - [Copy-and-follow troubleshooting manual](docs/故障排查照抄手册.zh-CN.md)

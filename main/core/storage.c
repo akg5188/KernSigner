@@ -490,22 +490,34 @@ esp_err_t storage_save_mnemonic(storage_location_t loc, const char *id,
 
 esp_err_t storage_load_mnemonic(storage_location_t loc, const char *filename,
                                 uint8_t **kef_envelope_out, size_t *len_out) {
+  if (loc == STORAGE_FLASH)
+    return ESP_ERR_INVALID_ARG;
+
   return item_load_file(&mnemonic_config, loc, filename, kef_envelope_out,
                         len_out, loc == STORAGE_SD);
 }
 
 esp_err_t storage_list_mnemonics(storage_location_t loc, char ***filenames_out,
                                  int *count_out) {
+  if (loc == STORAGE_FLASH)
+    return ESP_ERR_INVALID_ARG;
+
   const char *exts[] = {STORAGE_MNEMONIC_EXT};
   return item_list(&mnemonic_config, loc, exts, 1, filenames_out, count_out);
 }
 
 esp_err_t storage_delete_mnemonic(storage_location_t loc,
                                   const char *filename) {
+  if (loc == STORAGE_FLASH)
+    return ESP_ERR_INVALID_ARG;
+
   return item_delete(&mnemonic_config, loc, filename);
 }
 
 bool storage_mnemonic_exists(storage_location_t loc, const char *id) {
+  if (loc == STORAGE_FLASH)
+    return false;
+
   return item_exists(&mnemonic_config, loc, id, STORAGE_MNEMONIC_EXT);
 }
 
