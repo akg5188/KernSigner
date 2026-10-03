@@ -6,6 +6,16 @@ The current **test-only** firmware is in [`firmware/wave_43_20261003/`](../firmw
 
 The 2026-10-03 firmware was fully erased and flashed to an ESP32-P4 Wave43 board. Esptool verified all four writes; a boot log confirmed the factory app at `0x20000`, display initialization and GT911 touch initialization. This does not establish safety for real funds or validate all wallet workflows.
 
+To reproduce this exact image from the repository homepage, run
+`bash scripts/rebuild_verified_wave43.sh` after installing ESP-IDF v5.5.4.
+The script checks out the pinned source commit
+`1b4bd14f6e6701cfee884e95bf21176f9a500233` into a separate ignored
+worktree, builds with the pinned environment, compares all four images, and
+runs the tests. It stops with a nonzero exit status if any check fails. It
+never flashes the board. Use an optional new directory argument to keep
+multiple attempts (for example, `bash scripts/rebuild_verified_wave43.sh
+build_wave_43_verified_2`). The original working tree is not modified.
+
 Build inputs:
 
 - ESP-IDF v5.5.4, local commit `735507283d5b2f9fb363a1901172dbd9e847945d` (the local checkout had only unrelated example-file modifications).
@@ -14,11 +24,10 @@ Build inputs:
 - Committed `dependencies.lock`, recursive submodules, and the committed `main/ui/assets/signer_cn_20.c` and `signer_cn_28.c` assets. Do not update dependencies or regenerate fonts while verifying this image.
 - The new, disabled `ESP_VIDEO_USE_CUSTOMIZED_ESP_H264_VERSION` Kconfig compatibility setting only permits a fresh ESP-IDF component-manager resolution; it does not alter the flashed firmware image.
 
-Check out the exact Git commit that first includes
-`firmware/wave_43_20261003/` (find it in that directory's Git history);
-a later `master` may produce different firmware. Use a clean working tree and
-ESP-IDF v5.5.4 for this verification. `just build wave_43` may reuse an older
-build directory, so use the fresh-build command below when comparing hashes.
+For manual verification, check out the pinned source commit above, not a later
+`master`. Use a clean working tree and ESP-IDF v5.5.4. `just build wave_43`
+may reuse an older build directory, so use the fresh-build command below
+when comparing hashes.
 
 From the repository root:
 
